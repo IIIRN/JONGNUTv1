@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { db } from '@/app/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
@@ -29,8 +29,7 @@ const AddOnCard = ({ addOn, isSelected, onToggle }) => (
     </div>
 );
 
-
-export default function ServiceDetailPage() {
+function ServiceDetailContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const serviceId = searchParams.get('id');
@@ -149,5 +148,13 @@ export default function ServiceDetailPage() {
                 </button>
             </div>
         </div>
+    );
+}
+
+export default function ServiceDetailPage() {
+    return (
+        <Suspense fallback={<div>Loading...</div>}>
+            <ServiceDetailContent />
+        </Suspense>
     );
 }
