@@ -13,7 +13,7 @@ const eslintConfig = [
   ...compat.extends("next/core-web-vitals"),
   {
     rules: {
-      // Add any specific rules you want to enforce or override here
+      // สามารถเพิ่มกฎ ESLint ที่ต้องการได้ที่นี่
     },
   },
 ];
