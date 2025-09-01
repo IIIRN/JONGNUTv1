@@ -18,7 +18,21 @@ export default function AdminSettingsPage() {
     const [settings, setSettings] = useState({
         reportRecipients: [],
     });
-    const [bookingSettings, setBookingSettings] = useState({ bufferHours: 0 });
+    const [bookingSettings, setBookingSettings] = useState({ 
+        bufferHours: 0,
+        useBeautician: false,
+        totalBeauticians: 1,
+        timeQueues: [],
+        weeklySchedule: {
+            0: { isOpen: true, openTime: '09:00', closeTime: '18:00' }, // อาทิตย์
+            1: { isOpen: true, openTime: '09:00', closeTime: '18:00' }, // จันทร์
+            2: { isOpen: true, openTime: '09:00', closeTime: '18:00' }, // อังคาร
+            3: { isOpen: true, openTime: '09:00', closeTime: '18:00' }, // พุธ
+            4: { isOpen: true, openTime: '09:00', closeTime: '18:00' }, // พฤหัสบดี
+            5: { isOpen: true, openTime: '09:00', closeTime: '18:00' }, // ศุกร์
+            6: { isOpen: true, openTime: '09:00', closeTime: '18:00' }, // เสาร์
+        }
+    });
     const [allAdmins, setAllAdmins] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
@@ -38,7 +52,22 @@ export default function AdminSettingsPage() {
                 const bookSettingsRef = doc(db, 'settings', 'booking');
                 const bookDocSnap = await getDoc(bookSettingsRef);
                 if (bookDocSnap.exists()) {
-                    setBookingSettings(prev => ({ ...prev, ...bookDocSnap.data() }));
+                    const data = bookDocSnap.data();
+                    // รวม weeklySchedule จากฐานข้อมูลกับค่าเริ่มต้น
+                    const defaultSchedule = {
+                        0: { isOpen: true, openTime: '09:00', closeTime: '18:00' },
+                        1: { isOpen: true, openTime: '09:00', closeTime: '18:00' },
+                        2: { isOpen: true, openTime: '09:00', closeTime: '18:00' },
+                        3: { isOpen: true, openTime: '09:00', closeTime: '18:00' },
+                        4: { isOpen: true, openTime: '09:00', closeTime: '18:00' },
+                        5: { isOpen: true, openTime: '09:00', closeTime: '18:00' },
+                        6: { isOpen: true, openTime: '09:00', closeTime: '18:00' },
+                    };
+                    setBookingSettings(prev => ({ 
+                        ...prev, 
+                        ...data,
+                        weeklySchedule: data.weeklySchedule ? { ...defaultSchedule, ...data.weeklySchedule } : defaultSchedule
+                    }));
                 }
 
                 const adminResult = await fetchAllAdmins();
@@ -70,10 +99,19 @@ export default function AdminSettingsPage() {
         });
     };
 
+
     const handleBookingSettingChange = (e) => {
         const { name, value } = e.target;
         setBookingSettings(prev => ({ ...prev, [name]: Number(value) }));
     };
+
+    // Whenever timeQueues changes, sync availableTimes to match timeQueues
+    useEffect(() => {
+        setBookingSettings(prev => ({
+            ...prev,
+            availableTimes: Array.isArray(prev.timeQueues) ? prev.timeQueues.map(q => q.time) : []
+        }));
+    }, [bookingSettings.timeQueues]);
 
     const handleSave = async () => {
         setIsSaving(true);
@@ -82,13 +120,15 @@ export default function AdminSettingsPage() {
             const notificationData = {
                 reportRecipients: settings.reportRecipients || []
             };
+
             const bookingData = {
                 bufferHours: bookingSettings.bufferHours || 0,
-                availableTimes: bookingSettings.availableTimes || [],
-                holidays: Array.isArray(bookingSettings.holidays) ? bookingSettings.holidays.map(Number) : [],
+                // availableTimes always sync with timeQueues
+                availableTimes: Array.isArray(bookingSettings.timeQueues) ? bookingSettings.timeQueues.map(q => q.time) : [],
                 timeQueues: bookingSettings.timeQueues || [],
                 useBeautician: !!bookingSettings.useBeautician,
                 totalBeauticians: bookingSettings.totalBeauticians || '',
+                weeklySchedule: bookingSettings.weeklySchedule || {},
             };
 
             const results = await Promise.all([
@@ -136,29 +176,75 @@ export default function AdminSettingsPage() {
             <h1 className="text-3xl font-bold text-slate-800 mb-6">ตั้งค่าระบบ</h1>
 
             <div className="max-w-2xl mx-auto space-y-6">
-                <SettingsCard title="ตั้งค่าช่วงเวลาและคิวสูงสุดต่อช่วง (ไม่กำหนดพนักงาน)">
-                    <div className="mb-4 flex items-center gap-3">
-                        <label className="text-sm font-medium text-gray-700">เปิดใช้งานตัวเลือกพนักงาน</label>
-                        <button
-                            type="button"
-                            className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors duration-200 ${bookingSettings.useBeautician ? 'bg-green-500' : 'bg-gray-300'}`}
-                            onClick={() => setBookingSettings(prev => ({ ...prev, useBeautician: !prev.useBeautician }))}
-                        >
-                            <span className={`h-4 w-4 bg-white rounded-full shadow transform transition-transform duration-200 ${bookingSettings.useBeautician ? 'translate-x-6' : ''}`}></span>
-                        </button>
-                        <span className="text-xs text-gray-500">{bookingSettings.useBeautician ? 'เปิด' : 'ปิด'}</span>
+                <SettingsCard title="โหมดการจอง">
+                    <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                        <h3 className="font-semibold text-blue-800 mb-3">เลือกโหมดการจอง</h3>
+                        <div className="space-y-3">
+                            <label className="flex items-center space-x-3 cursor-pointer">
+                                <input
+                                    type="radio"
+                                    name="bookingMode"
+                                    checked={!bookingSettings.useBeautician}
+                                    onChange={() => setBookingSettings(prev => ({ ...prev, useBeautician: false }))}
+                                    className="w-4 h-4 text-blue-600"
+                                />
+                                <div>
+                                    <div className="font-medium text-gray-900">โหมดคิวธรรมดา (ไม่เลือกช่าง)</div>
+                                    <div className="text-sm text-gray-600">ลูกค้าเลือกเฉพาะวันและเวลา ระบบจะจัดช่างให้อัตโนมัติ</div>
+                                </div>
+                            </label>
+                            <label className="flex items-center space-x-3 cursor-pointer">
+                                <input
+                                    type="radio"
+                                    name="bookingMode"
+                                    checked={bookingSettings.useBeautician}
+                                    onChange={() => setBookingSettings(prev => ({ ...prev, useBeautician: true }))}
+                                    className="w-4 h-4 text-blue-600"
+                                />
+                                <div>
+                                    <div className="font-medium text-gray-900">โหมดเลือกช่าง</div>
+                                    <div className="text-sm text-gray-600">ลูกค้าสามารถเลือกช่างที่ต้องการได้</div>
+                                </div>
+                            </label>
+                        </div>
                     </div>
+                </SettingsCard>
+
+                <SettingsCard title={bookingSettings.useBeautician ? "ตั้งค่าช่างเสริมสวย" : "ตั้งค่าคิวและเวลา"}>
+                    {!bookingSettings.useBeautician && (
+                        <div className="mb-4 p-3 bg-yellow-50 rounded border border-yellow-200">
+                            <p className="text-sm text-yellow-800">
+                                <strong>โหมดคิวธรรมดา:</strong> กำหนดจำนวนคิวสูงสุดในแต่ละช่วงเวลา 
+                                ระบบจะไม่แสดงตัวเลือกช่างให้ลูกค้า
+                            </p>
+                        </div>
+                    )}
+                    {bookingSettings.useBeautician && (
+                        <div className="mb-4 p-3 bg-green-50 rounded border border-green-200">
+                            <p className="text-sm text-green-800">
+                                <strong>โหมดเลือกช่าง:</strong> ลูกค้าสามารถเลือกช่างที่ต้องการได้ 
+                                แต่ละช่างจะมีเวลาทำงานและคิวของตัวเอง
+                            </p>
+                        </div>
+                    )}
+                    
                     <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">จำนวนช่างทั้งหมด (ใช้สำหรับคำนวณคิวสูงสุดต่อช่วงเวลา)</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            {bookingSettings.useBeautician ? 'จำนวนช่างทั้งหมด' : 'จำนวนคิวสูงสุดพร้อมกัน (ถ้าไม่กำหนดเฉพาะช่วงเวลา)'}
+                        </label>
                         <input
                             type="number"
                             min={1}
                             value={bookingSettings.totalBeauticians !== undefined && bookingSettings.totalBeauticians !== null ? String(bookingSettings.totalBeauticians) : ''}
                             onChange={e => setBookingSettings(prev => ({ ...prev, totalBeauticians: e.target.value.replace(/[^0-9]/g, '') }))}
                             className="border rounded-md px-2 py-1 w-24"
-                            placeholder="จำนวนช่าง"
+                            placeholder={bookingSettings.useBeautician ? "จำนวนช่าง" : "จำนวนคิว"}
                         />
-                        <p className="text-xs text-gray-500 mt-1">ใช้สำหรับคำนวณคิวสูงสุดต่อช่วงเวลา</p>
+                        <p className="text-xs text-gray-500 mt-1">
+                            {bookingSettings.useBeautician 
+                                ? 'จำนวนช่างที่พร้อมให้บริการในร้าน' 
+                                : 'จำนวนคิวสูงสุดที่รับได้พร้อมกันในช่วงเวลาที่ไม่ได้กำหนดเฉพาะ'}
+                        </p>
                     </div>
                     <div className="flex gap-2 items-center mb-2">
                         <input
@@ -173,7 +259,7 @@ export default function AdminSettingsPage() {
                             value={bookingSettings._queueCount !== undefined && bookingSettings._queueCount !== null ? String(bookingSettings._queueCount) : ''}
                             onChange={e => setBookingSettings(prev => ({ ...prev, _queueCount: e.target.value.replace(/[^0-9]/g, '') }))}
                             className="border rounded-md px-2 py-1 w-20"
-                            placeholder="จำนวนคิว"
+                            placeholder={bookingSettings.useBeautician ? "จำนวนช่าง" : "จำนวนคิว"}
                         />
                         <button
                             type="button"
@@ -201,7 +287,7 @@ export default function AdminSettingsPage() {
                     <div className="flex flex-wrap gap-2">
                         {(bookingSettings.timeQueues || []).map(q => (
                             <span key={q.time} className="inline-flex items-center bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm">
-                                {q.time} <span className="mx-1">•</span> {q.count} คิว
+                                {q.time} <span className="mx-1">•</span> {q.count} {bookingSettings.useBeautician ? 'ช่าง' : 'คิว'}
                                 <button
                                     type="button"
                                     className="ml-2 text-red-500 hover:text-red-700"
@@ -216,93 +302,149 @@ export default function AdminSettingsPage() {
                             </span>
                         ))}
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">เพิ่มช่วงเวลาและจำนวนคิวสูงสุด เช่น 11:00 3 คิว, 13:00 8 คิว</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                        {bookingSettings.useBeautician 
+                            ? 'กำหนดจำนวนช่างที่พร้อมให้บริการในช่วงเวลาต่างๆ'
+                            : 'กำหนดจำนวนคิวสูงสุดที่รับได้ในช่วงเวลาต่างๆ เช่น 11:00 3 คิว, 13:00 8 คิว'}
+                    </p>
                 </SettingsCard>
-                <SettingsCard title="ตั้งค่าวันหยุดและเวลาทำการ">
-                    <div className="mb-4 flex items-center gap-3">
-                        <label className="text-sm font-medium text-gray-700">เปิดใช้งานตัวเลือกพนักงาน</label>
-                        <button
-                            type="button"
-                            className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors duration-200 ${bookingSettings.useBeautician ? 'bg-green-500' : 'bg-gray-300'}`}
-                            onClick={() => setBookingSettings(prev => ({ ...prev, useBeautician: !prev.useBeautician }))}
-                        >
-                            <span className={`h-4 w-4 bg-white rounded-full shadow transform transition-transform duration-200 ${bookingSettings.useBeautician ? 'translate-x-6' : ''}`}></span>
-                        </button>
-                        <span className="text-xs text-gray-500">{bookingSettings.useBeautician ? 'เปิด' : 'ปิด'}</span>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">วันหยุดประจำสัปดาห์</label>
-                        <div className="flex flex-wrap gap-2">
-                            {["อาทิตย์","จันทร์","อังคาร","พุธ","พฤหัสบดี","ศุกร์","เสาร์"].map((day, idx) => (
-                                <label key={day} className="flex items-center gap-1">
-                                    <input
-                                        type="checkbox"
-                                        name="holidays"
-                                        value={idx}
-                                        checked={bookingSettings.holidays?.includes(idx)}
-                                        onChange={e => {
-                                            const checked = e.target.checked;
-                                            setBookingSettings(prev => {
-                                                const holidays = prev.holidays || [];
-                                                return {
-                                                    ...prev,
-                                                    holidays: checked
-                                                        ? [...holidays, idx]
-                                                        : holidays.filter(d => d !== idx)
-                                                };
-                                            });
-                                        }}
-                                    />
-                                    <span>{day}</span>
-                                </label>
-                            ))}
+                <SettingsCard title="การตั้งค่าวันและเวลาทำการ">
+                    <div className="space-y-6">
+                        {/* Weekly Schedule */}
+                        <div>
+                            <h3 className="text-lg font-semibold text-gray-800 mb-4">ตารางเวลาทำการประจำสัปดาห์</h3>
+                            <div className="space-y-3">
+                                {["อาทิตย์","จันทร์","อังคาร","พุธ","พฤหัสบดี","ศุกร์","เสาร์"].map((dayName, dayIndex) => {
+                                    const daySchedule = bookingSettings.weeklySchedule?.[dayIndex] || { isOpen: false, openTime: '09:00', closeTime: '18:00' };
+                                    return (
+                                        <div key={dayIndex} className="flex items-center gap-4 p-3 border rounded-lg bg-gray-50">
+                                            <div className="w-20 font-medium text-gray-700">{dayName}</div>
+                                            
+                                            {/* เปิด/ปิด Toggle */}
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    type="button"
+                                                    className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors duration-200 ${
+                                                        daySchedule.isOpen ? 'bg-green-500' : 'bg-gray-300'
+                                                    }`}
+                                                    onClick={() => setBookingSettings(prev => ({
+                                                        ...prev,
+                                                        weeklySchedule: {
+                                                            ...prev.weeklySchedule,
+                                                            [dayIndex]: {
+                                                                ...daySchedule,
+                                                                isOpen: !daySchedule.isOpen
+                                                            }
+                                                        }
+                                                    }))}
+                                                >
+                                                    <span className={`h-4 w-4 bg-white rounded-full shadow transform transition-transform duration-200 ${
+                                                        daySchedule.isOpen ? 'translate-x-6' : ''
+                                                    }`}></span>
+                                                </button>
+                                                <span className="text-sm text-gray-600 w-12">
+                                                    {daySchedule.isOpen ? 'เปิด' : 'ปิด'}
+                                                </span>
+                                            </div>
+
+                                            {/* เวลาทำการ */}
+                                            {daySchedule.isOpen && (
+                                                <div className="flex items-center gap-2">
+                                                    <input
+                                                        type="time"
+                                                        value={daySchedule.openTime}
+                                                        onChange={e => setBookingSettings(prev => ({
+                                                            ...prev,
+                                                            weeklySchedule: {
+                                                                ...prev.weeklySchedule,
+                                                                [dayIndex]: {
+                                                                    ...daySchedule,
+                                                                    openTime: e.target.value
+                                                                }
+                                                            }
+                                                        }))}
+                                                        className="border rounded px-2 py-1 text-sm"
+                                                    />
+                                                    <span className="text-gray-500">ถึง</span>
+                                                    <input
+                                                        type="time"
+                                                        value={daySchedule.closeTime}
+                                                        onChange={e => setBookingSettings(prev => ({
+                                                            ...prev,
+                                                            weeklySchedule: {
+                                                                ...prev.weeklySchedule,
+                                                                [dayIndex]: {
+                                                                    ...daySchedule,
+                                                                    closeTime: e.target.value
+                                                                }
+                                                            }
+                                                        }))}
+                                                        className="border rounded px-2 py-1 text-sm"
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                            <p className="text-xs text-gray-500 mt-2">
+                                กำหนดวันและเวลาทำการของร้าน ลูกค้าจะสามารถจองได้เฉพาะในช่วงเวลาที่เปิดทำการเท่านั้น
+                            </p>
                         </div>
-                    </div>
-                    <div className="mt-4">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">เวลาที่เปิดให้จอง (เพิ่มทีละช่วงเวลา)</label>
-                        <div className="flex gap-2 items-center mb-2">
-                            <input
-                                type="time"
-                                value={bookingSettings._newTime !== undefined && bookingSettings._newTime !== null ? bookingSettings._newTime : ''}
-                                onChange={e => setBookingSettings(prev => ({ ...prev, _newTime: e.target.value }))}
-                                className="border rounded-md px-2 py-1"
-                            />
-                            <button
-                                type="button"
-                                className="bg-indigo-500 text-white px-3 py-1 rounded hover:bg-indigo-600"
-                                onClick={() => {
-                                    const t = bookingSettings._newTime;
-                                    if (!t) return;
-                                    setBookingSettings(prev => {
-                                        const arr = prev.availableTimes || [];
-                                        if (arr.includes(t)) return prev;
-                                        return { ...prev, availableTimes: [...arr, t], _newTime: '' };
-                                    });
-                                }}
-                                disabled={!bookingSettings._newTime}
-                            >
-                                เพิ่ม
-                            </button>
+
+                        {/* Quick Actions */}
+                        <div className="border-t pt-4">
+                            <h4 className="text-md font-medium text-gray-700 mb-3">การตั้งค่าด่วน</h4>
+                            <div className="flex flex-wrap gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const newSchedule = {};
+                                        for(let i = 0; i < 7; i++) {
+                                            newSchedule[i] = { isOpen: true, openTime: '09:00', closeTime: '18:00' };
+                                        }
+                                        setBookingSettings(prev => ({ ...prev, weeklySchedule: newSchedule }));
+                                    }}
+                                    className="px-3 py-2 bg-blue-500 text-white text-sm rounded hover:bg-blue-600"
+                                >
+                                    เปิดทุกวัน 9:00-18:00
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const newSchedule = {};
+                                        for(let i = 0; i < 7; i++) {
+                                            newSchedule[i] = { 
+                                                isOpen: i !== 0, // ปิดวันอาทิตย์
+                                                openTime: '09:00', 
+                                                closeTime: '18:00' 
+                                            };
+                                        }
+                                        setBookingSettings(prev => ({ ...prev, weeklySchedule: newSchedule }));
+                                    }}
+                                    className="px-3 py-2 bg-green-500 text-white text-sm rounded hover:bg-green-600"
+                                >
+                                    จันทร์-เสาร์ 9:00-18:00
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const newSchedule = {};
+                                        for(let i = 0; i < 7; i++) {
+                                            newSchedule[i] = { 
+                                                isOpen: i >= 1 && i <= 5, // จันทร์-ศุกร์
+                                                openTime: '09:00', 
+                                                closeTime: '17:00' 
+                                            };
+                                        }
+                                        setBookingSettings(prev => ({ ...prev, weeklySchedule: newSchedule }));
+                                    }}
+                                    className="px-3 py-2 bg-purple-500 text-white text-sm rounded hover:bg-purple-600"
+                                >
+                                    จันทร์-ศุกร์ 9:00-17:00
+                                </button>
+                            </div>
                         </div>
-                        <div className="flex flex-wrap gap-2">
-                            {(bookingSettings.availableTimes || []).map(timeStr => (
-                                <span key={timeStr} className="inline-flex items-center bg-purple-100 text-purple-700 px-3 py-1 rounded-full text-sm">
-                                    {timeStr}
-                                    <button
-                                        type="button"
-                                        className="ml-2 text-red-500 hover:text-red-700"
-                                        onClick={() => setBookingSettings(prev => ({
-                                            ...prev,
-                                            availableTimes: (prev.availableTimes || []).filter(t => t !== timeStr)
-                                        }))}
-                                        aria-label={`ลบ ${timeStr}`}
-                                    >
-                                        ×
-                                    </button>
-                                </span>
-                            ))}
-                        </div>
-                        <p className="text-xs text-gray-500 mt-1">เวลาที่เปิดให้จองและจำนวนช่างจะใช้ร่วมกันในการคำนวณคิวสูงสุดต่อช่วงเวลา เช่น ถ้ามี 5 ช่าง เวลานี้จะจองได้สูงสุด 5 คิว</p>
                     </div>
                 </SettingsCard>
 

@@ -32,9 +32,9 @@ function CustomerHeader() {
             <header className="rounded-2xl p-3 bg-gradient-to-r from-purple-400 via-violet-400 to-pink-300 text-white shadow flex items-center justify-between">
                 <div className="flex items-center gap-4">
                     {profile?.pictureUrl ? (
-                        <Image src={profile.pictureUrl} width={56} height={56} alt="Profile" className="rounded-md object-cover" />
+                        <Image src={profile.pictureUrl} width={56} height={56} alt="Profile" className="rounded-full object-cover overflow-hidden" />
                     ) : (
-                        <div className="w-14 h-14 rounded-md bg-white/30 flex-shrink-0" />
+                        <div className="w-16 h-16 rounded-md bg-white/30 flex-shrink-0" />
                     )}
                     <div>
                         <p className="font-semibold text-base">{profile?.displayName ? `คุณ${profile.displayName}` : 'ผู้ใช้'}</p>

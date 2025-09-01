@@ -1,3 +1,4 @@
+
 'use server';
 
 import { db } from '@/app/lib/firebaseAdmin';
@@ -5,6 +6,93 @@ import { FieldValue, GeoPoint, Timestamp } from 'firebase-admin/firestore';
 import { sendLineMessage } from '@/app/actions/lineActions';
 import { sendTelegramMessageToAdmin } from '@/app/actions/telegramActions';
 
+/**
+ * สร้างนัดหมายใหม่ (appointment) โดยป้องกัน overbooking slot
+ * @param {object} appointmentData - ต้องมี date, time, serviceId, beauticianId, userId, ...
+ * @returns {Promise<object>} - { success, id?, error? }
+ */
+export async function createAppointmentWithSlotCheck(appointmentData) {
+    const { date, time, serviceId, beauticianId } = appointmentData;
+    if (!date || !time) return { success: false, error: 'กรุณาระบุวันและเวลา' };
+    try {
+        
+        const settingsRef = db.collection('settings').doc('booking');
+        const settingsSnap = await settingsRef.get();
+        let maxSlot = 1;
+        let useBeautician = false;
+        let weeklySchedule = {};
+        
+        if (settingsSnap.exists) {
+            const data = settingsSnap.data();
+            useBeautician = !!data.useBeautician;
+            weeklySchedule = data.weeklySchedule || {};
+            
+            // ตรวจสอบว่าวันที่จองเปิดทำการหรือไม่
+            const appointmentDate = new Date(date);
+            const dayOfWeek = appointmentDate.getDay();
+            const daySchedule = weeklySchedule[dayOfWeek];
+            
+            if (daySchedule && !daySchedule.isOpen) {
+                return { success: false, error: 'วันที่เลือกปิดทำการ กรุณาเลือกวันอื่น' };
+            }
+            
+            // ตรวจสอบว่าเวลาที่จองอยู่ในช่วงเวลาทำการหรือไม่
+            if (daySchedule && daySchedule.isOpen) {
+                const timeSlot = time.replace(':', '');
+                const openTime = daySchedule.openTime.replace(':', '');
+                const closeTime = daySchedule.closeTime.replace(':', '');
+                
+                if (timeSlot < openTime || timeSlot > closeTime) {
+                    return { success: false, error: `เวลาที่เลือกอยู่นอกเวลาทำการ (${daySchedule.openTime} - ${daySchedule.closeTime})` };
+                }
+            }
+            
+            if (Array.isArray(data.timeQueues)) {
+                const q = data.timeQueues.find(q => q.time === time);
+                if (q && q.count) maxSlot = q.count;
+            }
+            if (!maxSlot && data.totalBeauticians) maxSlot = Number(data.totalBeauticians);
+        }
+
+        // เช็คจำนวนจองใน slot นี้
+        let queryConditions = [
+            ['date', '==', date],
+            ['time', '==', time],
+            ['status', 'in', ['pending', 'confirmed', 'awaiting_confirmation']]
+        ];
+        
+        // ถ้าเป็นโหมดเลือกช่างและมีการระบุช่าง ให้เช็คเฉพาะช่างนั้น
+        if (useBeautician && beauticianId && beauticianId !== 'auto-assign') {
+            queryConditions.push(['beauticianId', '==', beauticianId]);
+            maxSlot = 1; // แต่ละช่างรับได้ 1 คิวต่อช่วงเวลา
+        }
+        
+        let q = db.collection('appointments');
+        queryConditions.forEach(condition => {
+            q = q.where(...condition);
+        });
+        
+        const snap = await q.get();
+        if (snap.size >= maxSlot) {
+            const errorMsg = useBeautician && beauticianId !== 'auto-assign' 
+                ? 'ช่างท่านนี้ไม่ว่างในช่วงเวลาดังกล่าว กรุณาเลือกช่างอื่นหรือเวลาอื่น'
+                : 'ช่วงเวลานี้ถูกจองเต็มแล้ว กรุณาเลือกเวลาอื่น';
+            return { success: false, error: errorMsg };
+        }
+
+        // สร้าง appointment ใหม่
+        const newRef = db.collection('appointments').doc();
+        await newRef.set({
+            ...appointmentData,
+            createdAt: FieldValue.serverTimestamp(),
+            updatedAt: FieldValue.serverTimestamp(),
+        });
+        return { success: true, id: newRef.id };
+    } catch (error) {
+        console.error('Error creating appointment with slot check:', error);
+        return { success: false, error: error.message };
+    }
+}
 
 /**
  * ยืนยันการเสร็จสิ้นบริการโดยแอดมิน

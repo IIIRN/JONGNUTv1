@@ -113,13 +113,13 @@ function ServiceDetailContent() {
             </div>
 
             {/* รายละเอียดบริการ */}
-            <div className="px-4 pb-2">
+            <div className="py-2">
                 <p className="text-gray-600 text-sm mt-2">{service.details}</p>
             </div>
 
             {/* Add-on Services */}
             {(service.addOnServices && service.addOnServices.length > 0) && (
-                <div className="px-4 pt-2">
+                <div className="py2">
                     <h2 className="text-sm font-bold mb-1">รายการเสริม</h2>
                     <div className="space-y-1">
                         {service.addOnServices.map((addOn, idx) => (
@@ -135,7 +135,7 @@ function ServiceDetailContent() {
             )}
 
             {/* Footer ปกติ ไม่ fixed */}
-            <div className="px-4 pt-4">
+            <div className="py-4">
                 <div className="flex justify-between items-center mb-2">
                     <span className="text-gray-600 text-sm">ราคารวม</span>
                     <span className="text-xl font-bold text-gray-800">฿{totalPrice.toLocaleString()}</span>

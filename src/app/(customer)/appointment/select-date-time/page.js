@@ -14,9 +14,9 @@ import Image from 'next/image';
 const BeauticianCard = ({ beautician, isSelected, onSelect }) => (
     <div
         onClick={() => onSelect(beautician)}
-        className={`rounded-lg p-3 flex flex-col items-center border-2 transition-all cursor-pointer ${isSelected ? 'border-pink-500 bg-pink-50' : 'border-gray-200 bg-white'}`}
+        className={`rounded-lg p-4 flex items-center space-x-4 border-2 transition-all cursor-pointer w-full ${isSelected ? 'border-pink-500 bg-pink-50' : 'border-gray-200 bg-white'}`}
     >
-        <div className="relative w-20 h-20 rounded-full overflow-hidden">
+        <div className="relative w-16 h-16 rounded-full overflow-hidden flex-shrink-0">
             <Image
                 src={beautician.imageUrl || 'https://via.placeholder.com/150'}
                 alt={beautician.firstName}
@@ -24,10 +24,21 @@ const BeauticianCard = ({ beautician, isSelected, onSelect }) => (
                 style={{ objectFit: 'cover' }}
             />
         </div>
-        <p className="font-bold mt-2 text-gray-800">{beautician.firstName}</p>
-        <p className={`mt-1 text-xs px-2 py-0.5 rounded-full ${beautician.status === 'available' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
-            {beautician.status === 'available' ? 'ว่าง' : 'ไม่ว่าง'}
-        </p>
+        <div className="flex-1">
+            <p className="font-bold text-lg text-gray-800">{beautician.firstName}</p>
+        </div>
+        <div className="flex items-center space-x-3">
+            <p className={`text-sm px-3 py-1 rounded-full ${beautician.status === 'available' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                {beautician.status === 'available' ? 'ว่าง' : 'ไม่ว่าง'}
+            </p>
+            {isSelected && (
+                <div className="w-6 h-6 bg-pink-500 rounded-full flex items-center justify-center">
+                    <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                </div>
+            )}
+        </div>
     </div>
 );
 
@@ -49,48 +60,44 @@ function SelectDateTimeContent() {
     const addOns = searchParams.get('addOns');
 
     const [date, setDate] = useState(new Date());
-    // สัปดาห์ปัจจุบัน (เริ่มที่วันอาทิตย์)
-    const getStartOfWeek = (d) => {
-        const date = new Date(d);
-        const day = date.getDay();
-        date.setDate(date.getDate() - day);
-        date.setHours(0,0,0,0);
-        return date;
-    };
-    const [activeStartDate, setActiveStartDate] = useState(getStartOfWeek(new Date()));
+    const [activeMonth, setActiveMonth] = useState(new Date());
 
     const [time, setTime] = useState('');
     const [beauticians, setBeauticians] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedBeautician, setSelectedBeautician] = useState(null);
-    const [timeSlots, setTimeSlots] = useState([]);
     const [timeQueues, setTimeQueues] = useState([]); // [{time, count}]
     const [totalBeauticians, setTotalBeauticians] = useState(1);
     const [slotCounts, setSlotCounts] = useState({}); // { '09:00': 2, ... }
+    const [useBeautician, setUseBeautician] = useState(false); // โหมดการจอง
+    const [weeklySchedule, setWeeklySchedule] = useState({}); // ตารางเวลาทำการ
 
-    // Fetch availableTimes, timeQueues, totalBeauticians from settings/booking
+    // Fetch timeQueues and totalBeauticians from settings/booking
     useEffect(() => {
-        const fetchAvailableTimes = async () => {
+        const fetchBookingSettings = async () => {
             try {
                 const docRef = doc(db, 'settings', 'booking');
                 const docSnap = await getDoc(docRef);
                 if (docSnap.exists()) {
                     const data = docSnap.data();
-                    setTimeSlots(Array.isArray(data.availableTimes) ? data.availableTimes : []);
                     setTimeQueues(Array.isArray(data.timeQueues) ? data.timeQueues : []);
                     setTotalBeauticians(Number(data.totalBeauticians) || 1);
+                    setUseBeautician(!!data.useBeautician); // โหมดการจอง
+                    setWeeklySchedule(data.weeklySchedule || {});
                 } else {
-                    setTimeSlots([]);
                     setTimeQueues([]);
                     setTotalBeauticians(1);
+                    setUseBeautician(false);
+                    setWeeklySchedule({});
                 }
             } catch (e) {
-                setTimeSlots([]);
                 setTimeQueues([]);
                 setTotalBeauticians(1);
+                setUseBeautician(false);
+                setWeeklySchedule({});
             }
         };
-        fetchAvailableTimes();
+        fetchBookingSettings();
     }, []);
 
     // Fetch appointment counts for the selected date
@@ -102,7 +109,7 @@ function SelectDateTimeContent() {
                 const q = query(
                     collection(db, 'appointments'),
                     where('date', '==', dateStr),
-                    where('status', 'in', ['pending', 'confirmed'])
+                    where('status', 'in', ['pending', 'confirmed', 'awaiting_confirmation'])
                 );
                 const querySnapshot = await getDocs(q);
                 const counts = {};
@@ -141,16 +148,31 @@ function SelectDateTimeContent() {
     }, []);
 
     const handleConfirm = () => {
-        if (!date || !time || !selectedBeautician) {
-            alert('กรุณาเลือกวัน, เวลา และช่างเสริมสวย');
+        if (!date || !time) {
+            alert('กรุณาเลือกวันและเวลา');
             return;
         }
+        
+        // ตรวจสอบการเลือกช่างตามโหมด
+        if (useBeautician && !selectedBeautician) {
+            alert('กรุณาเลือกช่างเสริมสวย');
+            return;
+        }
+        
         const params = new URLSearchParams();
         if (serviceId) params.set('serviceId', serviceId);
         if (addOns) params.set('addOns', addOns);
         params.set('date', format(date, 'yyyy-MM-dd'));
         params.set('time', time);
-        params.set('beauticianId', selectedBeautician.id);
+        
+        // ส่ง beauticianId เฉพาะเมื่อเป็นโหมดเลือกช่าง
+        if (useBeautician && selectedBeautician) {
+            params.set('beauticianId', selectedBeautician.id);
+        } else {
+            // สำหรับโหมดไม่เลือกช่าง ใส่ค่า default หรือ null
+            params.set('beauticianId', 'auto-assign');
+        }
+        
         router.push(`/appointment/general-info?${params.toString()}`);
     };
 
@@ -161,116 +183,196 @@ function SelectDateTimeContent() {
         return totalBeauticians;
     };
 
+    // Helper: check if a date is open for business
+    const isDateOpen = (checkDate) => {
+        const dayOfWeek = checkDate.getDay();
+        const daySchedule = weeklySchedule[dayOfWeek];
+        return daySchedule ? daySchedule.isOpen : true; // default to open if no schedule
+    };
+
+    // Helper: check if a time slot is within business hours
+    const isTimeInBusinessHours = (timeSlot) => {
+        if (!date) return true;
+        const dayOfWeek = date.getDay();
+        const daySchedule = weeklySchedule[dayOfWeek];
+        if (!daySchedule || !daySchedule.isOpen) return false;
+        
+        const slotTime = timeSlot.replace(':', '');
+        const openTime = daySchedule.openTime.replace(':', '');
+        const closeTime = daySchedule.closeTime.replace(':', '');
+        
+        return slotTime >= openTime && slotTime <= closeTime;
+    };
+
     return (
-    <div className="min-h-screen bg-gradient-to-b from-purple-100 via-pink-50 to-white flex flex-col items-center pt-4 px-2">
+    <div className="min-h-screen flex flex-col items-center pt-4 px-2">
             {/* Calendar */}
             <div className="w-full max-w-md mx-auto flex flex-col items-center">
-                <div className="flex items-center justify-between w-full mb-2">
+                <div className="flex items-center justify-between w-full mb-4">
                     <button
-                        onClick={() => setActiveStartDate(prev => {
+                        onClick={() => setActiveMonth(prev => {
                             const d = new Date(prev);
-                            d.setDate(d.getDate() - 7);
+                            d.setMonth(d.getMonth() - 1);
                             return d;
                         })}
-                        className="px-2 py-1 text-xl text-purple-400 hover:text-pink-500"
+                        className="px-3 py-2 text-xl text-purple-400 hover:text-pink-500"
                     >&#60;</button>
-                    <span className="font-bold text-base text-purple-700">
-                        {activeStartDate.toLocaleString('th-TH', { month: 'long', year: 'numeric' })}
+                    <span className="font-bold text-lg text-purple-700">
+                        {activeMonth.toLocaleString('th-TH', { month: 'long', year: 'numeric' })}
                     </span>
                     <button
-                        onClick={() => setActiveStartDate(prev => {
+                        onClick={() => setActiveMonth(prev => {
                             const d = new Date(prev);
-                            d.setDate(d.getDate() + 7);
+                            d.setMonth(d.getMonth() + 1);
                             return d;
                         })}
-                        className="px-2 py-1 text-xl text-purple-400 hover:text-pink-500"
+                        className="px-3 py-2 text-xl text-purple-400 hover:text-pink-500"
                     >&#62;</button>
                 </div>
                 <div className="w-full">
-                    <div className="grid grid-cols-7 gap-2 justify-items-center">
+                    {/* Header วันในสัปดาห์ */}
+                    <div className="grid grid-cols-7 gap-1 mb-2">
                         {['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'].map((d, i) => (
-                            <div key={i} className="text-xs text-purple-400 text-center font-semibold">{d}</div>
+                            <div key={i} className="text-sm text-purple-400 text-center font-semibold py-2">{d}</div>
                         ))}
-                        {Array.from({ length: 7 }).map((_, i) => {
-                            const d = new Date(activeStartDate);
-                            d.setDate(d.getDate() + i);
-                            const isToday = (new Date()).toDateString() === d.toDateString();
-                            const isSelected = date && d.toDateString() === date.toDateString();
-                            const isPast = d < new Date(new Date().setHours(0,0,0,0));
-                            return (
-                                <button
-                                    key={i}
-                                    onClick={() => !isPast && setDate(d)}
-                                    className={`w-10 h-10 flex items-center justify-center rounded-full text-sm font-semibold transition-colors
-                                        ${isSelected ? 'bg-gradient-to-tr from-pink-400 to-purple-500 text-white shadow-lg' : isToday ? 'border-2 border-pink-400 text-pink-500 bg-white' : 'bg-white text-purple-700'}
-                                        ${isPast ? 'opacity-40 cursor-not-allowed' : 'hover:bg-pink-100'}
-                                    `}
-                                    disabled={isPast}
-                                >
-                                    {d.getDate()}
-                                </button>
-                            );
-                        })}
+                    </div>
+                    
+                    {/* วันที่ในเดือน */}
+                    <div className="grid grid-cols-7 gap-1">
+                        {(() => {
+                            const year = activeMonth.getFullYear();
+                            const month = activeMonth.getMonth();
+                            const firstDay = new Date(year, month, 1);
+                            const lastDay = new Date(year, month + 1, 0);
+                            const startDate = new Date(firstDay);
+                            startDate.setDate(startDate.getDate() - firstDay.getDay()); // เริ่มจากวันอาทิตย์
+                            
+                            const days = [];
+                            const currentDate = new Date(startDate);
+                            
+                            // สร้างปฏิทิน 6 สัปดาห์ (42 วัน)
+                            for (let i = 0; i < 42; i++) {
+                                const d = new Date(currentDate);
+                                const isCurrentMonth = d.getMonth() === month;
+                                const isToday = (new Date()).toDateString() === d.toDateString();
+                                const isSelected = date && d.toDateString() === date.toDateString();
+                                const isPast = d < new Date(new Date().setHours(0,0,0,0));
+                                const isBusinessOpen = isDateOpen(d);
+                                const isDisabled = isPast || !isBusinessOpen || !isCurrentMonth;
+                                
+                                days.push(
+                                    <button
+                                        key={i}
+                                        onClick={() => !isDisabled && setDate(d)}
+                                        className={`w-10 h-10 flex items-center justify-center rounded-lg text-sm font-semibold transition-colors relative
+                                            ${!isCurrentMonth ? 'text-gray-300' : 
+                                              isSelected ? 'bg-gradient-to-tr from-pink-400 to-purple-500 text-white shadow-lg' : 
+                                              isToday ? 'border-2 border-pink-400 text-pink-500 bg-white' : 
+                                              'bg-white text-purple-700 hover:bg-purple-50'}
+                                            ${isDisabled ? 'opacity-40 cursor-not-allowed' : ''}
+                                            ${!isBusinessOpen && !isPast && isCurrentMonth ? 'bg-gray-200 text-gray-400' : ''}
+                                        `}
+                                        disabled={isDisabled}
+                                        title={!isBusinessOpen && !isPast && isCurrentMonth ? 'วันปิดทำการ' : ''}
+                                    >
+                                        {d.getDate()}
+                                        {!isBusinessOpen && !isPast && isCurrentMonth && (
+                                            <span className="absolute top-0 right-0 w-2 h-2 bg-red-400 rounded-full"></span>
+                                        )}
+                                    </button>
+                                );
+                                currentDate.setDate(currentDate.getDate() + 1);
+                            }
+                            
+                            return days;
+                        })()}
                     </div>
                 </div>
             </div>
 
             {/* Available Time */}
             <div className="w-full max-w-md mx-auto mt-6">
-                <h2 className="text-base font-bold mb-2 text-purple-700">AVAILABLE TIME</h2>
-                <div className="grid grid-cols-3 gap-3">
-                    {[...timeSlots]
-                        .filter(Boolean)
-                        .map(String)
-                        .sort((a, b) => a.localeCompare(b))
-                        .map(slot => {
-                            const max = getMaxForSlot(slot);
-                            const booked = slotCounts[slot] || 0;
-                            const isFull = booked >= max;
-                            return (
-                                <button
-                                    key={slot}
-                                    onClick={() => !isFull && setTime(slot)}
-                                    className={`rounded-full px-4 py-2 text-sm font-semibold shadow-sm transition-colors
-                                        ${time === slot ? 'bg-gradient-to-tr from-pink-400 to-purple-500 text-white shadow-lg' : 'bg-white text-purple-700 border border-purple-100 hover:bg-purple-50'}
-                                        ${isFull ? 'opacity-40 cursor-not-allowed line-through' : ''}`}
-                                    disabled={isFull}
-                                    title={isFull ? 'คิวเต็ม' : ''}
-                                >
-                                    {slot} {isFull && <span className="text-xs">(เต็ม)</span>}
-                                </button>
-                            );
-                        })}
-                </div>
-            </div>
-
-            {/* Beautician Selection (optional, can be hidden for minimal UI) */}
-            <div className="w-full max-w-md mx-auto mt-6">
-                <h2 className="text-base font-bold mb-2 text-purple-700">เลือกช่างเสริมสวย</h2>
-                {loading ? (
-                    <div className="text-center">กำลังโหลดรายชื่อช่าง...</div>
-                ) : beauticians.length === 0 ? (
-                    <div className="text-center text-gray-500 bg-gray-100 p-4 rounded-lg">ขออภัย ไม่มีช่างที่พร้อมให้บริการในขณะนี้</div>
+                <h2 className="text-base font-bold mb-2 text-purple-700">เลือกช่วงเวลา</h2>
+                
+                {/* ตรวจสอบว่าวันที่เลือกเปิดทำการหรือไม่ */}
+                {date && !isDateOpen(date) ? (
+                    <div className="text-center p-4 bg-gray-100 rounded-lg">
+                        <p className="text-gray-600">วันที่เลือกปิดทำการ</p>
+                        <p className="text-sm text-gray-500">กรุณาเลือกวันอื่น</p>
+                    </div>
+                ) : timeQueues.filter(q => q.time && isTimeInBusinessHours(q.time)).length === 0 ? (
+                    <div className="text-center p-4 bg-gray-100 rounded-lg">
+                        <p className="text-gray-600">ไม่มีช่วงเวลาให้บริการในวันนี้</p>
+                    </div>
                 ) : (
                     <div className="grid grid-cols-3 gap-3">
-                        {beauticians.map(beautician => (
-                            <BeauticianCard
-                                key={beautician.id}
-                                beautician={beautician}
-                                isSelected={selectedBeautician?.id === beautician.id}
-                                onSelect={setSelectedBeautician}
-                            />
-                        ))}
+                        {timeQueues
+                            .filter(q => q.time && isTimeInBusinessHours(q.time))
+                            .sort((a, b) => String(a.time).localeCompare(String(b.time)))
+                            .map(queue => {
+                                const slot = queue.time;
+                                const max = queue.count || totalBeauticians;
+                                const booked = slotCounts[slot] || 0;
+                                const isFull = booked >= max;
+                                return (
+                                    <button
+                                        key={slot}
+                                        onClick={() => !isFull && setTime(slot)}
+                                        className={`rounded-full px-4 py-2 text-sm font-semibold shadow-sm transition-colors
+                                            ${time === slot ? 'bg-gradient-to-tr from-pink-400 to-purple-500 text-white shadow-lg' : 'bg-white text-purple-700 border border-purple-100 hover:bg-purple-50'}
+                                            ${isFull ? 'opacity-40 cursor-not-allowed line-through' : ''}`}
+                                        disabled={isFull}
+                                        title={isFull ? 'คิวเต็ม' : ''}
+                                    >
+                                        {slot} {isFull && <span className="text-xs">(เต็ม)</span>}
+                                    </button>
+                                );
+                            })}
                     </div>
                 )}
             </div>
+
+            {/* Beautician Selection - แสดงเฉพาะเมื่อเปิดโหมดเลือกช่าง */}
+            {useBeautician && (
+                <div className="w-full max-w-md mx-auto mt-6">
+                    <h2 className="text-base font-bold mb-2 text-purple-700">เลือกช่างเสริมสวย</h2>
+                    {loading ? (
+                        <div className="text-center">กำลังโหลดรายชื่อช่าง...</div>
+                    ) : beauticians.length === 0 ? (
+                        <div className="text-center text-gray-500 bg-gray-100 p-4 rounded-lg">ขออภัย ไม่มีช่างที่พร้อมให้บริการในขณะนี้</div>
+                    ) : (
+                        <div className="space-y-3">
+                            {beauticians.map(beautician => (
+                                <BeauticianCard
+                                    key={beautician.id}
+                                    beautician={beautician}
+                                    isSelected={selectedBeautician?.id === beautician.id}
+                                    onSelect={setSelectedBeautician}
+                                />
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* ข้อความสำหรับโหมดไม่เลือกช่าง */}
+            {!useBeautician && (
+                <div className="w-full max-w-md mx-auto mt-6">
+                    <div className="text-center p-4 bg-blue-50 rounded-lg border border-blue-200">
+                        <div className="text-sm text-blue-700">
+                            <strong>โหมดคิวธรรมดา</strong><br/>
+                            ระบบจะจัดช่างที่เหมาะสมให้คุณโดยอัตโนมัติ
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Confirm Button */}
             <div className="w-full max-w-md mx-auto mt-8 mb-8">
                 <button
                     onClick={handleConfirm}
-                    disabled={!date || !time || !selectedBeautician}
-                    className="w-full bg-gradient-to-tr from-pink-400 to-purple-500 text-white py-3 rounded-xl font-bold text-base shadow-lg hover:from-pink-500 hover:to-purple-600 disabled:bg-gray-300 disabled:text-gray-400"
+                    disabled={!date || !time || (useBeautician && !selectedBeautician)}
+                    className="w-full bg-purple-500 text-white py-3 rounded-xl font-bold shadow-lg "
                 >
                     ถัดไป
                 </button>

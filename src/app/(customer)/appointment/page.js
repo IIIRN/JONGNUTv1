@@ -66,16 +66,16 @@ export default function AppointmentPage() {
                     <div
                         key={service.id}
                         onClick={() => handleSelectService(service)}
-                        className="rounded-2xl overflow-hidden shadow-md cursor-pointer transform hover:scale-105 transition-transform duration-200 bg-transparent"
-                        style={{ minHeight: 140 }}
+                        className="rounded-2xl overflow-hidden shadow-md cursor-pointer transform hover:scale-105 transition-transform duration-200 bg-transparent p-0 m-0"
+                        style={{ minHeight: 0 }}
                     >
-                        <div className="relative w-full h-28">
+                        <div className="relative w-full" style={{ aspectRatio: '4/3', minHeight: 0 }}>
                             <Image
                                 src={service.imageUrl || 'https://via.placeholder.com/300'}
                                 alt={service.serviceName}
                                 fill
-                                style={{ objectFit: 'cover' }}
-                                className="rounded-2xl"
+                                className="object-cover w-full h-full"
+                                priority
                             />
                             {/* overlay gradient + text */}
                             <div className="absolute bottom-0 left-0 w-full px-2 py-2 bg-gradient-to-t from-purple-600/90 to-transparent">

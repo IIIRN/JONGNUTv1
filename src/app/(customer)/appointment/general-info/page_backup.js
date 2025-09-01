@@ -16,7 +16,7 @@ function GeneralInfoContent() {
     const router = useRouter();
 
     const serviceId = searchParams.get('serviceId');
-    const addOnsParam = searchParams.get('addOns'); // เปลี่ยนชื่อให้ชัดเจน
+    const addOns = searchParams.get('addOns');
     const date = searchParams.get('date');
     const time = searchParams.get('time');
     const beauticianId = searchParams.get('beauticianId');
@@ -29,9 +29,6 @@ function GeneralInfoContent() {
     const [showCoupon, setShowCoupon] = useState(false);
     const [loading, setLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
-
-    // แปลง addOns parameter เป็น array
-    const selectedAddOns = addOnsParam ? addOnsParam.split(',') : [];
 
     useEffect(() => {
         const fetchAllData = async () => {
@@ -80,12 +77,12 @@ function GeneralInfoContent() {
     const { basePrice, addOnsTotal, totalPrice, finalPrice, discount } = useMemo(() => {
         if (!service) return { basePrice: 0, addOnsTotal: 0, totalPrice: 0, finalPrice: 0, discount: 0 };
         const base = service.price || 0;
-        const addOnsPrice = (service.addOnServices || []).filter(a => selectedAddOns.includes(a.name)).reduce((sum, a) => sum + (a.price || 0), 0);
-        const total = base + addOnsPrice;
+        const addOns = (service.addOnServices || []).filter(a => addOns?.includes(a.name)).reduce((sum, a) => sum + (a.price || 0), 0);
+        const total = base + addOns;
         const selectedCoupon = availableCoupons.find(c => c.id === selectedCouponId);
         const discountAmount = selectedCoupon ? (selectedCoupon.discountType === 'percentage' ? total * (selectedCoupon.discountValue / 100) : selectedCoupon.discountValue) : 0;
-        return { basePrice: base, addOnsTotal: addOnsPrice, totalPrice: total, finalPrice: total - discountAmount, discount: discountAmount };
-    }, [service, selectedAddOns, selectedCouponId, availableCoupons]);
+        return { basePrice: base, addOnsTotal: addOns, totalPrice: total, finalPrice: total - discountAmount, discount: discountAmount };
+    }, [service, addOns, selectedCouponId, availableCoupons]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -114,8 +111,8 @@ function GeneralInfoContent() {
                     employeeId: beauticianId, // Keep employeeId for compatibility if needed
                     beauticianInfo: { firstName: beautician.firstName, lastName: beautician.lastName },
                     dateTime: new Date(`${date}T${time}`),
-                    addOns: (service.addOnServices || []).filter(a => selectedAddOns.includes(a.name)),
-                    duration: (service.duration || 0) + (service.addOnServices || []).filter(a => selectedAddOns.includes(a.name)).reduce((sum, a) => sum + (a.duration || 0), 0),
+                    addOns: (service.addOnServices || []).filter(a => addOns?.includes(a.name)),
+                    duration: (service.duration || 0) + (service.addOnServices || []).filter(a => addOns?.includes(a.name)).reduce((sum, a) => sum + (a.duration || 0), 0),
                 },
                 paymentInfo: {
                     basePrice,
@@ -169,6 +166,7 @@ function GeneralInfoContent() {
     }
 
     return (
+        <div className="min-h-screen bg-gradient-to-b from-purple-100 via-pink-50 to-white p-4">
             <div className="max-w-md mx-auto bg-white rounded-2xl shadow-xl overflow-hidden">
                 {/* Header */}
                 <div className="bg-gradient-to-r from-pink-400 to-purple-500 p-6 text-white">
@@ -317,6 +315,7 @@ function GeneralInfoContent() {
                     </button>
                 </form>
             </div>
+        </div>
     );
 }
 
