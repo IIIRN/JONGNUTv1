@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from 'react'; // Import Suspense
 import { useRouter, useSearchParams } from 'next/navigation';
 import { db } from '@/app/lib/firebase';
-import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, doc, getDoc } from 'firebase/firestore';
 import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
 import { format } from 'date-fns';
@@ -58,13 +58,67 @@ function SelectDateTimeContent() {
         return date;
     };
     const [activeStartDate, setActiveStartDate] = useState(getStartOfWeek(new Date()));
+
     const [time, setTime] = useState('');
     const [beauticians, setBeauticians] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedBeautician, setSelectedBeautician] = useState(null);
+    const [timeSlots, setTimeSlots] = useState([]);
+    const [timeQueues, setTimeQueues] = useState([]); // [{time, count}]
+    const [totalBeauticians, setTotalBeauticians] = useState(1);
+    const [slotCounts, setSlotCounts] = useState({}); // { '09:00': 2, ... }
 
-    // Example time slots
-    const timeSlots = ['09:00', '10:00', '11:00', '13:00', '14:00', '15:00', '16:00', '17:00'];
+    // Fetch availableTimes, timeQueues, totalBeauticians from settings/booking
+    useEffect(() => {
+        const fetchAvailableTimes = async () => {
+            try {
+                const docRef = doc(db, 'settings', 'booking');
+                const docSnap = await getDoc(docRef);
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    setTimeSlots(Array.isArray(data.availableTimes) ? data.availableTimes : []);
+                    setTimeQueues(Array.isArray(data.timeQueues) ? data.timeQueues : []);
+                    setTotalBeauticians(Number(data.totalBeauticians) || 1);
+                } else {
+                    setTimeSlots([]);
+                    setTimeQueues([]);
+                    setTotalBeauticians(1);
+                }
+            } catch (e) {
+                setTimeSlots([]);
+                setTimeQueues([]);
+                setTotalBeauticians(1);
+            }
+        };
+        fetchAvailableTimes();
+    }, []);
+
+    // Fetch appointment counts for the selected date
+    useEffect(() => {
+        if (!date) return;
+        const fetchSlotCounts = async () => {
+            try {
+                const dateStr = format(date, 'yyyy-MM-dd');
+                const q = query(
+                    collection(db, 'appointments'),
+                    where('date', '==', dateStr),
+                    where('status', 'in', ['pending', 'confirmed'])
+                );
+                const querySnapshot = await getDocs(q);
+                const counts = {};
+                querySnapshot.forEach(doc => {
+                    const appt = doc.data();
+                    if (appt.time) {
+                        counts[appt.time] = (counts[appt.time] || 0) + 1;
+                    }
+                });
+                setSlotCounts(counts);
+            } catch (e) {
+                setSlotCounts({});
+            }
+        };
+        fetchSlotCounts();
+    }, [date]);
 
     useEffect(() => {
         const fetchBeauticians = async () => {
@@ -98,6 +152,13 @@ function SelectDateTimeContent() {
         params.set('time', time);
         params.set('beauticianId', selectedBeautician.id);
         router.push(`/appointment/general-info?${params.toString()}`);
+    };
+
+    // Helper: get max allowed for a slot
+    const getMaxForSlot = (slot) => {
+        const queue = timeQueues.find(q => q.time === slot);
+        if (queue && queue.count) return queue.count;
+        return totalBeauticians;
     };
 
     return (
@@ -158,16 +219,28 @@ function SelectDateTimeContent() {
             <div className="w-full max-w-md mx-auto mt-6">
                 <h2 className="text-base font-bold mb-2 text-purple-700">AVAILABLE TIME</h2>
                 <div className="grid grid-cols-3 gap-3">
-                    {timeSlots.map(slot => (
-                        <button
-                            key={slot}
-                            onClick={() => setTime(slot)}
-                            className={`rounded-full px-4 py-2 text-sm font-semibold shadow-sm transition-colors
-                                ${time === slot ? 'bg-gradient-to-tr from-pink-400 to-purple-500 text-white shadow-lg' : 'bg-white text-purple-700 border border-purple-100 hover:bg-purple-50'}`}
-                        >
-                            {slot}
-                        </button>
-                    ))}
+                    {[...timeSlots]
+                        .filter(Boolean)
+                        .map(String)
+                        .sort((a, b) => a.localeCompare(b))
+                        .map(slot => {
+                            const max = getMaxForSlot(slot);
+                            const booked = slotCounts[slot] || 0;
+                            const isFull = booked >= max;
+                            return (
+                                <button
+                                    key={slot}
+                                    onClick={() => !isFull && setTime(slot)}
+                                    className={`rounded-full px-4 py-2 text-sm font-semibold shadow-sm transition-colors
+                                        ${time === slot ? 'bg-gradient-to-tr from-pink-400 to-purple-500 text-white shadow-lg' : 'bg-white text-purple-700 border border-purple-100 hover:bg-purple-50'}
+                                        ${isFull ? 'opacity-40 cursor-not-allowed line-through' : ''}`}
+                                    disabled={isFull}
+                                    title={isFull ? 'คิวเต็ม' : ''}
+                                >
+                                    {slot} {isFull && <span className="text-xs">(เต็ม)</span>}
+                                </button>
+                            );
+                        })}
                 </div>
             </div>
 

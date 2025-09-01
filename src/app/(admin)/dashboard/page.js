@@ -107,66 +107,49 @@ const statusColors = {
 const STATUS_FILTERS = ['all', 'awaiting_confirmation', 'confirmed', 'completed', 'cancelled'];
 
 // --- NEW: Booking Card Component ---
+
 const AppointmentCard = ({ appointment, beauticians, onCancel }) => {
     const router = useRouter();
     const appointmentDate = appointment.appointmentInfo && appointment.appointmentInfo.dateTime && typeof appointment.appointmentInfo.dateTime.toDate === 'function'
-            ? appointment.appointmentInfo.dateTime.toDate()
-            : null;
-        const beauticianName = appointment.appointmentInfo?.beauticianId && beauticians[appointment.appointmentInfo.beauticianId]
-            ? `${beauticians[appointment.appointmentInfo.beauticianId].firstName || ''} ${beauticians[appointment.appointmentInfo.beauticianId].lastName || ''}`.trim()
-            : 'N/A';
-
-    const formatPrice = (val) => {
-        if (val === null || val === undefined || val === '-') return '-';
-        if (typeof val === 'number') return val.toLocaleString();
-        const n = Number(val);
-        return Number.isFinite(n) ? n.toLocaleString() : String(val);
-    };
-
+        ? appointment.appointmentInfo.dateTime.toDate()
+        : null;
+    const beauticianName = appointment.appointmentInfo?.beauticianId && beauticians[appointment.appointmentInfo.beauticianId]
+        ? beauticians[appointment.appointmentInfo.beauticianId].firstName || '-' : '-';
     const addOns = appointment.appointmentInfo?.addOns || appointment.addOns || [];
-
+    const price = appointment.paymentInfo?.totalPrice || appointment.paymentInfo?.originalPrice || appointment.serviceInfo?.price || '-';
     return (
-        <div className="bg-white rounded-lg shadow-md p-4 flex flex-col justify-between">
-            <div>
-                <div className="flex justify-between items-start mb-2">
-                    <div>
-                        <p className="font-bold text-lg text-gray-800">{appointment.customerInfo?.name || '-'}</p>
-                        <p className="text-xs text-gray-500">{appointment.customerInfo?.phone || '-'}</p>
-                    </div>
-                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${statusColors[appointment.status]}`}>
-                        {statusTranslations[appointment.status]}
-                    </span>
+        <div className="bg-white rounded-lg shadow p-3 flex flex-col gap-2">
+            <div className="flex justify-between items-center">
+                <div>
+                    <div className="font-bold text-base text-gray-800">{appointment.customerInfo?.fullName || appointment.customerInfo?.name || '-'}</div>
+                    <div className="text-xs text-gray-500">{appointment.customerInfo?.phone || '-'}</div>
                 </div>
-                <div className="border-t my-2"></div>
-                <div className="flex items-center space-x-3 text-sm">
-                    <Image src={appointment.serviceInfo && appointment.serviceInfo.imageUrl ? appointment.serviceInfo.imageUrl : '/placeholder.png'} alt="service" width={60} height={60} className="rounded-md object-cover flex-shrink-0"/>
-                    <div>
-                        <p className="font-semibold text-gray-900">{appointment.serviceInfo && appointment.serviceInfo.name ? appointment.serviceInfo.name : '-'}</p>
-                                <p className="text-gray-600">ช่างเสริมสวย: {beauticianName}</p>
-                    </div>
-                </div>
-                {addOns && addOns.length > 0 && (
-                    <div className="mt-3 bg-gray-50 p-2 rounded-md text-sm text-gray-700">
-                        <h4 className="font-medium mb-1">บริการเสริม</h4>
-                        <ul className="space-y-1">
-                            {addOns.map((a, i) => (
-                                <li key={i} className="flex justify-between">
-                                    <span>{a.name || a.title || 'ไม่มีชื่อ'}</span>
-                                    <span className="font-medium">{formatPrice(a.price)} ฿</span>
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
-                )}
-                      <div className="text-xs text-gray-600 mt-3 space-y-1 bg-gray-50 p-2 rounded-md">
-                          <p><strong>นัดหมาย:</strong> {appointmentDate ? format(appointmentDate, 'dd MMM yy, HH:mm', { locale: th }) : '-'} ที่ {appointment.locationInfo?.name || '-'}</p>
+                <span className={`px-2 py-1 text-xs font-semibold rounded ${statusColors[appointment.status]}`}>{statusTranslations[appointment.status]}</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+                <Image src={appointment.serviceInfo?.imageUrl || '/placeholder.png'} alt="service" width={40} height={40} className="rounded object-cover"/>
+                <div>
+                    <div className="font-semibold text-gray-900">{appointment.serviceInfo?.name || '-'}</div>
+                    <div className="text-gray-600">พนักงาน: {beauticianName}</div>
                 </div>
             </div>
-            <div className="mt-4 pt-3 flex justify-end items-center gap-2">
-                 <button onClick={() => navigateToDetail(router, appointment.id)} className="text-sm bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-1 px-3 rounded-md">รายละเอียด</button>
-                 {['awaiting_confirmation', 'confirmed'].includes(appointment.status) && (
-                    <button onClick={() => onCancel(appointment)} className="text-sm bg-red-100 hover:bg-red-200 text-red-800 font-semibold py-1 px-3 rounded-md">ยกเลิก</button>
-                 )}
+            <div className="flex flex-wrap gap-2 text-xs text-gray-600">
+                <div>วัน/เวลา: {appointmentDate ? format(appointmentDate, 'dd MMM yy, HH:mm', { locale: th }) : '-'}</div>
+                <div>ราคา: {typeof price === 'number' ? price.toLocaleString() : price} ฿</div>
+            </div>
+            {addOns.length > 0 && (
+                <div className="flex flex-wrap gap-2 text-xs text-gray-700">
+                    <span className="font-medium">บริการเสริม:</span>
+                    {addOns.map((a, i) => (
+                        <span key={i}>{a.name || a.title || 'ไม่มีชื่อ'} ({typeof a.price === 'number' ? a.price.toLocaleString() : a.price}฿)</span>
+                    ))}
+                </div>
+            )}
+            <div className="flex justify-end gap-2 mt-2">
+                <button onClick={() => navigateToDetail(router, appointment.id)} className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold py-1 px-2 rounded">รายละเอียด</button>
+                {['awaiting_confirmation', 'confirmed'].includes(appointment.status) && (
+                    <button onClick={() => onCancel(appointment)} className="text-xs bg-red-100 hover:bg-red-200 text-red-800 font-semibold py-1 px-2 rounded">ยกเลิก</button>
+                )}
             </div>
         </div>
     );
@@ -183,6 +166,7 @@ export default function AdminDashboardPage() {
     const [loading, setLoading] = useState(true);
     const [appointmentToCancel, setAppointmentToCancel] = useState(null);
     const [appointmentToInvoice, setAppointmentToInvoice] = useState(null);
+    const [tabIndex, setTabIndex] = useState(0); // 0: confirmed, 1: awaiting, 2: completed/cancelled
 
     // --- Real-time listeners for appointments and services ---
     useEffect(() => {
@@ -343,49 +327,64 @@ export default function AdminDashboardPage() {
                 <StatCard title="เสร็จสิ้นวันนี้" value={stats.completedToday} color={{bg: 'bg-purple-100', ring: 'ring-purple-500'}} icon={'⬅️'} onClick={() => handleStatFilterClick('completed', 'today')} isActive={statusFilter === 'completed' && dateFilter === 'today'}/>
             </div>
 
-            {/* --- FILTER BAR (status / date / search) --- */}
-            <div className="bg-white p-4 rounded-lg shadow-md">
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="p-2 border rounded-md bg-white">
-                            <option value="all">ทั้งหมด</option>
-                            <option value="awaiting_confirmation">รอยืนยัน</option>
-                            <option value="confirmed">ยืนยันแล้ว</option>
-                            <option value="completed">เสร็จสิ้น</option>
-                            <option value="cancelled">ยกเลิก</option>
-                        </select>
-                        <select value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} className="p-2 border rounded-md bg-white">
-                            <option value="all">ทุกวันที่</option>
-                            <option value="today">วันนี้</option>
-                        </select>
-                        <input placeholder="ค้นหาชื่อ/เบอร์/บริการ" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="p-2 border rounded-md" />
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <button onClick={() => { setStatusFilter('all'); setDateFilter('all'); setSearchQuery(''); }} className="px-3 py-2 bg-gray-100 rounded-md">ล้าง</button>
-                    </div>
+
+            {/* --- Tabs --- */}
+            <div className="mt-6">
+                <div className="flex gap-2 mb-6">
+                    <button onClick={() => setTabIndex(0)} className={`px-4 py-2 rounded-t-lg font-bold border-b-2 ${tabIndex===0 ? 'border-blue-500 text-blue-700 bg-blue-50' : 'border-transparent text-gray-500 bg-gray-50'}`}>ยืนยันแล้ว</button>
+                    <button onClick={() => setTabIndex(1)} className={`px-4 py-2 rounded-t-lg font-bold border-b-2 ${tabIndex===1 ? 'border-yellow-500 text-yellow-700 bg-yellow-50' : 'border-transparent text-gray-500 bg-gray-50'}`}>รอยืนยัน</button>
+                    <button onClick={() => setTabIndex(2)} className={`px-4 py-2 rounded-t-lg font-bold border-b-2 ${tabIndex===2 ? 'border-gray-500 text-gray-700 bg-gray-100' : 'border-transparent text-gray-500 bg-gray-50'}`}>เสร็จสิ้น/ยกเลิก</button>
                 </div>
-                
-                {/* --- NEW: Appointment Cards Grid --- */}
-                <div className="mt-4">
-                    {filteredAppointments.length > 0 ? (
+                <div>
+                    {tabIndex === 0 && (
                         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                            {filteredAppointments.map(appointment => (
-                                <AppointmentCard 
-                                    key={appointment.id} 
-                                    appointment={appointment} 
-                                    beauticians={beauticians} 
-                                    onCancel={setAppointmentToCancel}
-                                />
-                            ))}
+                            {filteredAppointments.filter(a => a.status === 'confirmed').length > 0 ? (
+                                filteredAppointments.filter(a => a.status === 'confirmed').map(appointment => (
+                                    <AppointmentCard 
+                                        key={appointment.id} 
+                                        appointment={appointment} 
+                                        beauticians={beauticians} 
+                                        onCancel={setAppointmentToCancel}
+                                    />
+                                ))
+                            ) : (
+                                <div className="text-center py-6 text-gray-400 col-span-3">ไม่มีรายการ</div>
+                            )}
                         </div>
-                    ) : (
-                        <div className="text-center py-10 text-gray-500">
-                            <p className="font-semibold">ไม่พบรายการนัดหมาย</p>
-                            <p className="text-sm">ไม่มีรายการที่ตรงกับเงื่อนไขที่เลือก</p>
+                    )}
+                    {tabIndex === 1 && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                            {filteredAppointments.filter(a => a.status === 'awaiting_confirmation').length > 0 ? (
+                                filteredAppointments.filter(a => a.status === 'awaiting_confirmation').map(appointment => (
+                                    <AppointmentCard 
+                                        key={appointment.id} 
+                                        appointment={appointment} 
+                                        beauticians={beauticians} 
+                                        onCancel={setAppointmentToCancel}
+                                    />
+                                ))
+                            ) : (
+                                <div className="text-center py-6 text-gray-400 col-span-3">ไม่มีรายการ</div>
+                            )}
+                        </div>
+                    )}
+                    {tabIndex === 2 && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                            {filteredAppointments.filter(a => a.status === 'completed' || a.status === 'cancelled').length > 0 ? (
+                                filteredAppointments.filter(a => a.status === 'completed' || a.status === 'cancelled').map(appointment => (
+                                    <AppointmentCard 
+                                        key={appointment.id} 
+                                        appointment={appointment} 
+                                        beauticians={beauticians} 
+                                        onCancel={setAppointmentToCancel}
+                                    />
+                                ))
+                            ) : (
+                                <div className="text-center py-6 text-gray-400 col-span-3">ไม่มีรายการ</div>
+                            )}
                         </div>
                     )}
                 </div>
-
             </div>
         </div>
     );

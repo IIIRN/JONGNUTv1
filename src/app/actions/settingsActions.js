@@ -32,14 +32,11 @@ export async function saveNotificationSettings(settingsData) {
 export async function saveBookingSettings(settingsData) {
   try {
     const settingsRef = db.collection('settings').doc('booking');
-    // [!code focus start]
-    // --- UPDATED: บันทึกเฉพาะ bufferHours ---
-    const dataToSave = {
-        bufferHours: settingsData.bufferHours || 0,
-        updatedAt: FieldValue.serverTimestamp()
-    };
-    await settingsRef.set(dataToSave, { merge: true });
-    // [!code focus end]
+    // Save all fields from settingsData
+    await settingsRef.set({
+      ...settingsData,
+      updatedAt: FieldValue.serverTimestamp()
+    }, { merge: true });
     console.log("Successfully saved booking settings.");
     return { success: true };
   } catch (error) {

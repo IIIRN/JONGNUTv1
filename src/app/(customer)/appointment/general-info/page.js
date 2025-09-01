@@ -59,16 +59,23 @@ function GeneralInfoContent() {
         fetchAllData();
     }, [profile, liffLoading, serviceId, beauticianId]);
 
-    const { totalPrice, discount, finalPrice } = useMemo(() => {
-        if (!service) return { totalPrice: 0, discount: 0, finalPrice: 0 };
-        const addOnsPrice = (service.addOnServices || []).filter(a => addOns?.split(',').includes(a.name)).reduce((sum, a) => sum + (Number(a.price) || 0), 0);
-        const currentTotalPrice = (Number(service.price) || 0) + addOnsPrice;
+    const { basePrice, addOnsTotal, totalPrice, discount, finalPrice } = useMemo(() => {
+        if (!service) return { basePrice: 0, addOnsTotal: 0, totalPrice: 0, discount: 0, finalPrice: 0 };
+        const basePrice = Number(service.price) || 0;
+        const addOnsTotal = (service.addOnServices || []).filter(a => addOns?.split(',').includes(a.name)).reduce((sum, a) => sum + (Number(a.price) || 0), 0);
+        const currentTotalPrice = basePrice + addOnsTotal;
         let currentDiscount = 0;
         const selectedCoupon = availableCoupons.find(c => c.id === selectedCouponId);
         if (selectedCoupon?.type === 'percentage_discount') {
             currentDiscount = (currentTotalPrice * selectedCoupon.value) / 100;
         }
-        return { totalPrice: currentTotalPrice, discount: currentDiscount, finalPrice: currentTotalPrice - currentDiscount };
+        return {
+            basePrice,
+            addOnsTotal,
+            totalPrice: currentTotalPrice,
+            discount: currentDiscount,
+            finalPrice: currentTotalPrice - currentDiscount
+        };
     }, [service, addOns, selectedCouponId, availableCoupons]);
 
     const handleChange = (e) => {
@@ -98,8 +105,10 @@ function GeneralInfoContent() {
                     duration: (service.duration || 0) + (service.addOnServices || []).filter(a => addOns?.includes(a.name)).reduce((sum, a) => sum + (a.duration || 0), 0),
                 },
                 paymentInfo: {
-                    totalPrice: finalPrice,
+                    basePrice,
+                    addOnsTotal,
                     originalPrice: totalPrice,
+                    totalPrice: finalPrice,
                     discount: discount,
                     couponId: selectedCouponId || null,
                     couponName: availableCoupons.find(c => c.id === selectedCouponId)?.name || null,
