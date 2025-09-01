@@ -3,17 +3,20 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { db } from '@/app/lib/firebase';
-import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, orderBy, onSnapshot, getDocs } from 'firebase/firestore';
 import { useLiffContext } from '@/context/LiffProvider';
 import { Notification, ConfirmationModal } from '@/app/components/common/NotificationComponent';
 import { cancelAppointmentByUser } from '@/app/actions/appointmentActions';
-import AppointmentCard from './AppointmentCard'; // Updated import
-import QrCodeModal from '@/app/components/common/QrCodeModal'; // Updated import
+import AppointmentCard from './AppointmentCard';
+import QrCodeModal from '@/app/components/common/QrCodeModal';
+import HistoryCard from './history/HistoryCard';
 
 export default function MyAppointmentsPage() {
     const { profile, loading: liffLoading, error: liffError } = useLiffContext();
-    const [appointments, setAppointments] = useState([]);
+    const [appointments, setAppointments] = useState([]); // current
+    const [historyBookings, setHistoryBookings] = useState([]); // history
     const [loading, setLoading] = useState(true);
+    const [showHistory, setShowHistory] = useState(false);
     const [notification, setNotification] = useState({ show: false, title: '', message: '', type: 'success' });
     const [showQrModal, setShowQrModal] = useState(false);
     const [selectedAppointmentId, setSelectedAppointmentId] = useState(null);
@@ -32,15 +35,14 @@ export default function MyAppointmentsPage() {
             if (!liffLoading) setLoading(false);
             return;
         }
-
         setLoading(true);
+        // ดึงนัดหมายปัจจุบัน (รอ/ยืนยัน)
         const appointmentsQuery = query(
             collection(db, 'appointments'),
             where("userId", "==", profile.userId),
             where("status", "in", ['awaiting_confirmation', 'confirmed']),
             orderBy("appointmentInfo.dateTime", "asc")
         );
-
         const unsubscribe = onSnapshot(appointmentsQuery, (snapshot) => {
             const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             setAppointments(docs);
@@ -50,7 +52,23 @@ export default function MyAppointmentsPage() {
             setNotification({ show: true, title: 'Error', message: 'Could not fetch appointments.', type: 'error' });
             setLoading(false);
         });
-
+        // ดึงประวัติ (เสร็จ/ยกเลิก)
+        const fetchHistory = async () => {
+            try {
+                const bookingsQuery = query(
+                    collection(db, 'appointments'),
+                    where("userId", "==", profile.userId),
+                    where("status", "in", ["completed", "cancelled"]),
+                    orderBy("appointmentInfo.dateTime", "desc")
+                );
+                const querySnapshot = await getDocs(bookingsQuery);
+                const bookingsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                setHistoryBookings(bookingsData);
+            } catch (error) {
+                console.error("Error fetching booking history:", error);
+            }
+        };
+        fetchHistory();
         return () => unsubscribe();
     }, [profile, liffLoading]);
 
@@ -83,7 +101,6 @@ export default function MyAppointmentsPage() {
     return (
         <div className="space-y-5">
             <Notification {...notification} />
-
             <ConfirmationModal
                 show={!!appointmentToCancel}
                 title="ยืนยันการยกเลิก"
@@ -92,27 +109,15 @@ export default function MyAppointmentsPage() {
                 onCancel={() => setAppointmentToCancel(null)}
                 isProcessing={isCancelling}
             />
-
             <QrCodeModal
                 show={showQrModal}
                 onClose={() => setShowQrModal(false)}
                 appointmentId={selectedAppointmentId}
             />
-
-            <div className="flex items-center space-x-3">
-                <Link href="/appointment" className="w-full bg-white text-pink-500 bg-border shadow rounded-2xl py-4 text-center font-semibold ">
-                    จองบริการ
-                </Link>
-            </div>
-            <div className="flex ">
-                <button className="w-1/2 bg-pink-500 bg-border text-white rounded-l-full shadow py-2 font-semibold">
-                    รายการของฉัน
-                </button>
-                <Link href="/my-appointments/history" className="w-1/2 text-center bg-white shadow rounded-r-full py-2 text-gray-600 font-semibold">
-                    ประวัติ
-                </Link>
-            </div>
+            {/* ปุ่มจองบริการถูกลบออก */}
+            {/* นัดหมายปัจจุบัน */}
             <div className="space-y-4">
+                <div className="font-bold text-md text-gray-700">นัดหมายของฉัน</div>
                 {loading ? (
                     <div className="text-center text-gray-500 pt-10">กำลังโหลดรายการนัดหมาย...</div>
                 ) : appointments.length === 0 ? (
@@ -130,6 +135,36 @@ export default function MyAppointmentsPage() {
                     ))
                 )}
             </div>
+            {/* toggle ประวัติ */}
+            <div className="flex flex-col items-center mt-6">
+                <button
+                    className="text-purple-600 font-semibold flex items-center gap-2 focus:outline-none"
+                    onClick={() => setShowHistory(v => !v)}
+                >
+                    <span className="text-lg">{showHistory ? '▲ ซ่อนประวัติที่ผ่านมา' : '▼ ดูประวัติที่ผ่านมา'}</span>
+                </button>
+            </div>
+            {/* ประวัติ */}
+            {showHistory && (
+                <div className="space-y-4 mt-2">
+                    <div className="font-bold text-md text-gray-700">ประวัติการใช้บริการ</div>
+                    {loading ? (
+                        <div className="text-center text-gray-500 pt-10">กำลังโหลดประวัติ...</div>
+                    ) : historyBookings.length === 0 ? (
+                        <div className="text-center text-gray-500 pt-10 bg-white p-8 rounded-xl ">
+                            <p>ยังไม่มีประวัติการใช้บริการ</p>
+                        </div>
+                    ) : (
+                        historyBookings.map(job => (
+                            <HistoryCard
+                                key={job.id}
+                                appointment={job}
+                                onBookAgain={() => { window.location.href = '/appointment'; }}
+                            />
+                        ))
+                    )}
+                </div>
+            )}
         </div>
     );
 }

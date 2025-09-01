@@ -47,12 +47,9 @@ function CustomerHeader() {
                 </div>
             </header>
             
-            <div className="mt-4 grid grid-cols-3 gap-3">
+            <div className="mt-4 grid grid-cols-2 gap-3">
                  <Link href="/appointment" className="bg-white text-center text-pink-500 shadow rounded-lg py-3 font-semibold text-sm">
                     จองบริการ
-                </Link>
-                 <Link href="/rewards" className="bg-white text-center text-purple-500 shadow rounded-lg py-3 font-semibold text-sm">
-                    แลกรางวัล
                 </Link>
                  <Link href="/my-coupons" className="bg-white text-center text-indigo-500 shadow rounded-lg py-3 font-semibold text-sm">
                     คูปองของฉัน

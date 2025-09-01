@@ -57,11 +57,6 @@ export default function BookingHistoryPage() {
 
     return (
         <main className="space-y-5">
-            <div className="flex items-center space-x-3">
-                <Link href="/appointment" className="w-full bg-white text-pink-500 bg-border shadow rounded-2xl py-4 text-center font-semibold ">
-                    จองบริการ
-                </Link>
-            </div>
             <div className="flex shadow ">
                 <Link href="/my-appointments" className="w-1/2 text-center rounded-l-full py-2 bg-white  text-gray-600 font-semibold">
                     รายการของฉัน

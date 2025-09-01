@@ -4,8 +4,8 @@ import { useState, useEffect, Suspense } from 'react'; // Import Suspense
 import { useRouter, useSearchParams } from 'next/navigation';
 import { db } from '@/app/lib/firebase';
 import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
-import { DayPicker } from 'react-day-picker';
-import 'react-day-picker/dist/style.css';
+import Calendar from 'react-calendar';
+import 'react-calendar/dist/Calendar.css';
 import { format } from 'date-fns';
 import { th } from 'date-fns/locale';
 import Image from 'next/image';
@@ -49,6 +49,15 @@ function SelectDateTimeContent() {
     const addOns = searchParams.get('addOns');
 
     const [date, setDate] = useState(new Date());
+    // สัปดาห์ปัจจุบัน (เริ่มที่วันอาทิตย์)
+    const getStartOfWeek = (d) => {
+        const date = new Date(d);
+        const day = date.getDay();
+        date.setDate(date.getDate() - day);
+        date.setHours(0,0,0,0);
+        return date;
+    };
+    const [activeStartDate, setActiveStartDate] = useState(getStartOfWeek(new Date()));
     const [time, setTime] = useState('');
     const [beauticians, setBeauticians] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -92,38 +101,79 @@ function SelectDateTimeContent() {
     };
 
     return (
-        <div className="pb-28">
-             <div className="p-4">
-                <button onClick={() => router.back()} className="flex items-center text-gray-600">
-                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path></svg>
-                    ย้อนกลับ
-                </button>
-            </div>
-            
-            <div className="p-4">
-                <h2 className="text-lg font-bold mb-3">1. เลือกวันที่</h2>
-                <div className="flex justify-center bg-white p-2 rounded-lg shadow-sm">
-                    <DayPicker
-                        mode="single"
-                        selected={date}
-                        onSelect={setDate}
-                        locale={th}
-                        modifiers={{ disabled: { before: new Date() } }}
-                    />
+    <div className="min-h-screen bg-gradient-to-b from-purple-100 via-pink-50 to-white flex flex-col items-center pt-4 px-2">
+            {/* Calendar */}
+            <div className="w-full max-w-md mx-auto flex flex-col items-center">
+                <div className="flex items-center justify-between w-full mb-2">
+                    <button
+                        onClick={() => setActiveStartDate(prev => {
+                            const d = new Date(prev);
+                            d.setDate(d.getDate() - 7);
+                            return d;
+                        })}
+                        className="px-2 py-1 text-xl text-purple-400 hover:text-pink-500"
+                    >&#60;</button>
+                    <span className="font-bold text-base text-purple-700">
+                        {activeStartDate.toLocaleString('th-TH', { month: 'long', year: 'numeric' })}
+                    </span>
+                    <button
+                        onClick={() => setActiveStartDate(prev => {
+                            const d = new Date(prev);
+                            d.setDate(d.getDate() + 7);
+                            return d;
+                        })}
+                        className="px-2 py-1 text-xl text-purple-400 hover:text-pink-500"
+                    >&#62;</button>
+                </div>
+                <div className="w-full">
+                    <div className="grid grid-cols-7 gap-2 justify-items-center">
+                        {['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'].map((d, i) => (
+                            <div key={i} className="text-xs text-purple-400 text-center font-semibold">{d}</div>
+                        ))}
+                        {Array.from({ length: 7 }).map((_, i) => {
+                            const d = new Date(activeStartDate);
+                            d.setDate(d.getDate() + i);
+                            const isToday = (new Date()).toDateString() === d.toDateString();
+                            const isSelected = date && d.toDateString() === date.toDateString();
+                            const isPast = d < new Date(new Date().setHours(0,0,0,0));
+                            return (
+                                <button
+                                    key={i}
+                                    onClick={() => !isPast && setDate(d)}
+                                    className={`w-10 h-10 flex items-center justify-center rounded-full text-sm font-semibold transition-colors
+                                        ${isSelected ? 'bg-gradient-to-tr from-pink-400 to-purple-500 text-white shadow-lg' : isToday ? 'border-2 border-pink-400 text-pink-500 bg-white' : 'bg-white text-purple-700'}
+                                        ${isPast ? 'opacity-40 cursor-not-allowed' : 'hover:bg-pink-100'}
+                                    `}
+                                    disabled={isPast}
+                                >
+                                    {d.getDate()}
+                                </button>
+                            );
+                        })}
+                    </div>
                 </div>
             </div>
 
-            <div className="p-4">
-                 <h2 className="text-lg font-bold mb-3">2. เลือกเวลา</h2>
-                 <div className="grid grid-cols-4 gap-2">
+            {/* Available Time */}
+            <div className="w-full max-w-md mx-auto mt-6">
+                <h2 className="text-base font-bold mb-2 text-purple-700">AVAILABLE TIME</h2>
+                <div className="grid grid-cols-3 gap-3">
                     {timeSlots.map(slot => (
-                        <TimeSlot key={slot} time={slot} isSelected={time === slot} onSelect={setTime} />
+                        <button
+                            key={slot}
+                            onClick={() => setTime(slot)}
+                            className={`rounded-full px-4 py-2 text-sm font-semibold shadow-sm transition-colors
+                                ${time === slot ? 'bg-gradient-to-tr from-pink-400 to-purple-500 text-white shadow-lg' : 'bg-white text-purple-700 border border-purple-100 hover:bg-purple-50'}`}
+                        >
+                            {slot}
+                        </button>
                     ))}
-                 </div>
+                </div>
             </div>
 
-            <div className="p-4">
-                <h2 className="text-lg font-bold mb-3">3. เลือกช่างเสริมสวย</h2>
+            {/* Beautician Selection (optional, can be hidden for minimal UI) */}
+            <div className="w-full max-w-md mx-auto mt-6">
+                <h2 className="text-base font-bold mb-2 text-purple-700">เลือกช่างเสริมสวย</h2>
                 {loading ? (
                     <div className="text-center">กำลังโหลดรายชื่อช่าง...</div>
                 ) : beauticians.length === 0 ? (
@@ -142,22 +192,12 @@ function SelectDateTimeContent() {
                 )}
             </div>
 
-             {/* --- Fixed Footer --- */}
-             <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 shadow-lg max-w-md mx-auto">
-                 <div className="flex justify-between items-center mb-3 text-sm">
-                    <div>
-                        <p className="text-gray-500">วันที่เลือก</p>
-                        <p className="font-bold">{date ? format(date, 'dd MMM yyyy', { locale: th }) : 'ยังไม่ได้เลือก'}</p>
-                    </div>
-                     <div>
-                        <p className="text-gray-500">เวลา</p>
-                        <p className="font-bold">{time || 'ยังไม่ได้เลือก'}</p>
-                    </div>
-                 </div>
-                 <button 
-                    onClick={handleConfirm} 
+            {/* Confirm Button */}
+            <div className="w-full max-w-md mx-auto mt-8 mb-8">
+                <button
+                    onClick={handleConfirm}
                     disabled={!date || !time || !selectedBeautician}
-                    className="w-full bg-pink-500 text-white py-3 rounded-xl font-bold hover:bg-pink-600 disabled:bg-gray-300"
+                    className="w-full bg-gradient-to-tr from-pink-400 to-purple-500 text-white py-3 rounded-xl font-bold text-base shadow-lg hover:from-pink-500 hover:to-purple-600 disabled:bg-gray-300 disabled:text-gray-400"
                 >
                     ถัดไป
                 </button>

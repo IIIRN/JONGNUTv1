@@ -139,65 +139,123 @@ function GeneralInfoContent() {
     }
 
     return (
-        <div className="pb-28">
-            <form onSubmit={handleSubmit} className="p-4">
-                <div className="bg-white p-4 rounded-lg shadow-md">
-                    <h2 className="text-xl font-bold mb-4">ยืนยันการนัดหมาย</h2>
-                    
-                    <div className="space-y-2 text-sm mb-4 border-b pb-4">
-                         <div className="flex justify-between"><span className="text-gray-500">บริการ:</span><span className="font-semibold text-right">{service?.serviceName || 'N/A'}</span></div>
-                         <div className="flex justify-between"><span className="text-gray-500">พนักงาน:</span><span className="font-semibold text-right">{beautician ? `${beautician.firstName} ${beautician.lastName}` : 'N/A'}</span></div>
-                         <div className="flex justify-between"><span className="text-gray-500">วัน-เวลา:</span><span className="font-semibold text-right">{date ? `${format(new Date(date), 'dd MMM yyyy', { locale: th })}, ${time}` : 'N/A'}</span></div>
+        <form onSubmit={handleSubmit} className="w-full max-w-sm mx-auto flex flex-col justify-between">
+            <div className="bg-white/90 rounded-2xl shadow-lg p-5 mb-4 space-y-3">
+                <div className="flex items-center justify-between text-[15px] text-purple-700 font-semibold">
+                    <span>วันที่</span>
+                    <span className="font-bold text-[16px]">{date ? format(new Date(date), 'd/M/yyyy', { locale: th }) : '-'}</span>
+                    <span>เวลา</span>
+                    <span className="font-bold text-[16px]">{time ? `${time} น.` : '-'}</span>
+                </div>
+                <div className="border-b border-purple-100 my-2" />
+                <div className="grid grid-cols-2 gap-y-1 text-[15px]">
+                    <span className="text-gray-500">บริการ</span>
+                    <span className="text-right text-purple-700 font-semibold">{service?.serviceName || '-'}</span>
+                    <span className="text-gray-500">ระยะเวลา</span>
+                    <span className="text-right">{service?.duration || '-'} นาที</span>
+                    <span className="text-gray-500">ราคา</span>
+                    <span className="text-right">{service?.price?.toLocaleString() || '-'}</span>
+                </div>
+                {addOns && service?.addOnServices && service.addOnServices.filter(a => addOns.split(',').includes(a.name)).length > 0 && (
+                    <div className="mt-2">
+                        <div className="text-purple-700 font-semibold mb-1">บริการเสริม</div>
+                        <div className="space-y-1">
+                            {service.addOnServices.filter(a => addOns.split(',').includes(a.name)).map(a => (
+                                <div key={a.name} className="flex justify-between text-[15px]">
+                                    <span>{a.name}</span>
+                                    <span className="text-gray-500">{a.duration} นาที | {a.price?.toLocaleString()}</span>
+                                </div>
+                            ))}
+                        </div>
                     </div>
-
-                    <div className="space-y-4">
-                        <div>
-                            <label className="block mb-1 text-sm font-medium">ชื่อ-นามสกุล <span className="text-red-500">*</span></label>
-                            <input name="fullName" value={formData.fullName} onChange={handleChange} required className="border rounded-lg px-3 py-2 w-full"/>
+                )}
+                <div className="mt-2">
+                    <label className="block text-purple-700 font-semibold mb-1 text-[15px]">ใช้คูปอง</label>
+                    <select
+                        value={selectedCouponId}
+                        onChange={e => setSelectedCouponId(e.target.value)}
+                        className="w-full border border-purple-200 rounded-lg px-3 py-2 text-[15px] focus:ring-2 focus:ring-pink-200 bg-white"
+                        disabled={availableCoupons.length === 0}
+                    >
+                        <option value="">{availableCoupons.length > 0 ? 'ไม่ใช้คูปอง' : 'ไม่มีคูปองให้เลือก'}</option>
+                        {availableCoupons.map(coupon => (
+                            <option key={coupon.id} value={coupon.id}>{coupon.name} (-{coupon.value}%)</option>
+                        ))}
+                    </select>
+                </div>
+                {selectedCouponId && (
+                    <div className="flex justify-between items-center mt-2 text-[15px]">
+                        <span className="text-purple-700 font-semibold">คูปอง</span>
+                        <span className="text-right">{availableCoupons.find(c => c.id === selectedCouponId)?.name || '-'}</span>
+                    </div>
+                )}
+                <div className="flex justify-between items-center mt-2 text-[15px]">
+                    <span className="font-bold text-purple-700">รวม</span>
+                    <span className="text-right font-bold">{service ? ((service.duration || 0) + (service.addOnServices || []).filter(a => addOns?.split(',').includes(a.name)).reduce((sum, a) => sum + (a.duration || 0), 0)) : 0} นาที | {finalPrice.toLocaleString()} ฿</span>
+                </div>
+                <div className="flex justify-between items-center mt-2 text-[15px]">
+                    <span className="text-purple-700 font-semibold">พนักงาน</span>
+                    <span className="text-right">{beautician ? beautician.firstName : '-'}</span>
+                </div>
+                <div className="border-b border-purple-100 my-2" />
+                <div className="space-y-2 mt-2">
+                    <div className="bg-white rounded-xl border border-purple-100 p-4">
+                        <div className="mb-2">
+                            <label className="block text-gray-500 text-[15px] mb-1" htmlFor="fullName">ชื่อ-สกุล <span className="text-red-500">*</span></label>
+                            <input
+                                id="fullName"
+                                name="fullName"
+                                value={formData.fullName}
+                                onChange={handleChange}
+                                required
+                                className="w-full border border-purple-200 rounded-lg px-3 py-2 text-[15px] focus:ring-2 focus:ring-pink-200 bg-white"
+                                placeholder="กรอกชื่อ-นามสกุล"
+                            />
+                        </div>
+                        <div className="mb-2">
+                            <label className="block text-gray-500 text-[15px] mb-1" htmlFor="phone">เบอร์ติดต่อ <span className="text-red-500">*</span></label>
+                            <input
+                                id="phone"
+                                name="phone"
+                                type="tel"
+                                value={formData.phone}
+                                onChange={handleChange}
+                                required
+                                className="w-full border border-purple-200 rounded-lg px-3 py-2 text-[15px] focus:ring-2 focus:ring-pink-200 bg-white"
+                                placeholder="เบอร์โทรศัพท์"
+                            />
                         </div>
                         <div>
-                            <label className="block mb-1 text-sm font-medium">เบอร์โทรศัพท์ <span className="text-red-500">*</span></label>
-                            <input name="phone" type="tel" value={formData.phone} onChange={handleChange} required className="border rounded-lg px-3 py-2 w-full"/>
-                        </div>
-                        <div>
-                            <label className="block mb-1 text-sm font-medium">หมายเหตุเพิ่มเติม</label>
-                            <textarea name="note" value={formData.note} onChange={handleChange} rows={2} className="border rounded-lg px-3 py-2 w-full"/>
+                            <label className="block text-gray-500 text-[15px] mb-1" htmlFor="email">อีเมล <span className="text-gray-400">(ถ้ามี)</span></label>
+                            <input
+                                id="email"
+                                name="email"
+                                type="email"
+                                value={formData.email}
+                                onChange={handleChange}
+                                className="w-full border border-purple-200 rounded-lg px-3 py-2 text-[15px] focus:ring-2 focus:ring-pink-200 bg-white"
+                                placeholder="อีเมล (ถ้ามี)"
+                            />
                         </div>
                     </div>
-
-                    <div className="border-t pt-4 mt-4">
-                        {!showCoupon ? (
-                            <button type="button" onClick={() => setShowCoupon(true)} className="w-full text-center text-sm font-semibold text-indigo-600 p-2 rounded-lg hover:bg-indigo-50">
-                                ใช้คูปองส่วนลด
-                            </button>
-                        ) : (
-                            <div>
-                                <label className="block mb-1 text-sm font-medium">เลือกคูปอง</label>
-                                <select value={selectedCouponId} onChange={(e) => setSelectedCouponId(e.target.value)} className="w-full border rounded-lg px-3 py-2 bg-white" disabled={availableCoupons.length === 0}>
-                                    <option value="">{availableCoupons.length > 0 ? 'ไม่ใช้คูปอง' : 'ไม่มีคูปองให้เลือก'}</option>
-                                    {availableCoupons.map(coupon => <option key={coupon.id} value={coupon.id}>{coupon.name} (-{coupon.value}%)</option>)}
-                                </select>
-                            </div>
-                        )}
+                    <div className="bg-white rounded-xl border border-purple-100 p-4">
+                        <label className="block text-gray-500 text-[15px] mb-1" htmlFor="note">เพิ่มเติม</label>
+                        <textarea
+                            id="note"
+                            name="note"
+                            value={formData.note}
+                            onChange={handleChange}
+                            rows={2}
+                            className="w-full border border-purple-200 rounded-lg px-3 py-2 text-[15px] focus:ring-2 focus:ring-pink-200 bg-white"
+                            placeholder="หมายเหตุเพิ่มเติม (ถ้ามี)"
+                        />
                     </div>
                 </div>
-
-                <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 shadow-lg max-w-md mx-auto">
-                    <div className="flex justify-between items-center">
-                        <button type="button" onClick={() => router.back()} className="text-gray-600 font-semibold py-3 px-4">
-                            ย้อนกลับ
-                        </button>
-                        <div className="text-right">
-                            <p className="text-gray-600 text-sm">ยอดชำระ</p>
-                            <p className="text-2xl font-bold text-gray-800">฿{finalPrice.toLocaleString()}</p>
-                        </div>
-                        <button type="submit" className="bg-pink-500 text-white py-3 px-6 rounded-xl font-bold hover:bg-pink-600 disabled:bg-gray-300" disabled={isSubmitting || loading}>
-                            {isSubmitting ? '...' : 'ยืนยัน'}
-                        </button>
-                    </div>
-                </div>
-            </form>
-        </div>
+            </div>
+            <button type="submit" className="w-full bg-gradient-to-tr from-pink-400 to-purple-500 hover:from-pink-500 hover:to-purple-600 text-white py-3 rounded-xl font-bold text-lg shadow-lg mb-2 transition-colors disabled:bg-gray-300 disabled:text-gray-400" disabled={isSubmitting || loading}>
+                {isSubmitting ? '...' : 'ยืนยันการนัดหมาย'}
+            </button>
+        </form>
     );
 }
 
