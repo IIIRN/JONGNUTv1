@@ -17,6 +17,14 @@ const SettingsCard = ({ title, children }) => (
 export default function AdminSettingsPage() {
     const [settings, setSettings] = useState({
         reportRecipients: [],
+        lineNotifications: {
+            enabled: true,
+            newBooking: true,
+            bookingCancelled: true,
+            bookingModified: true,
+            paymentReceived: true,
+            reminderNotifications: true
+        }
     });
     const [bookingSettings, setBookingSettings] = useState({ 
         bufferHours: 0,
@@ -47,7 +55,19 @@ export default function AdminSettingsPage() {
                 const settingsRef = doc(db, 'settings', 'notifications');
                 const docSnap = await getDoc(settingsRef);
                 if (docSnap.exists()) {
-                    setSettings(prev => ({ ...prev, ...docSnap.data() }));
+                    const data = docSnap.data();
+                    setSettings(prev => ({ 
+                        ...prev, 
+                        ...data,
+                        lineNotifications: data.lineNotifications || {
+                            enabled: true,
+                            newBooking: true,
+                            bookingCancelled: true,
+                            bookingModified: true,
+                            paymentReceived: true,
+                            reminderNotifications: true
+                        }
+                    }));
                 }
 
                 const bookSettingsRef = doc(db, 'settings', 'booking');
@@ -107,6 +127,16 @@ export default function AdminSettingsPage() {
         setBookingSettings(prev => ({ ...prev, [name]: Number(value) }));
     };
 
+    const handleLineNotificationChange = (setting, value) => {
+        setSettings(prev => ({
+            ...prev,
+            lineNotifications: {
+                ...prev.lineNotifications,
+                [setting]: value
+            }
+        }));
+    };
+
     // Whenever timeQueues changes, sync availableTimes to match timeQueues
     useEffect(() => {
         setBookingSettings(prev => ({
@@ -120,7 +150,15 @@ export default function AdminSettingsPage() {
         setMessage('');
         try {
             const notificationData = {
-                reportRecipients: settings.reportRecipients || []
+                reportRecipients: settings.reportRecipients || [],
+                lineNotifications: settings.lineNotifications || {
+                    enabled: true,
+                    newBooking: true,
+                    bookingCancelled: true,
+                    bookingModified: true,
+                    paymentReceived: true,
+                    reminderNotifications: true
+                }
             };
 
             const bookingData = {
@@ -598,6 +636,146 @@ export default function AdminSettingsPage() {
 
                 {/* [!code focus start] */}
                 {/* --- นำโค้ดส่วน Report กลับมา --- */}
+                <SettingsCard title="ตั้งค่าการแจ้งเตือน LINE">
+                    <div className="space-y-4">
+                        {/* Main Toggle */}
+                        <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg border border-blue-200">
+                            <div>
+                                <div className="font-medium text-gray-900">เปิดการแจ้งเตือน LINE</div>
+                                <div className="text-sm text-gray-600">เปิด/ปิดการแจ้งเตือนทั้งระบบ</div>
+                            </div>
+                            <label className="relative inline-flex items-center cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={settings.lineNotifications?.enabled ?? true}
+                                    onChange={(e) => handleLineNotificationChange('enabled', e.target.checked)}
+                                    className="sr-only peer"
+                                />
+                                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                            </label>
+                        </div>
+
+                        {/* Individual Notification Settings */}
+                        {settings.lineNotifications?.enabled && (
+                            <div className="space-y-3">
+                                <h4 className="font-medium text-gray-800">เลือกประเภทการแจ้งเตือน</h4>
+                                
+                                <div className="space-y-2">
+                                    <label className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
+                                        <div>
+                                            <div className="font-medium text-gray-900">การจองใหม่</div>
+                                            <div className="text-sm text-gray-600">แจ้งเตือนเมื่อมีลูกค้าจองใหม่</div>
+                                        </div>
+                                        <input
+                                            type="checkbox"
+                                            checked={settings.lineNotifications?.newBooking ?? true}
+                                            onChange={(e) => handleLineNotificationChange('newBooking', e.target.checked)}
+                                            className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                        />
+                                    </label>
+
+                                    <label className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
+                                        <div>
+                                            <div className="font-medium text-gray-900">ยกเลิกการจอง</div>
+                                            <div className="text-sm text-gray-600">แจ้งเตือนเมื่อลูกค้ายกเลิกการจอง</div>
+                                        </div>
+                                        <input
+                                            type="checkbox"
+                                            checked={settings.lineNotifications?.bookingCancelled ?? true}
+                                            onChange={(e) => handleLineNotificationChange('bookingCancelled', e.target.checked)}
+                                            className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                        />
+                                    </label>
+
+                                    <label className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
+                                        <div>
+                                            <div className="font-medium text-gray-900">แก้ไขการจอง</div>
+                                            <div className="text-sm text-gray-600">แจ้งเตือนเมื่อลูกค้าแก้ไขการจอง</div>
+                                        </div>
+                                        <input
+                                            type="checkbox"
+                                            checked={settings.lineNotifications?.bookingModified ?? true}
+                                            onChange={(e) => handleLineNotificationChange('bookingModified', e.target.checked)}
+                                            className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                        />
+                                    </label>
+
+                                    <label className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
+                                        <div>
+                                            <div className="font-medium text-gray-900">การชำระเงิน</div>
+                                            <div className="text-sm text-gray-600">แจ้งเตือนเมื่อได้รับการชำระเงิน</div>
+                                        </div>
+                                        <input
+                                            type="checkbox"
+                                            checked={settings.lineNotifications?.paymentReceived ?? true}
+                                            onChange={(e) => handleLineNotificationChange('paymentReceived', e.target.checked)}
+                                            className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                        />
+                                    </label>
+
+                                    <label className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
+                                        <div>
+                                            <div className="font-medium text-gray-900">การแจ้งเตือนล่วงหน้า</div>
+                                            <div className="text-sm text-gray-600">แจ้งเตือนลูกค้าก่อนนัดหมาย</div>
+                                        </div>
+                                        <input
+                                            type="checkbox"
+                                            checked={settings.lineNotifications?.reminderNotifications ?? true}
+                                            onChange={(e) => handleLineNotificationChange('reminderNotifications', e.target.checked)}
+                                            className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                        />
+                                    </label>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                    
+                    {/* Test Notification Button */}
+                    {settings.lineNotifications?.enabled && (
+                        <div className="mt-4 p-3 bg-gray-50 rounded-lg border">
+                            <h5 className="font-medium text-gray-800 mb-2">ทดสอบการแจ้งเตือน</h5>
+                            <p className="text-sm text-gray-600 mb-3">ส่งข้อความทดสอบไปยังแอดมินทั้งหมดที่มี LINE ID</p>
+                            <button
+                                onClick={async () => {
+                                    try {
+                                        const { sendLineMessageToAllAdmins } = await import('@/app/actions/lineActions');
+                                        const result = await sendLineMessageToAllAdmins('🔔 ทดสอบการแจ้งเตือน LINE\n\nหากคุณเห็นข้อความนี้ แสดงว่าระบบการแจ้งเตือนทำงานปกติ ✅');
+                                        if (result.success) {
+                                            alert('ส่งข้อความทดสอบสำเร็จ!');
+                                        } else {
+                                            alert('เกิดข้อผิดพลาดในการส่งข้อความทดสอบ');
+                                        }
+                                    } catch (error) {
+                                        alert('เกิดข้อผิดพลาด: ' + error.message);
+                                    }
+                                }}
+                                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
+                            >
+                                ส่งข้อความทดสอบ
+                            </button>
+                            
+                            <button
+                                onClick={async () => {
+                                    try {
+                                        const { sendAppointmentReminders } = await import('@/app/actions/reminderActions');
+                                        const result = await sendAppointmentReminders();
+                                        if (result.success) {
+                                            alert(`ทดสอบการแจ้งเตือนล่วงหน้าสำเร็จ!\nส่งไปยัง: ${result.successCount} คน\nไม่สำเร็จ: ${result.failureCount} คน`);
+                                        } else {
+                                            alert('เกิดข้อผิดพลาดในการทดสอบการแจ้งเตือนล่วงหน้า');
+                                        }
+                                    } catch (error) {
+                                        alert('เกิดข้อผิดพลาด: ' + error.message);
+                                    }
+                                }}
+                                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm ml-2"
+                            >
+                                ทดสอบการแจ้งเตือนล่วงหน้า
+                            </button>
+                        </div>
+                    )}
+                </SettingsCard>
+
                 <SettingsCard title="ตั้งค่า Report สรุปรายวัน">
                     <div className='text-sm text-gray-600 bg-yellow-50 p-3 rounded-lg border border-yellow-200'>
                         <p className='font-bold'>หมายเหตุ:</p>

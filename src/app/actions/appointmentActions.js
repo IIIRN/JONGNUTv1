@@ -3,7 +3,7 @@
 
 import { db } from '@/app/lib/firebaseAdmin';
 import { FieldValue, GeoPoint, Timestamp } from 'firebase-admin/firestore';
-import { sendLineMessage } from '@/app/actions/lineActions';
+import { sendLineMessage, sendBookingNotification } from '@/app/actions/lineActions';
 import { sendTelegramMessageToAdmin } from '@/app/actions/telegramActions';
 
 /**
@@ -87,6 +87,25 @@ export async function createAppointmentWithSlotCheck(appointmentData) {
             createdAt: FieldValue.serverTimestamp(),
             updatedAt: FieldValue.serverTimestamp(),
         });
+
+        // ส่งการแจ้งเตือนการจองใหม่ไปยังแอดมิน
+        try {
+            const bookingNotificationData = {
+                customerName: appointmentData.customerInfo?.firstName 
+                    ? `${appointmentData.customerInfo.firstName} ${appointmentData.customerInfo.lastName || ''}`
+                    : appointmentData.customerInfo?.displayName || 'ลูกค้า',
+                serviceName: appointmentData.serviceInfo?.name || 'บริการ',
+                appointmentDate: appointmentData.date,
+                appointmentTime: appointmentData.time,
+                totalPrice: appointmentData.totalPrice || appointmentData.serviceInfo?.price || 0
+            };
+            
+            await sendBookingNotification(bookingNotificationData, 'newBooking');
+        } catch (notificationError) {
+            console.error('Error sending booking notification:', notificationError);
+            // ไม่ให้ notification error หยุดการทำงานของการจอง
+        }
+
         return { success: true, id: newRef.id };
     } catch (error) {
         console.error('Error creating appointment with slot check:', error);
@@ -187,6 +206,23 @@ export async function confirmAppointmentAndPaymentByAdmin(appointmentId, adminId
         // Send notification to customer
         const customerMessage = `การนัดหมายบริการ ${appointmentData.serviceInfo.name} ของคุณได้รับการยืนยันแล้วค่ะ`;
         await sendLineMessage(appointmentData.userId, customerMessage);
+
+        // ส่งการแจ้งเตือนการชำระเงินไปยังแอดมิน
+        try {
+            const bookingNotificationData = {
+                customerName: appointmentData.customerInfo?.firstName 
+                    ? `${appointmentData.customerInfo.firstName} ${appointmentData.customerInfo.lastName || ''}`
+                    : appointmentData.customerInfo?.displayName || 'ลูกค้า',
+                serviceName: appointmentData.serviceInfo?.name || 'บริการ',
+                appointmentDate: appointmentData.date,
+                appointmentTime: appointmentData.time,
+                totalPrice: data.amount
+            };
+            
+            await sendBookingNotification(bookingNotificationData, 'paymentReceived');
+        } catch (notificationError) {
+            console.error('Error sending payment notification:', notificationError);
+        }
 
         return { success: true };
     } catch (error) {
@@ -514,6 +550,22 @@ export async function cancelAppointmentByUser(appointmentId, userId) {
         // แจ้งลูกค้าว่ายกเลิกสำเร็จ
         const customerMessage = `การนัดหมายของคุณ (ID: ${appointmentId.substring(0,6).toUpperCase()}) ได้ถูกยกเลิกเรียบร้อยแล้วค่ะ`;
         await sendLineMessage(userId, customerMessage);
+
+        // ส่งการแจ้งเตือนการยกเลิกไปยังแอดมิน
+        try {
+            const bookingNotificationData = {
+                customerName: appointmentData.customerInfo?.firstName 
+                    ? `${appointmentData.customerInfo.firstName} ${appointmentData.customerInfo.lastName || ''}`
+                    : appointmentData.customerInfo?.displayName || 'ลูกค้า',
+                serviceName: result.serviceName,
+                appointmentDate: appointmentData.date,
+                appointmentTime: appointmentData.time
+            };
+            
+            await sendBookingNotification(bookingNotificationData, 'bookingCancelled');
+        } catch (notificationError) {
+            console.error('Error sending cancellation notification:', notificationError);
+        }
 
         // แจ้งเตือนแอดมิน
         const adminMessage = `🚫 นัดหมายถูกยกเลิกโดยลูกค้า\n\n*บริการ:* ${result.serviceName}\n*Appointment ID:* ${appointmentId.substring(0,6).toUpperCase()}`;
