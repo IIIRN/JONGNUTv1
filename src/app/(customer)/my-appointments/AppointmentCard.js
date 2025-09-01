@@ -34,55 +34,64 @@ const AppointmentCard = ({ job, onQrCodeClick, onCancelClick }) => {
     const statusInfo = statusConfig[job.status] || { text: job.status };
 
     return (
-        <div className="rounded-2xl overflow-hidden shadow">
-            <div className="p-4 bg-gradient-to-r from-purple-500 to-indigo-400 text-white">
-                <div className="flex justify-between items-start">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            {/* Header Section */}
+            <div className="bg-gradient-to-r from-purple-400 to-pink-300 p-4 text-white">
+                <div className="flex justify-between items-center">
                     <div>
                         <div className="text-sm opacity-90">นัดหมาย</div>
-                        <div className="font-bold text-lg">{job.serviceInfo?.name}</div>
+                        <div className="font-bold text-base">{format(appointmentDateTime, 'dd/MM/yyyy HH:mm')} น</div>
                     </div>
-                    <div className="text-right">
-                        <div className="text-xs opacity-90">คิว</div>
-                        <div className="mt-1 bg-white/20 px-3 py-1 rounded-full font-semibold">{job.queueNumber || '-'}</div>
-                    </div>
-                </div>
-                <div className="flex items-center justify-between mt-6">
-                    <div className="text-sm opacity-90">{format(appointmentDateTime, 'dd/MM/yyyy HH:mm')}</div>
-                    <button onClick={() => onQrCodeClick(job.id)} className="bg-white text-purple-700 px-5 py-2 rounded-full font-semibold">QR CODE</button>
+                    <button 
+                        onClick={() => onQrCodeClick(job.id)} 
+                        className="bg-white/20 backdrop-blur-sm px-4 py-2 rounded-full text-white font-medium text-sm border border-white/30"
+                    >
+                        QR CODE
+                    </button>
                 </div>
             </div>
 
-            <div className="bg-white p-4">
-                <div className="flex justify-between items-center">
-                    <div className="text-sm text-gray-700">ช่าง: {getBeauticianDisplayName()}</div>
-                    <div className="text-sm font-bold text-gray-800">{formatPrice(job.paymentInfo?.totalPrice)} บาท</div>
-                </div>
-
-                <div className="mt-3">
-                    <div className="flex items-center justify-between">
-                        <div className="text-sm font-semibold text-gray-600">สถานะ: {statusInfo.text}</div>
-                        <div className="flex items-center space-x-2">
-                            <button onClick={() => setIsExpanded(!isExpanded)} className="bg-pink-500 text-white font-semibold py-2 px-4 rounded-xl text-sm">{isExpanded ? 'ซ่อน' : 'ดูสถานที่'}</button>
-                            {job.status === 'awaiting_confirmation' && (
-                                <button onClick={() => onCancelClick(job)} className="bg-gray-200 text-gray-700 font-semibold py-2 px-4 rounded-xl text-sm">ยกเลิก</button>
-                            )}
+            {/* Content Section */}
+            <div className="p-4">
+                {/* Price Details */}
+                <div className="space-y-1 mb-4">
+                    <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">{job.serviceInfo?.name}</span>
+                        <span className="text-gray-800">({job.appointmentInfo?.duration || 45} นาที | {formatPrice(job.paymentInfo?.basePrice || 6600)})</span>
+                    </div>
+                    {job.appointmentInfo?.addOns?.length > 0 && job.appointmentInfo.addOns.map((addon, index) => (
+                        <div key={index} className="flex justify-between text-sm">
+                            <span className="text-gray-600">{addon.name}</span>
+                            <span className="text-gray-800">({addon.duration || 25} นาที | {formatPrice(addon.price || 200)})</span>
                         </div>
+                    ))}
+                </div>
+
+                {/* Total */}
+                <div className="border-t pt-3 mb-4">
+                    <div className="flex justify-between items-center">
+                        <span className="font-semibold text-gray-800">รวม</span>
+                        <span className="font-bold text-lg text-gray-800">({job.appointmentInfo?.duration || 70} นาที | {formatPrice(job.paymentInfo?.totalPrice || 6800)})</span>
                     </div>
                 </div>
 
-                {isExpanded && (
-                    <div className="border-t mt-3 pt-3">
-                        {job.locationInfo?.name ? (
-                            <>
-                                <h3 className="font-bold text-md mb-2">สถานที่ให้บริการ</h3>
-                                <div className="text-sm space-y-1">
-                                    <p><strong>ชื่อ:</strong> {job.locationInfo.name}</p>
-                                    <p><strong>ที่อยู่:</strong> {job.locationInfo.address || 'ไม่มีข้อมูลที่อยู่'}</p>
-                                </div>
-                            </>
-                        ) : <p>ไม่พบข้อมูลสถานที่</p>}
-                    </div>
-                )}
+                {/* Action Buttons */}
+                <div className="flex space-x-3">
+                    <button 
+                        onClick={() => setIsExpanded(!isExpanded)}
+                        className="flex-1 bg-purple-400 text-white py-3 rounded-xl font-semibold"
+                    >
+                        ยืนยัน
+                    </button>
+                    {job.status === 'awaiting_confirmation' && (
+                        <button 
+                            onClick={() => onCancelClick(job)}
+                            className="flex-1 bg-pink-300 text-white py-3 rounded-xl font-semibold"
+                        >
+                            ยกเลิก
+                        </button>
+                    )}
+                </div>
             </div>
         </div>
     );

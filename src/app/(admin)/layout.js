@@ -6,6 +6,7 @@ import { auth, db } from '@/app/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import AdminNavbar from '@/app/components/AdminNavbar';
+import { ToastProvider } from '@/app/components/Toast';
 import { markAllNotificationsAsRead, clearAllNotifications } from '@/app/actions/notificationActions';
 
 export default function AdminLayout({ children }) {
@@ -79,15 +80,17 @@ export default function AdminLayout({ children }) {
   // แสดง Layout ของ Admin เมื่อมีสิทธิ์เท่านั้น
   if (isAuthorized) {
     return (
-      <div className="min-h-screen bg-gray-100">
-        <AdminNavbar 
-            notifications={notifications} 
-            unreadCount={unreadCount} 
-            onMarkAsRead={handleMarkAsRead}
-            onClearAll={handleClearAll}
-        />
-        <main>{children}</main>
-      </div>
+      <ToastProvider>
+        <div className="min-h-screen bg-gray-100">
+          <AdminNavbar 
+              notifications={notifications} 
+              unreadCount={unreadCount} 
+              onMarkAsRead={handleMarkAsRead}
+              onClearAll={handleClearAll}
+          />
+          <main>{children}</main>
+        </div>
+      </ToastProvider>
     );
   }
 

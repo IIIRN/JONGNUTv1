@@ -9,6 +9,7 @@ import { useLiffContext } from '@/context/LiffProvider';
 import { format } from 'date-fns';
 import { th } from 'date-fns/locale';
 import Link from 'next/link';
+import CustomerHeader from '@/app/components/CustomerHeader';
 
 
 
@@ -62,9 +63,11 @@ export default function MyCouponsPage() {
     const usedCoupons = coupons.filter(c => c.used);
 
     return (
-        <div className="min-h-screen bg-white flex flex-col items-center pt-3 px-1">
+        <div>
+            <CustomerHeader />
+            <div className="min-h-screen bg-white flex flex-col items-center pt-3 px-1">
             {/* ปุ่มแลกคูปอง */}
-            <div className="w-full max-w-xs flex justify-end mb-2">
+            <div className="w-full px-4 flex justify-end mb-2">
                 <button
                     className="bg-pink-500 hover:bg-pink-600 text-white font-semibold py-1.5 px-4 rounded-full shadow text-sm transition-colors"
                     onClick={() => router.push('/rewards')}
@@ -72,7 +75,7 @@ export default function MyCouponsPage() {
                     แลกคูปอง
                 </button>
             </div>
-            <div className="w-full max-w-xs space-y-2">
+            <div className="w-full px-4 space-y-2">
                 {loading ? (
                     <div className="text-center text-gray-500 pt-6 text-sm">กำลังโหลดคูปอง...</div>
                 ) : coupons.length === 0 ? (
@@ -99,6 +102,7 @@ export default function MyCouponsPage() {
                         )}
                     </>
                 )}
+            </div>
             </div>
         </div>
     );

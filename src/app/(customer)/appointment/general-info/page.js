@@ -8,12 +8,15 @@ import { collection, addDoc, serverTimestamp, doc, getDoc, setDoc, query, where,
 import { format } from 'date-fns';
 import { th } from 'date-fns/locale';
 import { createAppointmentWithSlotCheck } from '@/app/actions/appointmentActions';
+import CustomerHeader from '@/app/components/CustomerHeader';
+import { useToast } from '@/app/components/common/Toast';
 
 // The main component logic is moved into its own component
 function GeneralInfoContent() {
     const searchParams = useSearchParams();
     const { profile, loading: liffLoading } = useLiffContext();
     const router = useRouter();
+    const { showToast, ToastComponent } = useToast();
 
     const serviceId = searchParams.get('serviceId');
     const addOnsParam = searchParams.get('addOns'); // เปลี่ยนชื่อให้ชัดเจน
@@ -83,8 +86,19 @@ function GeneralInfoContent() {
         const addOnsPrice = (service.addOnServices || []).filter(a => selectedAddOns.includes(a.name)).reduce((sum, a) => sum + (a.price || 0), 0);
         const total = base + addOnsPrice;
         const selectedCoupon = availableCoupons.find(c => c.id === selectedCouponId);
-        const discountAmount = selectedCoupon ? (selectedCoupon.discountType === 'percentage' ? total * (selectedCoupon.discountValue / 100) : selectedCoupon.discountValue) : 0;
-        return { basePrice: base, addOnsTotal: addOnsPrice, totalPrice: total, finalPrice: total - discountAmount, discount: discountAmount };
+        
+        let discountAmount = 0;
+        if (selectedCoupon) {
+            if (selectedCoupon.discountType === 'percentage') {
+                discountAmount = Math.round(total * (selectedCoupon.discountValue / 100));
+            } else {
+                discountAmount = selectedCoupon.discountValue;
+            }
+            // ป้องกันส่วนลดเกินราคาสินค้า
+            discountAmount = Math.min(discountAmount, total);
+        }
+        
+        return { basePrice: base, addOnsTotal: addOnsPrice, totalPrice: total, finalPrice: Math.max(0, total - discountAmount), discount: discountAmount };
     }, [service, selectedAddOns, selectedCouponId, availableCoupons]);
 
     const handleChange = (e) => {
@@ -94,8 +108,14 @@ function GeneralInfoContent() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!formData.fullName || !formData.phone) return alert("กรุณากรอกชื่อ-นามสกุล และเบอร์โทรศัพท์");
-        if (liffLoading || !profile?.userId) return alert('กรุณาเข้าสู่ระบบก่อนทำการจอง');
+        if (!formData.fullName || !formData.phone) {
+            showToast("กรุณากรอกชื่อ-นามสกุล และเบอร์โทรศัพท์", "warning", "ข้อมูลไม่ครบถ้วน");
+            return;
+        }
+        if (liffLoading || !profile?.userId) {
+            showToast('กรุณาเข้าสู่ระบบก่อนทำการจอง', "warning", "ต้องเข้าสู่ระบบ");
+            return;
+        }
 
         setIsSubmitting(true);
         try {
@@ -134,7 +154,7 @@ function GeneralInfoContent() {
             const result = await createAppointmentWithSlotCheck(appointmentData);
             
             if (!result.success) {
-                alert(result.error);
+                showToast(result.error, "error", "เกิดข้อผิดพลาด");
                 return;
             }
 
@@ -153,11 +173,13 @@ function GeneralInfoContent() {
             const newPoints = (customerSnap.exists() ? customerSnap.data().points : 0) + 1;
             await setDoc(customerRef, { ...formData, points: newPoints, updatedAt: serverTimestamp() }, { merge: true });
 
-            alert('จองสำเร็จ!');
-            router.push('/my-appointments');
+            showToast('จองสำเร็จ! กำลังพาไปหน้านัดหมาย', "success", "จองสำเร็จ");
+            setTimeout(() => {
+                router.push('/my-appointments');
+            }, 1500);
 
         } catch (err) {
-            alert('เกิดข้อผิดพลาดในการจอง');
+            showToast('เกิดข้อผิดพลาดในการจอง กรุณาลองอีกครั้ง', "error", "เกิดข้อผิดพลาด");
             console.error(err);
         } finally {
             setIsSubmitting(false);
@@ -169,85 +191,74 @@ function GeneralInfoContent() {
     }
 
     return (
-            <div className="max-w-md mx-auto bg-white rounded-2xl shadow-xl overflow-hidden">
-                {/* Header */}
-                <div className="bg-gradient-to-r from-pink-400 to-purple-500 p-6 text-white">
-                    <h1 className="text-xl font-bold text-center">ข้อมูลการจอง</h1>
-                    <div className="mt-4 space-y-2 text-sm">
-                        <div>📅 วันที่: {format(new Date(date), 'dd MMMM yyyy', { locale: th })}</div>
-                        <div>🕐 เวลา: {time}</div>
-                        <div>💅 บริการ: {service?.serviceName}</div>
-                        <div>👩‍💼 ช่าง: {beautician?.firstName} {beautician?.lastName}</div>
-                    </div>
-                </div>
-
-                {/* Form */}
-                <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                    <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">ชื่อ-นามสกุล *</label>
-                        <input
-                            type="text"
-                            name="fullName"
-                            value={formData.fullName}
-                            onChange={handleChange}
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                            placeholder="กรอกชื่อ-นามสกุล"
-                            required
-                        />
+        <div>
+            <ToastComponent />
+            <CustomerHeader showBackButton={true} showActionButtons={false} />
+            <div className="px-4 pb-4">
+                {/* Booking Details Card */}
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-4">
+                    {/* Date and Time */}
+                    <div className="p-4 border-b border-gray-100">
+                        <div className="flex justify-between items-center mb-2">
+                            <span className="text-sm font-medium text-gray-600">วันที่</span>
+                            <span className="text-sm font-semibold">{format(new Date(date), 'dd/MM/yyyy', { locale: th })}</span>
+                        </div>
+                        <div className="flex justify-between items-center mb-2">
+                            <span className="text-sm font-medium text-gray-600">เวลา</span>
+                            <span className="text-sm font-semibold">{time} น.</span>
+                        </div>
+                        <div className="flex justify-between items-center mb-2">
+                            <span className="text-sm font-medium text-gray-600">พนักงาน</span>
+                            <span className="text-sm font-semibold">{beautician?.firstName === 'ระบบจัดให้' ? 'บ่อง' : beautician?.firstName}</span>
+                        </div>
                     </div>
 
-                    <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">เบอร์โทรศัพท์ *</label>
-                        <input
-                            type="tel"
-                            name="phone"
-                            value={formData.phone}
-                            onChange={handleChange}
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                            placeholder="กรอกเบอร์โทรศัพท์"
-                            required
-                        />
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">อีเมล</label>
-                        <input
-                            type="email"
-                            name="email"
-                            value={formData.email}
-                            onChange={handleChange}
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                            placeholder="กรอกอีเมล (ไม่บังคับ)"
-                        />
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">หมายเหตุ</label>
-                        <textarea
-                            name="note"
-                            value={formData.note}
-                            onChange={handleChange}
-                            rows={3}
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                            placeholder="หมายเหตุเพิ่มเติม (ไม่บังคับ)"
-                        />
+                    {/* Services */}
+                    <div className="p-4 border-b border-gray-100">
+                        <div className="flex justify-between items-center mb-2">
+                            <span className="text-sm font-medium text-gray-600">บริการ</span>
+                            <div className="text-right">
+                                <div className="text-sm font-semibold">{service?.serviceName}</div>
+                                <div className="text-sm text-gray-500">{service?.duration}นาที | {basePrice.toLocaleString()}</div>
+                            </div>
+                        </div>
+                        
+                        {selectedAddOns.length > 0 && (
+                            <div className="flex justify-between items-center mb-2">
+                                <span className="text-sm font-medium text-gray-600">บริการเสริม</span>
+                                <div className="text-right">
+                                    <div className="text-sm font-semibold">
+                                        {(service.addOnServices || [])
+                                            .filter(a => selectedAddOns.includes(a.name))
+                                            .map(a => a.name).join(', ')
+                                        }
+                                    </div>
+                                    <div className="text-sm text-gray-500">
+                                        {(service.addOnServices || [])
+                                            .filter(a => selectedAddOns.includes(a.name))
+                                            .reduce((sum, a) => sum + (a.duration || 0), 0)
+                                        }นาที | {addOnsTotal.toLocaleString()}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* Coupon Section */}
                     {availableCoupons.length > 0 && (
-                        <div className="border-t pt-4">
+                        <div className="p-4 border-b border-gray-100">
                             <button
                                 type="button"
                                 onClick={() => setShowCoupon(!showCoupon)}
-                                className="flex items-center justify-between w-full text-left text-pink-600 font-semibold"
+                                className="flex items-center justify-between w-full text-left text-purple-600 font-medium"
                             >
                                 <span>🎫 ใช้คูปอง ({availableCoupons.length} ใบ)</span>
                                 <span>{showCoupon ? '▼' : '▶'}</span>
                             </button>
                             
                             {showCoupon && (
-                                <div className="mt-3 space-y-2">
-                                    <div>
+                                <div className="space-y-2">
+                                    <div className="bg-gray-50 rounded-lg p-3">
                                         <input
                                             type="radio"
                                             id="no-coupon"
@@ -260,7 +271,7 @@ function GeneralInfoContent() {
                                         <label htmlFor="no-coupon" className="text-sm">ไม่ใช้คูปอง</label>
                                     </div>
                                     {availableCoupons.map(coupon => (
-                                        <div key={coupon.id} className="border rounded-lg p-3">
+                                        <div key={coupon.id} className="bg-gray-50 rounded-lg p-3">
                                             <input
                                                 type="radio"
                                                 id={coupon.id}
@@ -271,8 +282,8 @@ function GeneralInfoContent() {
                                                 className="mr-2"
                                             />
                                             <label htmlFor={coupon.id} className="text-sm">
-                                                <div className="font-semibold">{coupon.name}</div>
-                                                <div className="text-gray-600">
+                                                <div className="font-medium">{coupon.name}</div>
+                                                <div className="text-gray-500">
                                                     ลด {coupon.discountType === 'percentage' ? `${coupon.discountValue}%` : `${coupon.discountValue}฿`}
                                                 </div>
                                             </label>
@@ -283,40 +294,88 @@ function GeneralInfoContent() {
                         </div>
                     )}
 
-                    {/* Price Summary */}
-                    <div className="border-t pt-4 space-y-2">
-                        <div className="flex justify-between">
-                            <span>ราคาบริการ:</span>
-                            <span>{basePrice.toLocaleString()}฿</span>
-                        </div>
-                        {addOnsTotal > 0 && (
-                            <div className="flex justify-between">
-                                <span>บริการเสริม:</span>
-                                <span>{addOnsTotal.toLocaleString()}฿</span>
+                    {/* Total */}
+                    <div className="p-4">
+                        <div className="flex justify-between items-center">
+                            <span className="text-base font-semibold">รวม</span>
+                            <div className="text-right">
+                                <div className="text-base font-bold">
+                                    {(service?.duration || 0) + (service.addOnServices || [])
+                                        .filter(a => selectedAddOns.includes(a.name))
+                                        .reduce((sum, a) => sum + (a.duration || 0), 0)
+                                    }นาที | {finalPrice.toLocaleString()}
+                                </div>
+                                {discount > 0 && (
+                                    <div className="text-sm text-green-600">ส่วนลด -{discount.toLocaleString()}฿</div>
+                                )}
                             </div>
-                        )}
-                        {discount > 0 && (
-                            <div className="flex justify-between text-green-600">
-                                <span>ส่วนลด:</span>
-                                <span>-{discount.toLocaleString()}฿</span>
-                            </div>
-                        )}
-                        <div className="flex justify-between font-bold text-lg border-t pt-2">
-                            <span>ยอดรวม:</span>
-                            <span>{finalPrice.toLocaleString()}฿</span>
                         </div>
                     </div>
+                </div>
 
-                    {/* Submit Button */}
-                    <button
-                        type="submit"
-                        disabled={isSubmitting}
-                        className="w-full bg-gradient-to-r from-pink-400 to-purple-500 text-white py-4 rounded-lg font-bold text-lg shadow-lg hover:from-pink-500 hover:to-purple-600 disabled:bg-gray-400"
-                    >
-                        {isSubmitting ? 'กำลังดำเนินการ...' : 'ยืนยันการจอง'}
-                    </button>
-                </form>
+                {/* Form Card */}
+                <div className="bg-white rounded-2xl p-4 mb-4 shadow-sm border border-gray-100">
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">ชื่อ-สกุล</label>
+                            <input
+                                type="text"
+                                name="fullName"
+                                value={formData.fullName}
+                                onChange={handleChange}
+                                className="w-full px-4 py-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                required
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">ติดต่อ</label>
+                            <input
+                                type="tel"
+                                name="phone"
+                                value={formData.phone}
+                                onChange={handleChange}
+                                className="w-full px-4 py-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent placeholder-gray-500"
+                                required
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">อีเมล</label>
+                            <input
+                                type="email"
+                                name="email"
+                                value={formData.email}
+                                onChange={handleChange}
+                                className="w-full px-4 py-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent placeholder-gray-500"
+                                
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">เพิ่มเติม</label>
+                            <textarea
+                                name="note"
+                                value={formData.note}
+                                onChange={handleChange}
+                                rows={2}
+                                className="w-full px-4 py-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none placeholder-gray-500"
+                               
+                            />
+                        </div>
+                    </form>
+                </div>
+
+                {/* Submit Button */}
+                <button
+                    onClick={handleSubmit}
+                    disabled={isSubmitting}
+                    className="w-full bg-gradient-to-r from-purple-400 via-violet-400 to-pink-300 text-white py-4 rounded-2xl font-semibold text-lg shadow-lg disabled:opacity-50"
+                >
+                    {isSubmitting ? 'กำลังดำเนินการ...' : 'ยืนยันการนัดหมาย'}
+                </button>
             </div>
+        </div>
     );
 }
 

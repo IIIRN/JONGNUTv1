@@ -2,27 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { fetchEmployees, deleteEmployee, updateEmployeeStatus } from '@/app/actions/employeeActions';
+import { fetchAdmins, deleteAdmin } from '@/app/actions/adminActions';
 import { auth, db } from '@/app/lib/firebase';  
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { collection, doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/app/components/Toast';
 
-// Helper Component: StatusBadge
-const StatusBadge = ({ status }) => {
-    let text = '';
-    let colorClasses = '';
-    switch (status) {
-        case 'available': text = 'พร้อมทำงาน'; colorClasses = 'bg-green-100 text-green-800'; break;
-        case 'on_leave': text = 'ลาพัก'; colorClasses = 'bg-yellow-100 text-yellow-800'; break;
-        case 'suspended': text = 'พักงาน'; colorClasses = 'bg-red-100 text-red-800'; break;
-        default: text = status || 'ไม่ระบุ'; colorClasses = 'bg-gray-100 text-gray-700';
-    }
-    return <span className={`px-2 py-1 text-xs font-semibold rounded-full ${colorClasses}`}>{text}</span>;
-};
-
-export default function EmployeesPage() {
-  const [employees, setEmployees] = useState([]);
+export default function AdminsPage() {
+  const [admins, setAdmins] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
   const [formData, setFormData] = useState({
@@ -31,64 +18,47 @@ export default function EmployeesPage() {
     phone: '',
     email: '',
     password: '',
-    lineUserId: '',
-    role: 'employee',
-    status: 'available'
+    lineUserId: ''
   });
   const [formLoading, setFormLoading] = useState(false);
   const { showToast } = useToast();
 
   useEffect(() => {
-    loadEmployees();
+    loadAdmins();
   }, []);
 
-  const loadEmployees = async () => {
+  const loadAdmins = async () => {
     try {
       setLoading(true);
-      const result = await fetchEmployees();
+      const result = await fetchAdmins();
       if (result.success) {
-        setEmployees(result.employees);
+        setAdmins(result.admins);
       } else {
         console.error(result.error);
-        showToast('เกิดข้อผิดพลาดในการโหลดข้อมูลพนักงาน', 'error');
+        showToast('เกิดข้อผิดพลาดในการโหลดข้อมูลผู้ดูแลระบบ', 'error');
       }
     } catch (error) {
-      console.error('Error loading employees:', error);
-      showToast('เกิดข้อผิดพลาดในการโหลดข้อมูลพนักงาน', 'error');
+      console.error('Error loading admins:', error);
+      showToast('เกิดข้อผิดพลาดในการโหลดข้อมูลผู้ดูแลระบบ', 'error');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDeleteEmployee = async (employeeId) => {
-    if (confirm('คุณแน่ใจหรือไม่ว่าต้องการลบพนักงานนี้?')) {
+  const handleDeleteAdmin = async (adminId) => {
+    if (confirm('คุณแน่ใจหรือไม่ว่าต้องการลบผู้ดูแลระบบนี้?')) {
       try {
-        const result = await deleteEmployee(employeeId);
+        const result = await deleteAdmin(adminId);
         if (result.success) {
-          showToast('ลบพนักงานสำเร็จ', 'success');
-          loadEmployees();
+          showToast('ลบผู้ดูแลระบบสำเร็จ', 'success');
+          loadAdmins();
         } else {
-          showToast('เกิดข้อผิดพลาดในการลบพนักงาน', 'error');
+          showToast('เกิดข้อผิดพลาดในการลบผู้ดูแลระบบ', 'error');
         }
       } catch (error) {
-        console.error('Error deleting employee:', error);
-        showToast('เกิดข้อผิดพลาดในการลบพนักงาน', 'error');
+        console.error('Error deleting admin:', error);
+        showToast('เกิดข้อผิดพลาดในการลบผู้ดูแลระบบ', 'error');
       }
-    }
-  };
-
-  const handleStatusChange = async (employeeId, newStatus) => {
-    try {
-      const result = await updateEmployeeStatus(employeeId, newStatus);
-      if (result.success) {
-        showToast('อัพเดทสถานะสำเร็จ', 'success');
-        loadEmployees();
-      } else {
-        showToast('เกิดข้อผิดพลาดในการอัพเดทสถานะ', 'error');
-      }
-    } catch (error) {
-      console.error('Error updating status:', error);
-      showToast('เกิดข้อผิดพลาดในการอัพเดทสถานะ', 'error');
     }
   };
 
@@ -97,7 +67,7 @@ export default function EmployeesPage() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleAddEmployee = async (e) => {
+  const handleAddAdmin = async (e) => {
     e.preventDefault();
     
     if (!formData.firstName || !formData.phone || !formData.email || !formData.password) {
@@ -119,7 +89,6 @@ export default function EmployeesPage() {
         displayName: `${formData.firstName} ${formData.lastName}`.trim(),
       });
 
-      const targetCollection = formData.role === 'admin' ? 'admins' : 'employees';
       const dataToSave = {
         uid: user.uid,
         firstName: formData.firstName,
@@ -127,17 +96,13 @@ export default function EmployeesPage() {
         phoneNumber: formData.phone,
         email: user.email,
         lineUserId: formData.lineUserId,
-        status: formData.status,
+        role: 'admin',
         createdAt: serverTimestamp(),
       };
 
-      if (formData.role === 'admin') {
-        dataToSave.role = 'admin';
-      }
+      await setDoc(doc(db, 'admins', user.uid), dataToSave);
 
-      await setDoc(doc(db, targetCollection, user.uid), dataToSave);
-
-      showToast(`เพิ่ม${formData.role === 'admin' ? 'ผู้ดูแลระบบ' : 'พนักงาน'}สำเร็จ!`, 'success');
+      showToast('เพิ่มผู้ดูแลระบบสำเร็จ!', 'success');
       
       // Reset form
       setFormData({
@@ -146,12 +111,10 @@ export default function EmployeesPage() {
         phone: '',
         email: '',
         password: '',
-        lineUserId: '',
-        role: 'employee',
-        status: 'available'
+        lineUserId: ''
       });
       setShowAddForm(false);
-      loadEmployees();
+      loadAdmins();
 
     } catch (error) {
       let errorMessage = "เกิดข้อผิดพลาดที่ไม่รู้จักในการลงทะเบียน";
@@ -179,21 +142,21 @@ export default function EmployeesPage() {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-800">จัดการพนักงาน</h1>
+        <h1 className="text-3xl font-bold text-gray-800">จัดการผู้ดูแลระบบ</h1>
         <button 
           onClick={() => setShowAddForm(!showAddForm)}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md flex items-center gap-2"
+          className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md flex items-center gap-2"
         >
           <span>+</span>
-          {showAddForm ? 'ปิดฟอร์ม' : 'เพิ่มพนักงาน'}
+          {showAddForm ? 'ปิดฟอร์ม' : 'เพิ่มผู้ดูแลระบบ'}
         </button>
       </div>
 
-      {/* Add Employee Form */}
+      {/* Add Admin Form */}
       {showAddForm && (
         <div className="bg-white p-6 rounded-lg shadow-md mb-6">
-          <h2 className="text-xl font-bold mb-4">เพิ่มพนักงานใหม่</h2>
-          <form onSubmit={handleAddEmployee} className="space-y-4">
+          <h2 className="text-xl font-bold mb-4">เพิ่มผู้ดูแลระบบใหม่</h2>
+          <form onSubmit={handleAddAdmin} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700">ชื่อจริง</label>
@@ -214,36 +177,6 @@ export default function EmployeesPage() {
                   className="w-full mt-1 p-2 border rounded-md"
                 />
               </div>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">ตำแหน่ง</label>
-                <select 
-                  name="role" 
-                  value={formData.role} 
-                  onChange={handleFormChange} 
-                  className="w-full mt-1 p-2 border rounded-md bg-white"
-                >
-                  <option value="employee">พนักงาน</option>
-                  <option value="admin">ผู้ดูแลระบบ</option>
-                </select>
-              </div>
-              {formData.role === 'employee' && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">สถานะ</label>
-                  <select 
-                    name="status" 
-                    value={formData.status} 
-                    onChange={handleFormChange} 
-                    className="w-full mt-1 p-2 border rounded-md bg-white"
-                  >
-                    <option value="available">พร้อมทำงาน</option>
-                    <option value="on_leave">ลาพัก</option>
-                    <option value="suspended">พักงาน</option>
-                  </select>
-                </div>
-              )}
             </div>
             
             <div>
@@ -298,9 +231,9 @@ export default function EmployeesPage() {
               <button 
                 type="submit" 
                 disabled={formLoading} 
-                className="flex-1 bg-indigo-600 text-white p-2 rounded-md hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                className="flex-1 bg-purple-600 text-white p-2 rounded-md hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
               >
-                {formLoading ? 'กำลังบันทึก...' : 'เพิ่มพนักงาน'}
+                {formLoading ? 'กำลังบันทึก...' : 'เพิ่มผู้ดูแลระบบ'}
               </button>
               <button 
                 type="button" 
@@ -314,74 +247,69 @@ export default function EmployeesPage() {
         </div>
       )}
 
-      {/* Employees Table */}
+      {/* Admins Table */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">พนักงาน</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ผู้ดูแลระบบ</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ข้อมูลติดต่อ</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">สถานะ</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">วันที่สร้าง</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">การดำเนินการ</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {employees.map((employee) => (
-              <tr key={employee.id} className="hover:bg-gray-50">
+            {admins.map((admin) => (
+              <tr key={admin.id} className="hover:bg-gray-50">
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center">
                     <div className="flex-shrink-0 h-10 w-10">
-                      {employee.photoURL ? (
+                      {admin.photoURL ? (
                         <Image
                           className="h-10 w-10 rounded-full"
-                          src={employee.photoURL}
+                          src={admin.photoURL}
                           alt="Profile"
                           width={40}
                           height={40}
                         />
                       ) : (
-                        <div className="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center">
-                          <span className="text-sm font-medium text-gray-700">
-                            {employee.firstName?.charAt(0)}
+                        <div className="h-10 w-10 rounded-full bg-purple-100 flex items-center justify-center">
+                          <span className="text-sm font-medium text-purple-700">
+                            {admin.firstName?.charAt(0)}
                           </span>
                         </div>
                       )}
                     </div>
                     <div className="ml-4">
                       <div className="text-sm font-medium text-gray-900">
-                        {employee.firstName} {employee.lastName}
+                        {admin.firstName} {admin.lastName}
                       </div>
-                      <div className="text-sm text-gray-500">{employee.email}</div>
+                      <div className="text-sm text-gray-500">{admin.email}</div>
+                      <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">
+                        ผู้ดูแลระบบ
+                      </span>
                     </div>
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-900">{employee.phoneNumber}</div>
-                  {employee.lineUserId && (
-                    <div className="text-sm text-gray-500">LINE: {employee.lineUserId}</div>
+                  <div className="text-sm text-gray-900">{admin.phoneNumber}</div>
+                  {admin.lineUserId && (
+                    <div className="text-sm text-gray-500">LINE: {admin.lineUserId}</div>
                   )}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <select 
-                    value={employee.status} 
-                    onChange={(e) => handleStatusChange(employee.id, e.target.value)}
-                    className="text-sm border rounded px-2 py-1"
-                  >
-                    <option value="available">พร้อมทำงาน</option>
-                    <option value="on_leave">ลาพัก</option>
-                    <option value="suspended">พักงาน</option>
-                  </select>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {admin.createdAt ? new Date(admin.createdAt.seconds * 1000).toLocaleDateString('th-TH') : 'ไม่ระบุ'}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                   <div className="flex space-x-2">
                     <button 
-                      onClick={() => window.location.href = `/employees/edit/${employee.id}`}
-                      className="text-indigo-600 hover:text-indigo-900"
+                      onClick={() => window.location.href = `/admins/edit/${admin.id}`}
+                      className="text-purple-600 hover:text-purple-900"
                     >
                       แก้ไข
                     </button>
                     <button 
-                      onClick={() => handleDeleteEmployee(employee.id)}
+                      onClick={() => handleDeleteAdmin(admin.id)}
                       className="text-red-600 hover:text-red-900"
                     >
                       ลบ
@@ -393,9 +321,9 @@ export default function EmployeesPage() {
           </tbody>
         </table>
         
-        {employees.length === 0 && (
+        {admins.length === 0 && (
           <div className="text-center py-8">
-            <p className="text-gray-500">ยังไม่มีข้อมูลพนักงาน</p>
+            <p className="text-gray-500">ยังไม่มีข้อมูลผู้ดูแลระบบ</p>
           </div>
         )}
       </div>

@@ -5,6 +5,7 @@ import { db } from '@/app/lib/firebase';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import CustomerHeader from '@/app/components/CustomerHeader';
 
 export default function AppointmentPage() {
     const [services, setServices] = useState([]);
@@ -60,8 +61,10 @@ export default function AppointmentPage() {
     }
 
     return (
-        <div className="p-3">
-            <div className="grid grid-cols-2 gap-3">
+        <div>
+            <CustomerHeader />
+            <div className="px-4 pb-4">
+                <div className="grid grid-cols-2 gap-3">
                 {services.map(service => (
                     <div
                         key={service.id}
@@ -89,6 +92,7 @@ export default function AppointmentPage() {
                         </div>
                     </div>
                 ))}
+            </div>
             </div>
         </div>
     );

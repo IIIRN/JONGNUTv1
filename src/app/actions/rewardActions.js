@@ -57,8 +57,8 @@ export async function redeemReward(userId, rewardId) {
                 rewardId: rewardId,
                 name: reward.name,
                 description: reward.description,
-                type: reward.type,
-                value: reward.value,
+                discountType: reward.discountType || 'percentage', // 'percentage' หรือ 'fixed'
+                discountValue: reward.discountValue || reward.value || 0, // จำนวนส่วนลด
                 redeemedAt: FieldValue.serverTimestamp(),
                 used: false,
                 expiresAt: null, // Can add expiry logic later

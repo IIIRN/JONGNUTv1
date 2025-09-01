@@ -4,34 +4,54 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { db } from '@/app/lib/firebase';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { useToast } from '@/app/components/Toast';
 
 export default function EditEmployeePage() {
-  const [formData, setFormData] = useState(null);
+  const [formData, setFormData] = useState({
+    firstName: '',
+    lastName: '',
+    phoneNumber: '',
+    email: '',
+    lineUserId: '',
+    status: 'available'
+  });
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const router = useRouter();
   const { id } = useParams();
+  const { showToast } = useToast();
 
   useEffect(() => {
     if (!id) return;
-    const fetchEmployee = async () => {
-      setLoading(true);
-      try {
-        const docRef = doc(db, "employees", id);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          setFormData(docSnap.data());
-        } else {
-          alert("ไม่พบข้อมูลพนักงาน");
-          router.push('/employees');
-        }
-      } catch (error) {
-        console.error("Error fetching document:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchEmployee();
-  }, [id, router]);
+  }, [id]);
+
+  const fetchEmployee = async () => {
+    setLoading(true);
+    try {
+      const docRef = doc(db, "employees", id);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setFormData({
+          firstName: data.firstName || '',
+          lastName: data.lastName || '',
+          phoneNumber: data.phoneNumber || '',
+          email: data.email || '',
+          lineUserId: data.lineUserId || '',
+          status: data.status || 'available'
+        });
+      } else {
+        showToast("ไม่พบข้อมูลพนักงาน", 'error');
+        router.push('/employees');
+      }
+    } catch (error) {
+      showToast("เกิดข้อผิดพลาดในการโหลดข้อมูล", 'error');
+      router.push('/employees');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -40,16 +60,30 @@ export default function EditEmployeePage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
+    
+    if (!formData.firstName || !formData.phoneNumber) {
+      showToast('กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน', 'error');
+      return;
+    }
+
+    setSaving(true);
     try {
       const docRef = doc(db, "employees", id);
-      await updateDoc(docRef, formData);
-      alert("อัปเดตข้อมูลพนักงานสำเร็จ!");
+      await updateDoc(docRef, {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        phoneNumber: formData.phoneNumber,
+        lineUserId: formData.lineUserId,
+        status: formData.status,
+        updatedAt: new Date()
+      });
+      
+      showToast("อัปเดตข้อมูลพนักงานสำเร็จ!", 'success');
       router.push('/employees');
     } catch (error) {
-      console.error("Error updating document: ", error);
-      alert("เกิดข้อผิดพลาด: " + error.message);
-      setLoading(false);
+      showToast("เกิดข้อผิดพลาดในการบันทึกข้อมูล", 'error');
+    } finally {
+      setSaving(false);
     }
   };
 

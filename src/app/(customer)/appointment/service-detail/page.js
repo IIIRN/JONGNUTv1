@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { db } from '@/app/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import Image from 'next/image';
+import CustomerHeader from '@/app/components/CustomerHeader';
 
 // --- Add-on Card Component ---
 const AddOnCard = ({ addOn, isSelected, onToggle }) => (
@@ -91,9 +92,11 @@ function ServiceDetailContent() {
     if (!service) return null;
 
     return (
-        <div className="pb-24">
-            {/* รูปภาพบริการ + overlay */}
-            <div className="relative w-full h-48 rounded-2xl overflow-hidden mb-2">
+        <div>
+            <CustomerHeader showBackButton={true} showActionButtons={false} />
+            <div className="px-4 pb-24">
+            {/* รูปภาพบริการ */}
+            <div className="relative w-full h-48 rounded-2xl overflow-hidden mb-4">
                 <Image
                     src={service.imageUrl || 'https://via.placeholder.com/400x200'}
                     alt={service.serviceName}
@@ -102,14 +105,19 @@ function ServiceDetailContent() {
                     className="rounded-2xl"
                     priority
                 />
-                {/* overlay gradient + ข้อความ */}
-                <div className="absolute bottom-0 left-0 w-full px-4 py-3 bg-gradient-to-t from-purple-700/90 to-transparent">
-                    <div className="flex items-center justify-between">
-                        <h1 className="text-lg font-bold text-white drop-shadow-sm truncate">{service.serviceName}</h1>
-                        <span className="text-white font-semibold text-base drop-shadow-sm">{service.duration} นาที | ฿{service.price?.toLocaleString()}</span>
-                    </div>
+            </div>
+
+            {/* ชื่อและราคาบริการ */}
+            <div className="mb-2">
+                <h1 className="text-xl font-bold text-gray-800 mb-2">{service.serviceName}</h1>
+                <div className="flex items-center justify-between">
+                    <span className="text-gray-600">ระยะเวลา</span>
+                    <span className="font-semibold text-gray-800">{service.duration} นาที</span>
                 </div>
-                {/* ปุ่มย้อนกลับถูกลบออก */}
+                <div className="flex items-center justify-between">
+                    <span className="text-gray-600">ราคา</span>
+                    <span className="font-bold text-lg text-gray-800">฿{service.price?.toLocaleString()}</span>
+                </div>
             </div>
 
             {/* รายละเอียดบริการ */}
@@ -146,6 +154,7 @@ function ServiceDetailContent() {
                 >
                     ยืนยัน
                 </button>
+            </div>
             </div>
         </div>
     );

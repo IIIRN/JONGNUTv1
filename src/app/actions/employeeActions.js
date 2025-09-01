@@ -142,3 +142,80 @@ export async function promoteEmployeeToAdmin(employeeId) {
         return { success: false, error: error.message };
     }
 }
+
+/**
+ * Fetches only employees from Firestore.
+ * @returns {Promise<{success: boolean, employees?: Array, error?: string}>}
+ */
+export async function fetchEmployees() {
+  try {
+    const employeesRef = db.collection('employees');
+    const employeeSnapshot = await employeesRef.get();
+
+    const employees = employeeSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      type: 'employee', // เพิ่ม property 'type' เพื่อระบุประเภท
+    }));
+
+    // เรียงลำดับตามวันที่สร้างล่าสุด
+    const sortedEmployees = employees.sort((a, b) => {
+        const dateA = a.createdAt?.toDate() || 0;
+        const dateB = b.createdAt?.toDate() || 0;
+        return dateB - dateA;
+    });
+
+    return { success: true, employees: JSON.parse(JSON.stringify(sortedEmployees)) };
+  } catch (error) {
+    console.error("Error fetching employees:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Deletes an employee from the 'employees' collection.
+ * @param {string} employeeId - The UID of the employee to delete.
+ * @returns {Promise<{success: boolean, error?: string}>}
+ */
+export async function deleteEmployee(employeeId) {
+    if (!employeeId) {
+        return { success: false, error: 'Employee ID is required.' };
+    }
+
+    try {
+        const docRef = db.collection('employees').doc(employeeId);
+        await docRef.delete();
+        console.log(`Successfully deleted employee ${employeeId}.`);
+        revalidatePath('/employees');
+        return { success: true };
+    } catch (error) {
+        console.error(`Error deleting employee ${employeeId}:`, error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Updates employee status
+ * @param {string} employeeId - The UID of the employee to update.
+ * @param {string} status - New status ('available', 'on_leave', 'suspended').
+ * @returns {Promise<{success: boolean, error?: string}>}
+ */
+export async function updateEmployeeStatus(employeeId, status) {
+    if (!employeeId || !status) {
+        return { success: false, error: 'Employee ID and status are required.' };
+    }
+
+    try {
+        const docRef = db.collection('employees').doc(employeeId);
+        await docRef.update({ 
+            status: status,
+            updatedAt: new Date()
+        });
+        console.log(`Successfully updated employee ${employeeId} status to ${status}.`);
+        revalidatePath('/employees');
+        return { success: true };
+    } catch (error) {
+        console.error(`Error updating employee ${employeeId} status:`, error);
+        return { success: false, error: error.message };
+    }
+}

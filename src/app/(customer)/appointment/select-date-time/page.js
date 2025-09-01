@@ -9,6 +9,8 @@ import 'react-calendar/dist/Calendar.css';
 import { format } from 'date-fns';
 import { th } from 'date-fns/locale';
 import Image from 'next/image';
+import CustomerHeader from '@/app/components/CustomerHeader';
+import { useToast } from '@/app/components/common/Toast';
 
 // --- Beautician Card Component ---
 const BeauticianCard = ({ beautician, isSelected, onSelect }) => (
@@ -58,6 +60,7 @@ function SelectDateTimeContent() {
     const searchParams = useSearchParams();
     const serviceId = searchParams.get('serviceId');
     const addOns = searchParams.get('addOns');
+    const { showToast, ToastComponent } = useToast();
 
     const [date, setDate] = useState(new Date());
     const [activeMonth, setActiveMonth] = useState(new Date());
@@ -71,6 +74,7 @@ function SelectDateTimeContent() {
     const [slotCounts, setSlotCounts] = useState({}); // { '09:00': 2, ... }
     const [useBeautician, setUseBeautician] = useState(false); // โหมดการจอง
     const [weeklySchedule, setWeeklySchedule] = useState({}); // ตารางเวลาทำการ
+    const [holidayDates, setHolidayDates] = useState([]); // วันหยุดพิเศษ
 
     // Fetch timeQueues and totalBeauticians from settings/booking
     useEffect(() => {
@@ -84,17 +88,20 @@ function SelectDateTimeContent() {
                     setTotalBeauticians(Number(data.totalBeauticians) || 1);
                     setUseBeautician(!!data.useBeautician); // โหมดการจอง
                     setWeeklySchedule(data.weeklySchedule || {});
+                    setHolidayDates(Array.isArray(data.holidayDates) ? data.holidayDates : []);
                 } else {
                     setTimeQueues([]);
                     setTotalBeauticians(1);
                     setUseBeautician(false);
                     setWeeklySchedule({});
+                    setHolidayDates([]);
                 }
             } catch (e) {
                 setTimeQueues([]);
                 setTotalBeauticians(1);
                 setUseBeautician(false);
                 setWeeklySchedule({});
+                setHolidayDates([]);
             }
         };
         fetchBookingSettings();
@@ -149,13 +156,13 @@ function SelectDateTimeContent() {
 
     const handleConfirm = () => {
         if (!date || !time) {
-            alert('กรุณาเลือกวันและเวลา');
+            showToast('กรุณาเลือกวันและเวลาที่ต้องการจอง', "warning", "ข้อมูลไม่ครบถ้วน");
             return;
         }
         
         // ตรวจสอบการเลือกช่างตามโหมด
         if (useBeautician && !selectedBeautician) {
-            alert('กรุณาเลือกช่างเสริมสวย');
+            showToast('กรุณาเลือกช่างเสริมสวยที่ต้องการ', "warning", "ข้อมูลไม่ครบถ้วน");
             return;
         }
         
@@ -187,7 +194,17 @@ function SelectDateTimeContent() {
     const isDateOpen = (checkDate) => {
         const dayOfWeek = checkDate.getDay();
         const daySchedule = weeklySchedule[dayOfWeek];
-        return daySchedule ? daySchedule.isOpen : true; // default to open if no schedule
+        
+        // ตรวจสอบตารางเวลาทำการประจำ
+        const isRegularlyOpen = daySchedule ? daySchedule.isOpen : true;
+        if (!isRegularlyOpen) return false;
+        
+        // ตรวจสอบวันหยุดพิเศษ
+        const dateStr = format(checkDate, 'yyyy-MM-dd');
+        const isHoliday = holidayDates.some(holiday => holiday.date === dateStr);
+        if (isHoliday) return false;
+        
+        return true;
     };
 
     // Helper: check if a time slot is within business hours
@@ -205,7 +222,10 @@ function SelectDateTimeContent() {
     };
 
     return (
-    <div className="min-h-screen flex flex-col items-center pt-4 px-2">
+        <div>
+            <ToastComponent />
+            <CustomerHeader showBackButton={true} showActionButtons={false} />
+            <div className="min-h-screen flex flex-col items-center pt-4 px-4">
             {/* Calendar */}
             <div className="w-full max-w-md mx-auto flex flex-col items-center">
                 <div className="flex items-center justify-between w-full mb-4">
@@ -258,6 +278,12 @@ function SelectDateTimeContent() {
                                 const isSelected = date && d.toDateString() === date.toDateString();
                                 const isPast = d < new Date(new Date().setHours(0,0,0,0));
                                 const isBusinessOpen = isDateOpen(d);
+                                
+                                // ตรวจสอบวันหยุดพิเศษ
+                                const dateStr = format(d, 'yyyy-MM-dd');
+                                const holidayInfo = holidayDates.find(holiday => holiday.date === dateStr);
+                                const isHoliday = !!holidayInfo;
+                                
                                 const isDisabled = isPast || !isBusinessOpen || !isCurrentMonth;
                                 
                                 days.push(
@@ -268,16 +294,28 @@ function SelectDateTimeContent() {
                                             ${!isCurrentMonth ? 'text-gray-300' : 
                                               isSelected ? 'bg-gradient-to-tr from-pink-400 to-purple-500 text-white shadow-lg' : 
                                               isToday ? 'border-2 border-pink-400 text-pink-500 bg-white' : 
+                                              isHoliday ? 'bg-red-100 text-red-600 border border-red-300' :
                                               'bg-white text-purple-700 hover:bg-purple-50'}
                                             ${isDisabled ? 'opacity-40 cursor-not-allowed' : ''}
                                             ${!isBusinessOpen && !isPast && isCurrentMonth ? 'bg-gray-200 text-gray-400' : ''}
                                         `}
                                         disabled={isDisabled}
-                                        title={!isBusinessOpen && !isPast && isCurrentMonth ? 'วันปิดทำการ' : ''}
+                                        title={
+                                            isHoliday && holidayInfo?.note 
+                                                ? `วันหยุด: ${holidayInfo.note}` 
+                                                : !isBusinessOpen && !isPast && isCurrentMonth 
+                                                ? 'วันปิดทำการ' 
+                                                : ''
+                                        }
                                     >
                                         {d.getDate()}
-                                        {!isBusinessOpen && !isPast && isCurrentMonth && (
-                                            <span className="absolute top-0 right-0 w-2 h-2 bg-red-400 rounded-full"></span>
+                                        {isHoliday && isCurrentMonth && (
+                                            <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border border-white text-xs text-white flex items-center justify-center">
+                                                ✕
+                                            </span>
+                                        )}
+                                        {!isBusinessOpen && !isPast && isCurrentMonth && !isHoliday && (
+                                            <span className="absolute top-0 right-0 w-2 h-2 bg-gray-400 rounded-full"></span>
                                         )}
                                     </button>
                                 );
@@ -296,8 +334,25 @@ function SelectDateTimeContent() {
                 
                 {/* ตรวจสอบว่าวันที่เลือกเปิดทำการหรือไม่ */}
                 {date && !isDateOpen(date) ? (
-                    <div className="text-center p-4 bg-gray-100 rounded-lg">
-                        <p className="text-gray-600">วันที่เลือกปิดทำการ</p>
+                    <div className="text-center p-4 bg-red-50 border border-red-200 rounded-lg">
+                        {(() => {
+                            const dateStr = format(date, 'yyyy-MM-dd');
+                            const holidayInfo = holidayDates.find(holiday => holiday.date === dateStr);
+                            
+                            if (holidayInfo) {
+                                return (
+                                    <div>
+                                        <p className="text-red-600 font-medium">วันหยุดพิเศษ</p>
+                                        {holidayInfo.note && (
+                                            <p className="text-red-500 text-sm mt-1">{holidayInfo.note}</p>
+                                        )}
+                                        <p className="text-red-400 text-xs mt-2">กรุณาเลือกวันที่อื่น</p>
+                                    </div>
+                                );
+                            } else {
+                                return <p className="text-gray-600">วันที่เลือกปิดทำการ</p>;
+                            }
+                        })()}
                         <p className="text-sm text-gray-500">กรุณาเลือกวันอื่น</p>
                     </div>
                 ) : timeQueues.filter(q => q.time && isTimeInBusinessHours(q.time)).length === 0 ? (
@@ -376,6 +431,7 @@ function SelectDateTimeContent() {
                 >
                     ถัดไป
                 </button>
+            </div>
             </div>
         </div>
     );

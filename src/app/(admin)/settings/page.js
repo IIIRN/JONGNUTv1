@@ -31,7 +31,8 @@ export default function AdminSettingsPage() {
             4: { isOpen: true, openTime: '09:00', closeTime: '18:00' }, // พฤหัสบดี
             5: { isOpen: true, openTime: '09:00', closeTime: '18:00' }, // ศุกร์
             6: { isOpen: true, openTime: '09:00', closeTime: '18:00' }, // เสาร์
-        }
+        },
+        holidayDates: [] // วันหยุดพิเศษ เก็บเป็น array ของ date strings
     });
     const [allAdmins, setAllAdmins] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -66,7 +67,8 @@ export default function AdminSettingsPage() {
                     setBookingSettings(prev => ({ 
                         ...prev, 
                         ...data,
-                        weeklySchedule: data.weeklySchedule ? { ...defaultSchedule, ...data.weeklySchedule } : defaultSchedule
+                        weeklySchedule: data.weeklySchedule ? { ...defaultSchedule, ...data.weeklySchedule } : defaultSchedule,
+                        holidayDates: data.holidayDates || []
                     }));
                 }
 
@@ -129,6 +131,7 @@ export default function AdminSettingsPage() {
                 useBeautician: !!bookingSettings.useBeautician,
                 totalBeauticians: bookingSettings.totalBeauticians || '',
                 weeklySchedule: bookingSettings.weeklySchedule || {},
+                holidayDates: bookingSettings.holidayDates || [],
             };
 
             const results = await Promise.all([
@@ -448,7 +451,150 @@ export default function AdminSettingsPage() {
                     </div>
                 </SettingsCard>
 
+                <SettingsCard title="วันหยุดพิเศษ">
+                    <div className="space-y-4">
+                        <div className="p-3 bg-blue-50 rounded border border-blue-200">
+                            <p className="text-sm text-blue-800">
+                                <strong>วันหยุดพิเศษ:</strong> กำหนดวันที่จะปิดทำการเป็นพิเศษ เช่น วันหยุดนักขัตฤกษ์, วันลาพักร้อน, ฯลฯ 
+                                ระบบจะไม่เปิดให้จองในวันที่กำหนดไว้
+                            </p>
+                        </div>
 
+                        {/* Add Holiday Form */}
+                        <div className="border p-4 rounded-lg bg-gray-50">
+                            <h4 className="font-medium text-gray-700 mb-3">เพิ่มวันหยุดใหม่</h4>
+                            <div className="flex gap-3 items-end">
+                                <div className="flex-1">
+                                    <label className="block text-sm font-medium text-gray-600 mb-1">
+                                        เลือกวันที่
+                                    </label>
+                                    <input
+                                        type="date"
+                                        value={bookingSettings._newHolidayDate || ''}
+                                        onChange={e => setBookingSettings(prev => ({ 
+                                            ...prev, 
+                                            _newHolidayDate: e.target.value 
+                                        }))}
+                                        className="border rounded-md px-3 py-2 w-full"
+                                        min={new Date().toISOString().split('T')[0]} // ป้องกันเลือกวันที่ผ่านมาแล้ว
+                                    />
+                                </div>
+                                <div className="flex-1">
+                                    <label className="block text-sm font-medium text-gray-600 mb-1">
+                                        หมายเหตุ (ไม่บังคับ)
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={bookingSettings._newHolidayNote || ''}
+                                        onChange={e => setBookingSettings(prev => ({ 
+                                            ...prev, 
+                                            _newHolidayNote: e.target.value 
+                                        }))}
+                                        placeholder="เช่น วันขึ้นปีใหม่, ลาพักร้อน"
+                                        className="border rounded-md px-3 py-2 w-full"
+                                    />
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const date = bookingSettings._newHolidayDate;
+                                        const note = bookingSettings._newHolidayNote || '';
+                                        
+                                        if (!date) return;
+                                        
+                                        // ตรวจสอบว่าวันที่นั้นมีอยู่แล้วหรือไม่
+                                        const existing = (bookingSettings.holidayDates || []).find(h => h.date === date);
+                                        if (existing) {
+                                            alert('วันที่นี้ได้ถูกเพิ่มเป็นวันหยุดแล้ว');
+                                            return;
+                                        }
+
+                                        setBookingSettings(prev => ({
+                                            ...prev,
+                                            holidayDates: [
+                                                ...(prev.holidayDates || []),
+                                                { 
+                                                    date: date, 
+                                                    note: note,
+                                                    createdAt: new Date().toISOString()
+                                                }
+                                            ],
+                                            _newHolidayDate: '',
+                                            _newHolidayNote: ''
+                                        }));
+                                    }}
+                                    disabled={!bookingSettings._newHolidayDate}
+                                    className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                                >
+                                    เพิ่มวันหยุด
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Holiday List */}
+                        <div>
+                            <h4 className="font-medium text-gray-700 mb-3">รายการวันหยุดพิเศษ</h4>
+                            {(!bookingSettings.holidayDates || bookingSettings.holidayDates.length === 0) ? (
+                                <div className="text-center p-6 text-gray-500 border rounded-lg bg-gray-50">
+                                    ยังไม่ได้กำหนดวันหยุดพิเศษ
+                                </div>
+                            ) : (
+                                <div className="space-y-2 max-h-60 overflow-y-auto border rounded-lg">
+                                    {bookingSettings.holidayDates
+                                        .sort((a, b) => new Date(a.date) - new Date(b.date))
+                                        .map((holiday, index) => {
+                                            const dateObj = new Date(holiday.date);
+                                            const isExpired = dateObj < new Date().setHours(0, 0, 0, 0);
+                                            const formattedDate = dateObj.toLocaleDateString('th-TH', {
+                                                year: 'numeric',
+                                                month: 'long',
+                                                day: 'numeric',
+                                                weekday: 'long'
+                                            });
+                                            
+                                            return (
+                                                <div 
+                                                    key={index} 
+                                                    className={`flex items-center justify-between p-3 border-b last:border-b-0 ${
+                                                        isExpired ? 'bg-gray-100 opacity-60' : 'bg-white'
+                                                    }`}
+                                                >
+                                                    <div className="flex-1">
+                                                        <div className={`font-medium ${isExpired ? 'text-gray-500' : 'text-gray-800'}`}>
+                                                            {formattedDate}
+                                                            {isExpired && <span className="ml-2 text-xs text-red-500">(ผ่านมาแล้ว)</span>}
+                                                        </div>
+                                                        {holiday.note && (
+                                                            <div className={`text-sm ${isExpired ? 'text-gray-400' : 'text-gray-600'}`}>
+                                                                {holiday.note}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            if (confirm(`ต้องการลบวันหยุด "${formattedDate}" หรือไม่?`)) {
+                                                                setBookingSettings(prev => ({
+                                                                    ...prev,
+                                                                    holidayDates: (prev.holidayDates || []).filter((_, i) => i !== index)
+                                                                }));
+                                                            }
+                                                        }}
+                                                        className="text-red-500 hover:text-red-700 px-2 py-1 rounded hover:bg-red-50"
+                                                        title="ลบวันหยุดนี้"
+                                                    >
+                                                        ลบ
+                                                    </button>
+                                                </div>
+                                            );
+                                        })}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Quick Actions - ลบส่วนวันหยุดนักขัตฤกษ์ออก */}
+                    </div>
+                </SettingsCard>
 
                 {/* [!code focus start] */}
                 {/* --- นำโค้ดส่วน Report กลับมา --- */}

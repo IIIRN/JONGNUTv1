@@ -10,6 +10,7 @@ import { cancelAppointmentByUser } from '@/app/actions/appointmentActions';
 import AppointmentCard from './AppointmentCard';
 import QrCodeModal from '@/app/components/common/QrCodeModal';
 import HistoryCard from './history/HistoryCard';
+import CustomerHeader from '@/app/components/CustomerHeader';
 
 export default function MyAppointmentsPage() {
     const { profile, loading: liffLoading, error: liffError } = useLiffContext();
@@ -99,7 +100,9 @@ export default function MyAppointmentsPage() {
     if (liffError) return <div className="p-4 text-center text-red-500">LIFF Error: {liffError}</div>;
 
     return (
-        <div className="space-y-5">
+        <div>
+            <CustomerHeader showBackButton={false} showActionButtons={true} />
+            <div className="px-4 pb-4 space-y-5">
             <Notification {...notification} />
             <ConfirmationModal
                 show={!!appointmentToCancel}
@@ -114,14 +117,14 @@ export default function MyAppointmentsPage() {
                 onClose={() => setShowQrModal(false)}
                 appointmentId={selectedAppointmentId}
             />
-            {/* ปุ่มจองบริการถูกลบออก */}
+            
             {/* นัดหมายปัจจุบัน */}
             <div className="space-y-4">
                 <div className="font-bold text-md text-gray-700">นัดหมายของฉัน</div>
                 {loading ? (
                     <div className="text-center text-gray-500 pt-10">กำลังโหลดรายการนัดหมาย...</div>
                 ) : appointments.length === 0 ? (
-                    <div className="text-center text-gray-500 pt-10 bg-white p-8 rounded-xl ">
+                    <div className="text-center text-gray-500 pt-10 bg-white p-8 rounded-xl">
                         <p className="font-semibold">ไม่มีรายการนัดหมายที่กำลังดำเนินอยู่</p>
                     </div>
                 ) : (
@@ -135,6 +138,7 @@ export default function MyAppointmentsPage() {
                     ))
                 )}
             </div>
+            
             {/* toggle ประวัติ */}
             <div className="flex flex-col items-center mt-6">
                 <button
@@ -144,6 +148,7 @@ export default function MyAppointmentsPage() {
                     <span className="text-lg">{showHistory ? '▲ ซ่อนประวัติที่ผ่านมา' : '▼ ดูประวัติที่ผ่านมา'}</span>
                 </button>
             </div>
+            
             {/* ประวัติ */}
             {showHistory && (
                 <div className="space-y-4 mt-2">
@@ -151,7 +156,7 @@ export default function MyAppointmentsPage() {
                     {loading ? (
                         <div className="text-center text-gray-500 pt-10">กำลังโหลดประวัติ...</div>
                     ) : historyBookings.length === 0 ? (
-                        <div className="text-center text-gray-500 pt-10 bg-white p-8 rounded-xl ">
+                        <div className="text-center text-gray-500 pt-10 bg-white p-8 rounded-xl">
                             <p>ยังไม่มีประวัติการใช้บริการ</p>
                         </div>
                     ) : (
@@ -165,6 +170,7 @@ export default function MyAppointmentsPage() {
                     )}
                 </div>
             )}
+            </div>
         </div>
     );
 }

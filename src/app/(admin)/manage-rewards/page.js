@@ -54,6 +54,11 @@ export default function AdminRewardsPage() {
                         <div>
                             <h2 className="font-bold text-lg text-indigo-600">{reward.name}</h2>
                             <p className="text-sm text-gray-600 mt-2">{reward.description}</p>
+                            <div className="mt-2">
+                                <span className="text-sm text-purple-600 font-medium">
+                                    {reward.discountType === 'percentage' ? `ส่วนลด ${reward.discountValue}%` : `ส่วนลด ${reward.discountValue} บาท`}
+                                </span>
+                            </div>
                         </div>
                         <div className="mt-4 pt-4 border-t">
                              <div className="flex justify-between items-center">

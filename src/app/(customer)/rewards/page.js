@@ -7,6 +7,7 @@ import { db } from '@/app/lib/firebase';
 import { collection, doc, getDocs, onSnapshot, query, orderBy } from 'firebase/firestore'; 
 import { redeemReward } from '@/app/actions/rewardActions';
 import { Notification } from '@/app/components/common/NotificationComponent';
+import CustomerHeader from '@/app/components/CustomerHeader';
 
 const RewardCard = ({ reward, userPoints, onRedeem, isRedeeming }) => {
     const canRedeem = userPoints >= reward.pointsRequired;
@@ -15,6 +16,9 @@ const RewardCard = ({ reward, userPoints, onRedeem, isRedeeming }) => {
             <div>
                 <h3 className="font-bold text-indigo-600">{reward.name}</h3>
                 <p className="text-sm text-gray-600">{reward.description}</p>
+                <div className="text-sm text-purple-600 font-medium mt-1">
+                    {reward.discountType === 'percentage' ? `ส่วนลด ${reward.discountValue}%` : `ส่วนลด ${reward.discountValue} บาท`}
+                </div>
                 <p className="text-sm text-gray-500 mt-1">ใช้ {reward.pointsRequired} คะแนน</p>
             </div>
             <button
@@ -74,7 +78,9 @@ export default function RewardsPage() {
     if (loading || liffLoading) return <div className="text-center p-10">กำลังโหลด...</div>
 
     return (
-        <div className="space-y-6">
+        <div>
+            <CustomerHeader />
+            <div className="px-4 pb-4 space-y-6">
             <Notification {...notification} />
             <div className="bg-white p-5 rounded-lg shadow-md text-center">
                 <p className="text-gray-500">คะแนนสะสมของคุณ</p>
@@ -96,6 +102,7 @@ export default function RewardsPage() {
                 ) : (
                     <p className="text-center text-gray-500">ยังไม่มีของรางวัลให้แลกในขณะนี้</p>
                 )}
+            </div>
             </div>
         </div>
     );
