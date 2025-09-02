@@ -17,7 +17,7 @@ const AppointmentCard = ({ job, onQrCodeClick, onCancelClick, onConfirmClick, is
     return (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
             {/* Header Section */}
-            <div className="bg-gradient-to-r from-purple-800 to-pink-400 p-4 text-white">
+            <div className="bg-primary p-4 text-white">
                 <div className="flex justify-between items-center">
                     <div>
                         <div className="text-sm opacity-90">นัดหมายบริการ</div>
@@ -50,8 +50,8 @@ const AppointmentCard = ({ job, onQrCodeClick, onCancelClick, onConfirmClick, is
                 {/* Total Price */}
                 <div className="border-t pt-3 mb-4">
                     <div className="flex justify-between items-center">
-                        <span className="font-semibold text-gray-800">ราคารวม</span>
-                        <span className="font-bold text-lg text-gray-800">{job.paymentInfo?.totalPrice?.toLocaleString() || 'N/A'} บาท</span>
+                        <span className="font-semibold text-black">ราคารวม</span>
+                        <span className="font-bold text-lg text-black">{job.paymentInfo?.totalPrice?.toLocaleString() || 'N/A'} บาท</span>
                     </div>
                 </div>
 
@@ -59,7 +59,7 @@ const AppointmentCard = ({ job, onQrCodeClick, onCancelClick, onConfirmClick, is
                 <div className="flex justify-between items-center">
                     <button 
                         onClick={() => onQrCodeClick(job.id)}
-                        className="bg-slate-700 text-white py-2 px-4 rounded-lg font-semibold text-sm hover:bg-slate-600 transition-colors"
+                        className="bg-primary-dark text-white py-2 px-4 rounded-lg font-semibold text-sm hover:bg-slate-600 transition-colors"
                     >
                         QR Code
                     </button>
@@ -68,14 +68,14 @@ const AppointmentCard = ({ job, onQrCodeClick, onCancelClick, onConfirmClick, is
                             <button 
                                 onClick={() => onConfirmClick(job)}
                                 disabled={isConfirming}
-                                className=" bg-violet-800 text-white py-2 px-4 rounded-lg font-semibold text-sm hover:bg-green-600 transition-colors disabled:bg-gray-400"
+                                className=" bg-primary text-white py-2 px-4 rounded-lg font-semibold text-sm hover:bg-green-600 transition-colors disabled:bg-gray-400"
                             >
                                 {isConfirming ? '...' : 'ยืนยัน'}
                             </button>
                         )}
                          {job.status === 'confirmed' && (
                             <button 
-                                className="bg-gray-200 text-gray-500 py-2 px-4 rounded-lg font-semibold text-sm cursor-not-allowed"
+                                className="bg-success text-white py-2 px-4 rounded-lg font-semibold text-sm cursor-not-allowed"
                                 disabled
                             >
                                 ยืนยันแล้ว
@@ -84,7 +84,7 @@ const AppointmentCard = ({ job, onQrCodeClick, onCancelClick, onConfirmClick, is
                         {job.status !== 'in_progress' && (
                             <button 
                                 onClick={() => onCancelClick(job)}
-                                className="bg-red-100 text-red-700 py-2 px-4 rounded-lg font-semibold text-sm hover:bg-red-200 transition-colors"
+                                className="bg-error text-white py-2 px-4 rounded-lg font-semibold text-sm hover:bg-red-200 transition-colors"
                             >
                                 ยกเลิก
                             </button>

@@ -151,7 +151,7 @@ function ServiceDetailContent() {
                 </div>
                 <button
                     onClick={handleConfirm}
-                    className="w-full bg-purple-400 hover:bg-purple-500 text-white py-3 rounded-xl font-bold text-base transition-colors"
+                    className="w-full bg-primary hover:bg-primary-dark text-white py-3 rounded-xl font-bold text-base transition-colors"
                 >
                     ยืนยัน
                 </button>

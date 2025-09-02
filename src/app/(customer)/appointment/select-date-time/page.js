@@ -16,7 +16,7 @@ import { useToast } from '@/app/components/common/Toast';
 const BeauticianCard = ({ beautician, isSelected, onSelect }) => (
     <div
         onClick={() => onSelect(beautician)}
-        className={`rounded-lg p-4 flex items-center space-x-4 border-2 transition-all cursor-pointer w-full ${isSelected ? 'border-pink-500 bg-pink-50' : 'border-gray-200 bg-white'}`}
+        className={`rounded-lg p-4 flex items-center space-x-4 border-2 transition-all cursor-pointer w-full ${isSelected ? 'border-primary bg-primary-light' : 'border-gray-200 bg-white'}`}
     >
         <div className="relative w-16 h-16 rounded-full overflow-hidden flex-shrink-0">
             <Image
@@ -34,7 +34,7 @@ const BeauticianCard = ({ beautician, isSelected, onSelect }) => (
                 {beautician.status === 'available' ? 'ว่าง' : 'ไม่ว่าง'}
             </p>
             {isSelected && (
-                <div className="w-6 h-6 bg-pink-500 rounded-full flex items-center justify-center">
+                <div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center">
                     <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
@@ -48,7 +48,7 @@ const BeauticianCard = ({ beautician, isSelected, onSelect }) => (
 const TimeSlot = ({ time, isSelected, onSelect }) => (
     <button
         onClick={() => onSelect(time)}
-        className={`rounded-lg px-4 py-2 transition-colors text-sm font-semibold ${isSelected ? 'bg-pink-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+        className={`rounded-lg px-4 py-2 transition-colors text-sm font-semibold ${isSelected ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
     >
         {time}
     </button>
@@ -235,9 +235,9 @@ function SelectDateTimeContent() {
                             d.setMonth(d.getMonth() - 1);
                             return d;
                         })}
-                        className="px-3 py-2 text-xl text-purple-400 hover:text-pink-500"
+                        className="px-3 py-2 text-xl text-primary hover:text-primary"
                     >&#60;</button>
-                    <span className="font-bold text-lg text-purple-700">
+                    <span className="font-bold text-lg text-primary">
                         {activeMonth.toLocaleString('th-TH', { month: 'long', year: 'numeric' })}
                     </span>
                     <button
@@ -246,19 +246,19 @@ function SelectDateTimeContent() {
                             d.setMonth(d.getMonth() + 1);
                             return d;
                         })}
-                        className="px-3 py-2 text-xl text-purple-400 hover:text-pink-500"
+                        className="px-3 py-2 text-xl text-primary hover:text-primary"
                     >&#62;</button>
                 </div>
                 <div className="w-full">
                     {/* Header วันในสัปดาห์ */}
                     <div className="grid grid-cols-7 gap-1 mb-2">
                         {['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'].map((d, i) => (
-                            <div key={i} className="text-sm text-purple-400 text-center font-semibold py-2">{d}</div>
+                            <div key={i} className="text-sm text-primary text-center font-semibold py-2">{d}</div>
                         ))}
                     </div>
                     
                     {/* วันที่ในเดือน */}
-                    <div className="grid grid-cols-7 gap-1">
+                    <div className="grid grid-cols-7 gap-2">
                         {(() => {
                             const year = activeMonth.getFullYear();
                             const month = activeMonth.getMonth();
@@ -292,10 +292,10 @@ function SelectDateTimeContent() {
                                         onClick={() => !isDisabled && setDate(d)}
                                         className={`w-10 h-10 flex items-center justify-center rounded-lg text-sm font-semibold transition-colors relative
                                             ${!isCurrentMonth ? 'text-gray-300' : 
-                                              isSelected ? 'bg-gradient-to-tr from-pink-400 to-purple-500 text-white shadow-lg' : 
-                                              isToday ? 'border-2 border-pink-400 text-pink-500 bg-white' : 
+                                              isSelected ? 'bg-primary text-white shadow-lg' : 
+                                              isToday ? 'border-2 border-primary text-primary bg-white' : 
                                               isHoliday ? 'bg-red-100 text-red-600 border border-red-300' :
-                                              'bg-white text-purple-700 hover:bg-purple-50'}
+                                              'bg-white text-primary hover:bg-purple-50'}
                                             ${isDisabled ? 'opacity-40 cursor-not-allowed' : ''}
                                             ${!isBusinessOpen && !isPast && isCurrentMonth ? 'bg-gray-200 text-gray-400' : ''}
                                         `}
@@ -330,7 +330,7 @@ function SelectDateTimeContent() {
 
             {/* Available Time */}
             <div className="w-full max-w-md mx-auto mt-6">
-                <h2 className="text-base font-bold mb-2 text-purple-700">เลือกช่วงเวลา</h2>
+                <h2 className="text-base font-bold mb-2 text-primary">เลือกช่วงเวลา</h2>
                 
                 {/* ตรวจสอบว่าวันที่เลือกเปิดทำการหรือไม่ */}
                 {date && !isDateOpen(date) ? (
@@ -374,7 +374,7 @@ function SelectDateTimeContent() {
                                         key={slot}
                                         onClick={() => !isFull && setTime(slot)}
                                         className={`rounded-full px-4 py-2 text-sm font-semibold shadow-sm transition-colors
-                                            ${time === slot ? 'bg-gradient-to-tr from-pink-400 to-purple-500 text-white shadow-lg' : 'bg-white text-purple-700 border border-purple-100 hover:bg-purple-50'}
+                                            ${time === slot ? 'bg-primary text-white shadow-lg' : 'bg-white text-primary border border-purple-100 hover:bg-purple-50'}
                                             ${isFull ? 'opacity-40 cursor-not-allowed line-through' : ''}`}
                                         disabled={isFull}
                                         title={isFull ? 'คิวเต็ม' : ''}
@@ -390,7 +390,7 @@ function SelectDateTimeContent() {
             {/* Beautician Selection - แสดงเฉพาะเมื่อเปิดโหมดเลือกช่าง */}
             {useBeautician && (
                 <div className="w-full max-w-md mx-auto mt-6">
-                    <h2 className="text-base font-bold mb-2 text-purple-700">เลือกช่างเสริมสวย</h2>
+                    <h2 className="text-base font-bold mb-2 text-primary">เลือกช่างเสริมสวย</h2>
                     {loading ? (
                         <div className="text-center">กำลังโหลดรายชื่อช่าง...</div>
                     ) : beauticians.length === 0 ? (
@@ -412,7 +412,7 @@ function SelectDateTimeContent() {
 
             {/* ข้อความสำหรับโหมดไม่เลือกช่าง */}
             {!useBeautician && (
-                <div className="w-full max-w-md mx-auto mt-6">
+                <div className="w-full max-w-md mx-auto mt-6 hidden">
                     <div className="text-center p-4 bg-blue-50 rounded-lg border border-blue-200">
                         <div className="text-sm text-blue-700">
                             <strong>โหมดคิวธรรมดา</strong><br/>
@@ -427,7 +427,7 @@ function SelectDateTimeContent() {
                 <button
                     onClick={handleConfirm}
                     disabled={!date || !time || (useBeautician && !selectedBeautician)}
-                    className="w-full bg-violet-800 text-white py-3 rounded-xl font-bold shadow-lg "
+                    className="w-full bg-primary-dark text-white py-3 rounded-xl font-bold shadow-lg "
                 >
                     ถัดไป
                 </button>

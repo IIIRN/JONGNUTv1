@@ -198,25 +198,25 @@ function GeneralInfoContent() {
                 {/* Booking Details Card */}
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-4">
                     {/* Date and Time */}
-                    <div className="p-4 border-b border-gray-100">
+                    <div className="p-4 border-b border-gray-100  text-black">
                         <div className="flex justify-between items-center mb-2">
-                            <span className="text-sm font-medium text-gray-600">วันที่</span>
-                            <span className="text-sm font-semibold">{format(new Date(date), 'dd/MM/yyyy', { locale: th })}</span>
+                            <span className="text-sm font-medium">วันที่</span>
+                            <span className="text-sm font-semibold ">{format(new Date(date), 'dd/MM/yyyy', { locale: th })}</span>
                         </div>
                         <div className="flex justify-between items-center mb-2">
-                            <span className="text-sm font-medium text-gray-600">เวลา</span>
+                            <span className="text-sm font-medium ">เวลา</span>
                             <span className="text-sm font-semibold">{time} น.</span>
                         </div>
                         <div className="flex justify-between items-center mb-2">
-                            <span className="text-sm font-medium text-gray-600">พนักงาน</span>
+                            <span className="text-sm font-medium">พนักงาน</span>
                             <span className="text-sm font-semibold">{beautician?.firstName === 'ระบบจัดให้' ? 'บ่อง' : beautician?.firstName}</span>
                         </div>
                     </div>
 
                     {/* Services */}
-                    <div className="p-4 border-b border-gray-100">
+                    <div className="p-4 border-b border-gray-100  text-black">
                         <div className="flex justify-between items-center mb-2">
-                            <span className="text-sm font-medium text-gray-600">บริการ</span>
+                            <span className="text-sm font-medium">บริการ</span>
                             <div className="text-right">
                                 <div className="text-sm font-semibold">{service?.serviceName}</div>
                                 <div className="text-sm text-gray-500">{service?.duration}นาที | {basePrice.toLocaleString()}</div>
@@ -225,7 +225,7 @@ function GeneralInfoContent() {
                         
                         {selectedAddOns.length > 0 && (
                             <div className="flex justify-between items-center mb-2">
-                                <span className="text-sm font-medium text-gray-600">บริการเสริม</span>
+                                <span className="text-sm font-medium text-primary">บริการเสริม</span>
                                 <div className="text-right">
                                     <div className="text-sm font-semibold">
                                         {(service.addOnServices || [])
@@ -246,19 +246,19 @@ function GeneralInfoContent() {
 
                     {/* Coupon Section */}
                     {availableCoupons.length > 0 && (
-                        <div className="p-4 border-b border-gray-100">
+                        <div className="p-4 border-b border-gray-100 ">
                             <button
                                 type="button"
                                 onClick={() => setShowCoupon(!showCoupon)}
-                                className="flex items-center justify-between w-full text-left text-purple-600 font-medium"
+                                className="flex items-center justify-between w-full text-left text-primary font-medium"
                             >
-                                <span>🎫 ใช้คูปอง ({availableCoupons.length} ใบ)</span>
+                                <span>ใช้คูปอง ({availableCoupons.length} ใบ)</span>
                                 <span>{showCoupon ? '▼' : '▶'}</span>
                             </button>
                             
                             {showCoupon && (
                                 <div className="space-y-2">
-                                    <div className="bg-gray-50 rounded-lg p-3">
+                                    <div className="bg-gray-50 text-primary rounded-lg p-3">
                                         <input
                                             type="radio"
                                             id="no-coupon"
@@ -271,7 +271,7 @@ function GeneralInfoContent() {
                                         <label htmlFor="no-coupon" className="text-sm">ไม่ใช้คูปอง</label>
                                     </div>
                                     {availableCoupons.map(coupon => (
-                                        <div key={coupon.id} className="bg-gray-50 rounded-lg p-3">
+                                        <div key={coupon.id} className="bg-gray-50 text-primary rounded-lg p-3">
                                             <input
                                                 type="radio"
                                                 id={coupon.id}
@@ -297,9 +297,9 @@ function GeneralInfoContent() {
                     {/* Total */}
                     <div className="p-4">
                         <div className="flex justify-between items-center">
-                            <span className="text-base font-semibold">รวม</span>
+                            <span className="text-black font-semibold">รวม</span>
                             <div className="text-right">
-                                <div className="text-base font-bold">
+                                <div className="text-black font-bold">
                                     {(service?.duration || 0) + (service.addOnServices || [])
                                         .filter(a => selectedAddOns.includes(a.name))
                                         .reduce((sum, a) => sum + (a.duration || 0), 0)
@@ -316,50 +316,50 @@ function GeneralInfoContent() {
                 {/* Form Card */}
                 <div className="bg-white rounded-2xl p-4 mb-4 shadow-sm border border-gray-100">
                     <form onSubmit={handleSubmit} className="space-y-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">ชื่อ-สกุล</label>
+                        <div className='flex'>
+                            <label className="w-16 block text-sm font-medium text-gray-700 mb-2">ชื่อ-สกุล</label>
                             <input
                                 type="text"
                                 name="fullName"
                                 value={formData.fullName}
                                 onChange={handleChange}
-                                className="w-full px-4 py-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                className="w-full px-4 py-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent"
                                 required
                             />
                         </div>
 
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">ติดต่อ</label>
+                        <div className='flex'>
+                            <label className="w-16 block text-sm font-medium text-gray-700 mb-2">ติดต่อ</label>
                             <input
                                 type="tel"
                                 name="phone"
                                 value={formData.phone}
                                 onChange={handleChange}
-                                className="w-full px-4 py-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent placeholder-gray-500"
+                                className="w-full px-4 py-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent placeholder-gray-500"
                                 required
                             />
                         </div>
 
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">อีเมล</label>
+                        <div className='flex'>
+                            <label className="w-16 block text-sm font-medium text-gray-700 mb-2">อีเมล</label>
                             <input
                                 type="email"
                                 name="email"
                                 value={formData.email}
                                 onChange={handleChange}
-                                className="w-full px-4 py-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent placeholder-gray-500"
+                                className="w-full px-4 py-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent placeholder-gray-500"
                                 
                             />
                         </div>
 
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">เพิ่มเติม</label>
+                        <div className='flex'>
+                            <label className="w-16 block text-sm font-medium text-gray-700 mb-2">เพิ่มเติม</label>
                             <textarea
                                 name="note"
                                 value={formData.note}
                                 onChange={handleChange}
                                 rows={2}
-                                className="w-full px-4 py-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none placeholder-gray-500"
+                                className="w-full px-4 py-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent resize-none placeholder-gray-500"
                                
                             />
                         </div>
@@ -370,7 +370,7 @@ function GeneralInfoContent() {
                 <button
                     onClick={handleSubmit}
                     disabled={isSubmitting}
-                    className="w-full bg-violet-800 text-white py-4 rounded-2xl font-semibold text-lg shadow-lg disabled:opacity-50"
+                    className="w-full bg-primary-dark text-white py-4 rounded-2xl font-semibold text-lg shadow-lg disabled:opacity-50"
                 >
                     {isSubmitting ? 'กำลังดำเนินการ...' : 'ยืนยันการนัดหมาย'}
                 </button>

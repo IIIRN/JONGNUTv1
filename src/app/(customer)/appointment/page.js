@@ -81,7 +81,7 @@ export default function AppointmentPage() {
                                     priority
                                 />
                                 {/* overlay gradient + text */}
-                                <div className="absolute bottom-0 left-0 w-full px-2 py-2 bg-gradient-to-t from-purple-600/90 to-transparent">
+                                <div className="absolute bottom-0 left-0 w-full px-2 py-2 bg-gradient-to-t from-[#A8999E]/90 to-transparent">
                                     <div className="text-white font-semibold text-sm truncate drop-shadow">
                                         {service.serviceName}
                                     </div>

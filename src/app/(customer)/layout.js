@@ -6,7 +6,7 @@ export default function CustomerLayout({ children }) {
     const customerLiffId = process.env.NEXT_PUBLIC_CUSTOMER_LIFF_ID;
     return (
         <LiffProvider liffId={customerLiffId}>
-            <div className="bg-gray-50 min-h-screen relative bg-fixed">
+            <div className="bg-gradient-to-b from-[#A8999E] via-white to-white min-h-screen relative bg-fixed">
                 <main>
                     {children}
                 </main>

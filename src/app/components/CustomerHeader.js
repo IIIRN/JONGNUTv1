@@ -13,7 +13,7 @@ export default function CustomerHeader({ showBackButton = false, showActionButto
     const router = useRouter();
 
     useEffect(() => {
-        let unsubscribe = () => {};
+        let unsubscribe = () => { };
         if (profile?.userId) {
             const customerRef = doc(db, "customers", profile.userId);
             unsubscribe = onSnapshot(customerRef, (doc) => {
@@ -29,7 +29,7 @@ export default function CustomerHeader({ showBackButton = false, showActionButto
 
     return (
         <div className="p-3">
-            <header className="rounded-xl p-4 bg-violet-800 text-white shadow-md flex items-center justify-between">
+            <header className="rounded-xl p-4 bg-primary-dark text-white shadow-md flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     {profile?.pictureUrl ? (
                         <div className="w-14 h-14 rounded-full overflow-hidden flex-shrink-0">
@@ -44,26 +44,27 @@ export default function CustomerHeader({ showBackButton = false, showActionButto
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
-                    <div className="bg-white/90 rounded-full px-3 py-1 text-purple-600 font-bold text-sm">
+                    <div className="bg-white/90 rounded-full px-4 py-2 text-primary font-bold text-sm">
                         {customerData?.points ?? 0} <span className="font-normal">พ้อย</span>
                     </div>
                 </div>
             </header>
-            
+
             {showActionButtons && (
-                <div className="mt-3 grid grid-cols-2 gap-2">
-                    <button 
+                <div className="mt-4 grid grid-cols-2 gap-4">
+                    <button
                         onClick={() => router.push('/appointment')}
-                        className="bg-white text-center text-pink-500 shadow-sm rounded-lg py-4 font-semibold text-md hover:shadow-md transition-shadow"
+                        className="bg-primary-light text-primary shadow-sm rounded-2xl py-8 font-semibold text-md hover:shadow-md transition-shadow"
                     >
                         จองบริการ
                     </button>
-                    <button 
+                    <button
                         onClick={() => router.push('/my-coupons')}
-                        className="bg-white text-center text-indigo-500 shadow-sm rounded-lg py-4 font-semibold text-md hover:shadow-md transition-shadow"
+                        className="bg-primary-light text-primary shadow-sm rounded-2xl py-8  font-semibold text-md hover:shadow-md transition-shadow"
                     >
                         คูปองของฉัน
                     </button>
+
                 </div>
             )}
         </div>
