@@ -2,67 +2,64 @@
 
 import { db } from '@/app/lib/firebaseAdmin';
 import { FieldValue } from 'firebase-admin/firestore';
-import { sendLineMessage } from './lineActions'; // [!code focus]
+import { sendLineMessage } from './lineActions'; 
 
 /**
- * Submits a review for a completed booking.
+ * Submits a review for a completed appointment.
  * @param {object} reviewData - The review data from the form.
- * @param {string} reviewData.bookingId - The ID of the booking being reviewed.
+ * @param {string} reviewData.appointmentId - The ID of the appointment being reviewed.
  * @param {string} reviewData.userId - The LINE User ID of the customer.
- * @param {string} reviewData.driverId - The ID of the driver.
+ * @param {string} reviewData.beauticianId - The ID of the beautician.
  * @param {number} reviewData.rating - The star rating (1-5).
  * @param {string} reviewData.comment - The customer's comment.
  * @returns {Promise<{success: boolean, error?: string}>}
  */
 export async function submitReview(reviewData) {
-  const { bookingId, userId, driverId, rating, comment } = reviewData;
+  const { appointmentId, userId, beauticianId, rating, comment } = reviewData;
 
-  if (!bookingId || !userId || !rating) {
+  if (!appointmentId || !userId || !rating) {
     return { success: false, error: 'ข้อมูลที่จำเป็นไม่ครบถ้วน' };
   }
 
-  const bookingRef = db.collection('bookings').doc(bookingId);
-  const reviewRef = db.collection('reviews').doc(bookingId); // Use bookingId as reviewId for simplicity
+  const appointmentRef = db.collection('appointments').doc(appointmentId);
+  const reviewRef = db.collection('reviews').doc(appointmentId); // Use appointmentId as reviewId for simplicity
 
   try {
     await db.runTransaction(async (transaction) => {
-      const bookingDoc = await transaction.get(bookingRef);
-      if (!bookingDoc.exists) {
-        throw new Error('ไม่พบข้อมูลการจองนี้');
+      const appointmentDoc = await transaction.get(appointmentRef);
+      if (!appointmentDoc.exists) {
+        throw new Error('ไม่พบข้อมูลการนัดหมายนี้');
       }
       
-      const bookingData = bookingDoc.data();
-      if (bookingData.userId !== userId) {
-          throw new Error('คุณไม่มีสิทธิ์รีวิวการจองนี้');
+      const appointmentData = appointmentDoc.data();
+      if (appointmentData.userId !== userId) {
+          throw new Error('คุณไม่มีสิทธิ์รีวิวการนัดหมายนี้');
       }
-      if (bookingData.reviewInfo?.submitted) {
-          throw new Error('คุณได้รีวิวการจองนี้ไปแล้ว');
+      if (appointmentData.reviewInfo?.submitted) {
+          throw new Error('คุณได้รีวิวการนัดหมายนี้ไปแล้ว');
       }
 
       // Save the new review
       transaction.set(reviewRef, {
-        bookingId,
+        appointmentId,
         userId,
-        driverId: driverId || null,
-        customerName: bookingData.customerInfo.name,
+        beauticianId: beauticianId || null,
+        customerName: appointmentData.customerInfo.name,
         rating: Number(rating),
         comment: comment || '',
         createdAt: FieldValue.serverTimestamp(),
       });
 
-      // Mark the booking as reviewed
-      transaction.update(bookingRef, {
+      // Mark the appointment as reviewed
+      transaction.update(appointmentRef, {
         'reviewInfo.submitted': true,
         'reviewInfo.rating': Number(rating),
         updatedAt: FieldValue.serverTimestamp(),
       });
     });
 
-    // [!code focus start]
-    // ส่งข้อความขอบคุณหลังจากบันทึกรีวิวสำเร็จ
-    const thankYouMessage = 'ขอบคุณสำหรับรีวิวครับ! ความคิดเห็นของคุณมีความสำคัญอย่างยิ่งในการพัฒนาบริการของเราให้ดียิ่งขึ้นไปครับ';
+    const thankYouMessage = 'ขอบคุณสำหรับรีวิวค่ะ! ความคิดเห็นของคุณมีความสำคัญอย่างยิ่งในการพัฒนาบริการของเราให้ดียิ่งขึ้นไปค่ะ';
     await sendLineMessage(userId, thankYouMessage);
-    // [!code focus end]
 
     return { success: true };
   } catch (error) {

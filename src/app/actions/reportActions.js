@@ -2,16 +2,13 @@
 
 import { db } from '@/app/lib/firebaseAdmin';
 import { sendLineMessage } from './lineActions';
-// --- [!code focus start] ---
-import { Timestamp, FieldPath } from 'firebase-admin/firestore'; // 1. Import FieldPath
-// --- [!code focus end] ---
+import { Timestamp, FieldPath } from 'firebase-admin/firestore';
 
 /**
  * Generates and sends a daily report to selected admins.
  */
 export async function sendDailyReportNow() {
   try {
-    // 1. ดึงข้อมูลการตั้งค่าเพื่อดูว่าต้องส่งให้ใครบ้าง
     const settingsRef = db.collection('settings').doc('notifications');
     const settingsDoc = await settingsRef.get();
     if (!settingsDoc.exists) {
@@ -24,12 +21,8 @@ export async function sendDailyReportNow() {
       return { success: true, message: "ไม่มีผู้รับที่ถูกตั้งค่าไว้" };
     }
 
-    // 2. ดึงข้อมูล lineUserId ของแอดมินที่ต้องรับ Report
     const adminsRef = db.collection('admins');
-    // --- [!code focus start] ---
-    // 2. แก้ไข query ให้ค้นหาจาก Document ID แทนฟิลด์ 'uid'
     const adminsSnapshot = await adminsRef.where(FieldPath.documentId(), 'in', recipientUids).get();
-    // --- [!code focus end] ---
     const recipientLineIds = adminsSnapshot.docs
         .map(doc => doc.data().lineUserId)
         .filter(Boolean);
@@ -38,36 +31,32 @@ export async function sendDailyReportNow() {
         return { success: true, message: "ผู้รับที่เลือกไม่มี Line User ID" };
     }
 
-    // 3. ดึงข้อมูลการจองสำหรับวันนี้
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    const bookingsQuery = db.collection('bookings')
+    const appointmentsSnapshot = await db.collection('appointments')
       .where('createdAt', '>=', Timestamp.fromDate(today))
-      .where('createdAt', '<', Timestamp.fromDate(tomorrow));
+      .where('createdAt', '<', Timestamp.fromDate(tomorrow))
+      .get();
       
-    const bookingsSnapshot = await bookingsQuery.get();
-    const todaysBookings = bookingsSnapshot.docs.map(doc => doc.data());
+    const todaysAppointments = appointmentsSnapshot.docs.map(doc => doc.data());
 
-    // 4. สรุปข้อมูล
-    const totalBookings = todaysBookings.length;
-    const completedBookings = todaysBookings.filter(b => b.status === 'completed').length;
-    const cancelledBookings = todaysBookings.filter(b => b.status === 'cancelled').length;
-    const totalRevenue = todaysBookings
+    const totalAppointments = todaysAppointments.length;
+    const completedAppointments = todaysAppointments.filter(b => b.status === 'completed').length;
+    const cancelledAppointments = todaysAppointments.filter(b => b.status === 'cancelled').length;
+    const totalRevenue = todaysAppointments
       .filter(b => b.paymentInfo.paymentStatus === 'paid')
       .reduce((sum, b) => sum + b.paymentInfo.totalPrice, 0);
 
-    // 5. สร้างข้อความ Report
     const reportMessage = `📊 Report สรุปประจำวันที่ ${today.toLocaleDateString('th-TH')}\n\n` +
-      `- รายการจองใหม่: ${totalBookings} รายการ\n` +
-      `- งานที่สำเร็จ: ${completedBookings} รายการ\n` +
-      `- ยกเลิก: ${cancelledBookings} รายการ\n` +
+      `- รายการนัดหมายใหม่: ${totalAppointments} รายการ\n` +
+      `- งานที่สำเร็จ: ${completedAppointments} รายการ\n` +
+      `- ยกเลิก: ${cancelledAppointments} รายการ\n` +
       `- รายได้รวม: ${totalRevenue.toLocaleString()} บาท\n\n` +
       `(ข้อความนี้ถูกสร้างโดยการกดส่งทันที)`;
 
-    // 6. ส่งข้อความไปยังแอดมินทุกคนที่เลือกไว้
     const sendPromises = recipientLineIds.map(lineId => sendLineMessage(lineId, reportMessage));
     await Promise.all(sendPromises);
 

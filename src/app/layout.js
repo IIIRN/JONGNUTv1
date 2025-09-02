@@ -19,8 +19,8 @@ const notoSansThai = Noto_Sans_Thai({
 
 
 export const metadata = {
-  title: "Carrent",
-  description: " จองรถ ",
+  title: "BEAUTYTHIP",
+  description: "ระบบจองบริการเสริมความงาม",
 };
 
 export default function RootLayout({ children }) {

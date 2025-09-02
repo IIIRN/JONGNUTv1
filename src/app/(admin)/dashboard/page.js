@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { navigateToDetail } from '@/lib/navigateToDetail';
 import Image from 'next/image';
-import { cancelBookingByAdmin, sendInvoiceToCustomer, confirmPayment, sendReviewRequestToCustomer } from '@/app/actions/appointmentActions';
+import { cancelAppointmentByAdmin, sendInvoiceToCustomer, confirmPayment, sendReviewRequestToCustomer } from '@/app/actions/appointmentActions';
 import { isToday, isFuture, isPast, format } from 'date-fns';
 import { th } from 'date-fns/locale';
 
@@ -71,24 +71,6 @@ ${paymentUrl}`;
     );
 }
 
-// --- NEW: Stat Card Component ---
-const StatCard = ({ title, value, icon, color, onClick, isActive }) => (
-    <div 
-        onClick={onClick}
-        className={`p-4 rounded-lg shadow-md flex items-center transition-all duration-200 ${onClick ? 'cursor-pointer' : ''} ${isActive ? 'ring-2 ring-offset-2 ' + color.ring : 'bg-white'}`}
-    >
-        <div className={`p-3 rounded-full mr-4 ${color.bg}`}>
-            {icon}
-        </div>
-        <div>
-            <p className="text-2xl font-bold text-gray-800">{value}</p>
-            <p className="text-sm font-medium text-gray-500">{title}</p>
-        </div>
-    </div>
-);
-
-
-// --- MODIFIED: Status Translations for Self-Drive ---
 const statusTranslations = {
     'awaiting_confirmation': 'รอยืนยัน',
     'confirmed': 'ยืนยันแล้ว',
@@ -102,11 +84,6 @@ const statusColors = {
     'completed': 'bg-green-100 text-green-800',
     'cancelled': 'bg-red-100 text-red-800',
 };
-
-// Unified filter state (status + optional date filter + free-text query)
-const STATUS_FILTERS = ['all', 'awaiting_confirmation', 'confirmed', 'completed', 'cancelled'];
-
-// --- NEW: Booking Card Component ---
 
 const AppointmentCard = ({ appointment, beauticians, onCancel }) => {
     const router = useRouter();
@@ -158,32 +135,26 @@ const AppointmentCard = ({ appointment, beauticians, onCancel }) => {
 
 export default function AdminDashboardPage() {
     const [allAppointments, setAllAppointments] = useState([]);
-    const [allServices, setAllServices] = useState([]); // <-- For stats
-    const [beauticians, setBeauticians] = useState({}); // Renamed from employees
-    const [statusFilter, setStatusFilter] = useState('all');
-    const [dateFilter, setDateFilter] = useState('all'); // 'all' | 'today'
-    const [searchQuery, setSearchQuery] = useState('');
+    const [beauticians, setBeauticians] = useState({});
     const [loading, setLoading] = useState(true);
     const [appointmentToCancel, setAppointmentToCancel] = useState(null);
     const [appointmentToInvoice, setAppointmentToInvoice] = useState(null);
-    const [tabIndex, setTabIndex] = useState(0); // 0: confirmed, 1: awaiting, 2: completed/cancelled
+    const [tabIndex, setTabIndex] = useState(0);
 
-    // --- Real-time listeners for appointments and services ---
     useEffect(() => {
         const appointmentsQuery = query(collection(db, 'appointments'), orderBy('createdAt', 'desc'));
-        const servicesQuery = query(collection(db, 'services'));
-
+        
         const unsubscribeAppointments = onSnapshot(appointmentsQuery, async (snapshot) => {
             const appointmentsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             setAllAppointments(appointmentsData);
             
-            // Fetch beautician data if not already fetched
-                        const newBeauticianIds = [...new Set(
-                            appointmentsData
-                                .filter(a => a.appointmentInfo && a.appointmentInfo.beauticianId)
-                                .map(a => a.appointmentInfo.beauticianId)
-                        )];
+            const newBeauticianIds = [...new Set(
+                appointmentsData
+                    .filter(a => a.appointmentInfo && a.appointmentInfo.beauticianId)
+                    .map(a => a.appointmentInfo.beauticianId)
+            )];
             const missingBeauticianIds = newBeauticianIds.filter(id => !beauticians[id]);
+
             if(missingBeauticianIds.length > 0){
                 const beauticianPromises = missingBeauticianIds.map(id => getDoc(doc(db, 'beauticians', id)));
                 const beauticianDocs = await Promise.all(beauticianPromises);
@@ -200,79 +171,25 @@ export default function AdminDashboardPage() {
             setLoading(false);
         });
 
-        const unsubscribeServices = onSnapshot(servicesQuery, (snapshot) => {
-            const servicesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            setAllServices(servicesData);
-        });
-
         return () => {
             unsubscribeAppointments();
-            unsubscribeServices();
         };
     }, []);
-
-    // --- Memoized calculations for performance ---
-    const stats = useMemo(() => {
-        const confirmedAppointments = allAppointments.filter(a => a.status === 'confirmed').length;
-        const appointmentsToday = allAppointments.filter(a => a.status === 'confirmed' && isToday(a.appointmentInfo.dateTime.toDate())).length;
-        const completedToday = allAppointments.filter(a => a.status === 'completed' && isToday(a.appointmentInfo.dateTime.toDate())).length;
-        const awaitingConfirmation = allAppointments.filter(b => b.status === 'awaiting_confirmation').length;
-
-        return {
-            awaitingConfirmation: awaitingConfirmation,
-            confirmedAppointments: confirmedAppointments,
-            appointmentsToday: appointmentsToday,
-            completedToday: completedToday,
-        };
-    }, [allAppointments]);
-
-    const filteredAppointments = useMemo(() => {
-        let list = allAppointments.slice();
-
-        if (statusFilter && statusFilter !== 'all') {
-            list = list.filter(a => a.status === statusFilter);
-        }
-
-        if (dateFilter === 'today') {
-            list = list.filter(a => {
-                try {
-                    return isToday(a.appointmentInfo.dateTime.toDate());
-                } catch (e) { return false; }
-            });
-        }
-
-        if (searchQuery && searchQuery.trim()) {
-            const q = searchQuery.trim().toLowerCase();
-            list = list.filter(a => {
-                const cust = (a.customerInfo?.name || a.userInfo?.displayName || '').toLowerCase();
-                const phone = (a.customerInfo?.phone || '').toLowerCase();
-                const svc = ((a.serviceInfo && a.serviceInfo.name) || a.serviceName || '').toLowerCase();
-                return cust.includes(q) || phone.includes(q) || svc.includes(q);
-            });
-        }
-
-        list.sort((a, b) => {
-            try {
-                const ta = a.appointmentInfo?.dateTime?.toMillis ? a.appointmentInfo.dateTime.toMillis() : (a.appointmentInfo?.dateTime ? new Date(a.appointmentInfo.dateTime).getTime() : 0);
-                const tb = b.appointmentInfo?.dateTime?.toMillis ? b.appointmentInfo.dateTime.toMillis() : (b.appointmentInfo?.dateTime ? new Date(b.appointmentInfo.dateTime).getTime() : 0);
-                return ta - tb;
-            } catch (e) { return 0; }
+    
+    const appointmentsByStatus = useMemo(() => {
+        const sorted = [...allAppointments].sort((a, b) => {
+            const timeA = a.appointmentInfo?.dateTime?.toDate() || 0;
+            const timeB = b.appointmentInfo?.dateTime?.toDate() || 0;
+            return timeA - timeB;
         });
 
-        return list;
-    }, [allAppointments, statusFilter, dateFilter, searchQuery]);
+        return {
+            confirmed: sorted.filter(a => a.status === 'confirmed'),
+            awaiting: sorted.filter(a => a.status === 'awaiting_confirmation'),
+            history: sorted.filter(a => ['completed', 'cancelled'].includes(a.status)).sort((a, b) => (b.appointmentInfo?.dateTime?.toDate() || 0) - (a.appointmentInfo?.dateTime?.toDate() || 0)),
+        };
+    }, [allAppointments]);
     
-    const handleStatFilterClick = (filter, date = 'all') => {
-        if (statusFilter === filter && dateFilter === date) {
-            setStatusFilter('all');
-            setDateFilter('all');
-        } else {
-            setStatusFilter(filter);
-            setDateFilter(date);
-        }
-    };
-    
-    // --- Action Handlers (Implemented) ---
     const handleConfirmCancel = async (appointmentId, reason) => {
         const result = await cancelAppointmentByAdmin(appointmentId, reason);
         if (result.success) {
@@ -319,27 +236,17 @@ export default function AdminDashboardPage() {
             {appointmentToCancel && <CancelAppointmentModal appointment={appointmentToCancel} onClose={() => setAppointmentToCancel(null)} onConfirm={handleConfirmCancel} />}
             {appointmentToInvoice && <InvoicePreviewModal appointment={appointmentToInvoice} onClose={() => setAppointmentToInvoice(null)} onConfirm={handleSendInvoice} />}
             
-            {/* --- NEW: Stats Section --- */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <StatCard title="รอยืนยัน" value={stats.awaitingConfirmation} color={{bg: 'bg-yellow-100', ring: 'ring-yellow-500'}} icon={'⏰'} onClick={() => handleStatFilterClick('awaiting_confirmation')} isActive={statusFilter === 'awaiting_confirmation' && dateFilter === 'all'}/>
-                <StatCard title="ยืนยันแล้ว" value={stats.confirmedAppointments} color={{bg: 'bg-blue-100', ring: 'ring-blue-500'}} icon={''} onClick={() => handleStatFilterClick('confirmed')} isActive={statusFilter === 'confirmed' && dateFilter === 'all'}/>
-                <StatCard title="นัดหมายวันนี้" value={stats.appointmentsToday} color={{bg: 'bg-green-100', ring: 'ring-green-500'}} icon={'➡️'} onClick={() => handleStatFilterClick('confirmed', 'today')} isActive={statusFilter === 'confirmed' && dateFilter === 'today'}/>
-                <StatCard title="เสร็จสิ้นวันนี้" value={stats.completedToday} color={{bg: 'bg-purple-100', ring: 'ring-purple-500'}} icon={'⬅️'} onClick={() => handleStatFilterClick('completed', 'today')} isActive={statusFilter === 'completed' && dateFilter === 'today'}/>
-            </div>
-
-
-            {/* --- Tabs --- */}
             <div className="mt-6">
                 <div className="flex gap-2 mb-6">
-                    <button onClick={() => setTabIndex(0)} className={`px-4 py-2 rounded-t-lg font-bold border-b-2 ${tabIndex===0 ? 'border-blue-500 text-blue-700 bg-blue-50' : 'border-transparent text-gray-500 bg-gray-50'}`}>ยืนยันแล้ว</button>
-                    <button onClick={() => setTabIndex(1)} className={`px-4 py-2 rounded-t-lg font-bold border-b-2 ${tabIndex===1 ? 'border-yellow-500 text-yellow-700 bg-yellow-50' : 'border-transparent text-gray-500 bg-gray-50'}`}>รอยืนยัน</button>
-                    <button onClick={() => setTabIndex(2)} className={`px-4 py-2 rounded-t-lg font-bold border-b-2 ${tabIndex===2 ? 'border-gray-500 text-gray-700 bg-gray-100' : 'border-transparent text-gray-500 bg-gray-50'}`}>เสร็จสิ้น/ยกเลิก</button>
+                    <button onClick={() => setTabIndex(0)} className={`px-4 py-2 rounded-t-lg font-bold border-b-2 ${tabIndex===0 ? 'border-blue-500 text-blue-700 bg-blue-50' : 'border-transparent text-gray-500 bg-gray-50'}`}>ยืนยันแล้ว ({appointmentsByStatus.confirmed.length})</button>
+                    <button onClick={() => setTabIndex(1)} className={`px-4 py-2 rounded-t-lg font-bold border-b-2 ${tabIndex===1 ? 'border-yellow-500 text-yellow-700 bg-yellow-50' : 'border-transparent text-gray-500 bg-gray-50'}`}>รอยืนยัน ({appointmentsByStatus.awaiting.length})</button>
+                    <button onClick={() => setTabIndex(2)} className={`px-4 py-2 rounded-t-lg font-bold border-b-2 ${tabIndex===2 ? 'border-gray-500 text-gray-700 bg-gray-100' : 'border-transparent text-gray-500 bg-gray-50'}`}>ประวัติ ({appointmentsByStatus.history.length})</button>
                 </div>
                 <div>
                     {tabIndex === 0 && (
                         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                            {filteredAppointments.filter(a => a.status === 'confirmed').length > 0 ? (
-                                filteredAppointments.filter(a => a.status === 'confirmed').map(appointment => (
+                            {appointmentsByStatus.confirmed.length > 0 ? (
+                                appointmentsByStatus.confirmed.map(appointment => (
                                     <AppointmentCard 
                                         key={appointment.id} 
                                         appointment={appointment} 
@@ -354,8 +261,8 @@ export default function AdminDashboardPage() {
                     )}
                     {tabIndex === 1 && (
                         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                            {filteredAppointments.filter(a => a.status === 'awaiting_confirmation').length > 0 ? (
-                                filteredAppointments.filter(a => a.status === 'awaiting_confirmation').map(appointment => (
+                            {appointmentsByStatus.awaiting.length > 0 ? (
+                                appointmentsByStatus.awaiting.map(appointment => (
                                     <AppointmentCard 
                                         key={appointment.id} 
                                         appointment={appointment} 
@@ -370,8 +277,8 @@ export default function AdminDashboardPage() {
                     )}
                     {tabIndex === 2 && (
                         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                            {filteredAppointments.filter(a => a.status === 'completed' || a.status === 'cancelled').length > 0 ? (
-                                filteredAppointments.filter(a => a.status === 'completed' || a.status === 'cancelled').map(appointment => (
+                            {appointmentsByStatus.history.length > 0 ? (
+                                appointmentsByStatus.history.map(appointment => (
                                     <AppointmentCard 
                                         key={appointment.id} 
                                         appointment={appointment} 

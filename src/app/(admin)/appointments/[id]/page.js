@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { db } from '@/app/lib/firebase';
-import { doc, getDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, deleteDoc } from 'firebase/firestore';
+import { updateAppointmentStatusByAdmin } from '@/app/actions/appointmentActions';
 const STATUS_OPTIONS = [
   { value: 'awaiting_confirmation', label: 'รอยืนยัน' },
   { value: 'confirmed', label: 'ยืนยันแล้ว' },
@@ -44,17 +45,32 @@ export default function AdminAppointmentDetail() {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
   const handleStatusChange = async (e) => {
     const newStatus = e.target.value;
-    if (!appointment?.id) return;
-    setUpdating(true);
-    try {
-      await updateDoc(doc(db, 'appointments', appointment.id), { status: newStatus, updatedAt: new Date() });
-      setAppointment(prev => ({ ...prev, status: newStatus, updatedAt: new Date() }));
-    } catch (err) {
-      alert('อัพเดทสถานะไม่สำเร็จ');
-    } finally {
-      setUpdating(false);
+    const currentStatus = appointment.status;
+    if (!appointment?.id || newStatus === currentStatus) return;
+
+    const statusLabel = STATUS_OPTIONS.find(opt => opt.value === newStatus)?.label || newStatus;
+
+    if (window.confirm(`คุณแน่ใจหรือไม่ว่าต้องการเปลี่ยนสถานะเป็น "${statusLabel}"? การดำเนินการนี้จะส่งการแจ้งเตือนไปยังลูกค้า`)) {
+        setUpdating(true);
+        try {
+            const result = await updateAppointmentStatusByAdmin(appointment.id, newStatus);
+            if (result.success) {
+                alert('อัพเดทสถานะสำเร็จ และส่งการแจ้งเตือนแล้ว');
+                setAppointment(prev => ({ ...prev, status: newStatus, updatedAt: new Date() }));
+            } else {
+                throw new Error(result.error);
+            }
+        } catch (err) {
+            alert(`อัพเดทสถานะไม่สำเร็จ: ${err.message}`);
+            e.target.value = currentStatus;
+        } finally {
+            setUpdating(false);
+        }
+    } else {
+        e.target.value = currentStatus;
     }
   };
 
@@ -107,21 +123,6 @@ export default function AdminAppointmentDetail() {
       <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold">รายละเอียดนัดหมาย #{appointment.id.substring(0,6).toUpperCase()}</h1>
-          <div className="flex items-center gap-2 text-gray-500 mt-1">
-            <span>สถานะ:</span>
-            <select
-              className="border rounded px-2 py-1 text-sm"
-              value={appointment.status || ''}
-              onChange={handleStatusChange}
-              disabled={updating}
-            >
-              <option value="">-</option>
-              {STATUS_OPTIONS.map(opt => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-            {updating && <span className="text-xs text-blue-500 ml-2">กำลังอัพเดท...</span>}
-          </div>
         </div>
         <button
           onClick={handleDelete}
@@ -140,6 +141,21 @@ export default function AdminAppointmentDetail() {
           <InfoRow label="เบอร์โทร" value={appointment.customerInfo?.phone} />
           <InfoRow label="LINE ID" value={appointment.userId} />
           <InfoRow label="หมายเหตุ" value={appointment.customerInfo?.note || appointment.note || '-'} />
+          <div className="flex items-center gap-2 text-gray-500 mt-1">
+            <span>สถานะ:</span>
+            <select
+              className="border rounded px-2 py-1 text-sm"
+              value={appointment.status || ''}
+              onChange={handleStatusChange}
+              disabled={updating}
+            >
+              <option value="">-</option>
+              {STATUS_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+            {updating && <span className="text-xs text-blue-500 ml-2">กำลังอัพเดท...</span>}
+          </div>
         </div>
 
         {/* ข้อมูลบริการ */}
@@ -227,7 +243,12 @@ export default function AdminAppointmentDetail() {
           <div className="border-t mt-3 pt-3 space-y-1">
             <InfoRow label="สร้างเมื่อ" value={safeDate(appointment.createdAt) ? format(safeDate(appointment.createdAt), 'dd MMM yyyy, HH:mm', { locale: th }) : '-'} />
             <InfoRow label="อัพเดตล่าสุด" value={safeDate(appointment.updatedAt) ? format(safeDate(appointment.updatedAt), 'dd MMM yyyy, HH:mm', { locale: th }) : '-'} />
-            <button onClick={() => router.back()} className="w-full bg-gray-900 text-white py-2 rounded-md mt-2">กลับ</button>
+            <button 
+                onClick={() => alert('ฟังก์ชันแก้ไขการชำระเงินยังไม่เปิดให้บริการ')}
+                className="w-full bg-yellow-500 text-white py-2 rounded-md mt-2"
+            >
+                แก้ไขการชำระเงิน
+            </button>
           </div>
         </div>
       </div>

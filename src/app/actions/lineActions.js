@@ -1,8 +1,7 @@
 "use server";
 
 import { Client } from '@line/bot-sdk';
-import { db } from '@/app/lib/firebaseAdmin'; // 1. Import db จาก Admin SDK
-import { collection, getDocs, query, where, doc, getDoc } from 'firebase/firestore';
+import { db } from '@/app/lib/firebaseAdmin'; // Correct: Using Admin SDK's db instance
 
 const client = new Client({
   channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
@@ -17,7 +16,7 @@ async function getNotificationSettings() {
     const settingsRef = db.collection('settings').doc('notifications');
     const settingsDoc = await settingsRef.get();
     
-    if (settingsDoc.exists()) {
+    if (settingsDoc.exists) {
       const data = settingsDoc.data();
       return data.lineNotifications || {
         enabled: true,
@@ -71,7 +70,7 @@ export async function sendLineMessage(to, messageText) {
 }
 
 /**
- * (ใหม่) Sends a push message to all registered admins.
+ * (แก้ไข) Sends a multicast message to all registered admins using Admin SDK syntax.
  * @param {string} messageText - The text message to send.
  * @returns {Promise<{success: boolean, error?: string}>} - The result of the operation.
  */
@@ -84,8 +83,8 @@ export async function sendLineMessageToAllAdmins(messageText) {
       return { success: true, message: "Notifications disabled" };
     }
 
-    // 2. ค้นหาแอดมินทั้งหมดใน Firestore
-    const adminsQuery = query(db.collection('admins'), where("lineUserId", "!=", null));
+    // 2. ค้นหาแอดมินทั้งหมดใน Firestore using Admin SDK syntax
+    const adminsQuery = db.collection('admins').where("lineUserId", "!=", null);
     const adminSnapshot = await adminsQuery.get();
 
     if (adminSnapshot.empty) {
@@ -93,23 +92,24 @@ export async function sendLineMessageToAllAdmins(messageText) {
       return { success: true, message: "No admins to notify." };
     }
 
-    // 3. สร้าง Promise สำหรับส่งข้อความหาแอดมินทุกคน
-    const notificationPromises = adminSnapshot.docs.map(doc => {
-      const admin = doc.data();
-      return sendLineMessage(admin.lineUserId, messageText);
-    });
+    // 3. รวบรวม lineUserId ทั้งหมด
+    const adminLineIds = adminSnapshot.docs.map(doc => doc.data().lineUserId);
 
-    // 4. รอให้ส่งข้อความครบทุกคน
-    await Promise.all(notificationPromises);
+    if (adminLineIds.length > 0) {
+      // 4. สร้าง object ข้อความและส่งแบบ multicast
+      const messageObject = { type: 'text', text: messageText };
+      await client.multicast(adminLineIds, [messageObject]);
+      console.log(`Successfully sent multicast notification to ${adminLineIds.length} admins.`);
+    }
 
-    console.log(`Successfully sent notifications to ${adminSnapshot.size} admins.`);
     return { success: true };
 
   } catch (error) {
-    console.error('Error sending message to all admins:', error);
+    console.error('Error sending multicast message to admins:', error.originalError?.response?.data || error);
     return { success: false, error: 'Failed to send message to admins' };
   }
 }
+
 
 /**
  * Send booking notification to admins

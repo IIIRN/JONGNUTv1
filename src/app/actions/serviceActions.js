@@ -1,4 +1,3 @@
-// src/app/actions/vehicleActions.js
 "use server";
 
 import { db } from '@/app/lib/firebaseAdmin'; 
@@ -6,91 +5,76 @@ import { revalidatePath } from 'next/cache';
 import { fetchBookingSettings } from './settingsActions'; 
 
 /**
- * (ฟังก์ชันเดิม - ไม่มีการเปลี่ยนแปลง)
+ * Adds a new service to Firestore.
+ * @param {object} serviceData - The data for the new service.
+ * @returns {Promise<{success: boolean, message?: string, error?: string}>}
  */
-export async function addVehicle(formData) {
+export async function addService(serviceData) {
   try {
-    const vehicleData = {
-      plateNumber: formData.get('plateNumber'),
-      brand: formData.get('brand'),
-      model: formData.get('model'),
-      type: formData.get('type'),
-      color: formData.get('color'),
+    const serviceRef = await db.collection('services').add({
+      ...serviceData,
       status: 'available',
       createdAt: db.FieldValue.serverTimestamp(),
-    };
+    });
     
-    const vehicleRef = await db.collection('vehicles').add(vehicleData);
-    
-    console.log('✅ Vehicle added to Firestore with ID: ', vehicleRef.id);
+    console.log('✅ Service added to Firestore with ID: ', serviceRef.id);
 
-    revalidatePath('/admin/vehicles'); 
+    revalidatePath('/admin/services'); 
 
-    return { success: true, message: `เพิ่มรถสำเร็จ ID: ${vehicleRef.id}` };
+    return { success: true, message: `เพิ่มบริการสำเร็จ ID: ${serviceRef.id}` };
 
   } catch (error) {
-    console.error("🔥 Error adding vehicle to Firestore:", error);
+    console.error("🔥 Error adding service to Firestore:", error);
     return { success: false, error: error.message };
   }
 }
 
 /**
- * (ฟังก์ชันที่แก้ไขชื่อให้ถูกต้อง)
- * Fetches all vehicles and their active booking schedules, now including the buffer time.
- * @returns {Promise<{vehicles: Array, bookings: Object}|{error: string, details: string}>}
+ * Fetches all services and their active appointment schedules.
+ * @returns {Promise<{services: Array, appointments: Object}|{error: string, details: string}>}
  */
-export async function fetchAllVehiclesWithSchedules() { // [!code focus]
+export async function fetchAllServicesWithSchedules() {
   try {
-    const settingsResult = await fetchBookingSettings();
-    if (!settingsResult.success) {
-        console.warn("Could not fetch booking settings, using default buffer.");
-    }
-    const bufferHours = settingsResult.settings?.bufferHours || 0;
+    const servicesRef = db.collection('services');
+    const servicesQuery = servicesRef.where('status', 'in', ['available', 'unavailable']).orderBy('serviceName');
+    const servicesSnapshot = await servicesQuery.get();
+    const services = servicesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-    const vehiclesRef = db.collection('vehicles');
-    const vehiclesQuery = vehiclesRef.where('status', 'in', ['available', 'in_use']).orderBy('brand').orderBy('model');
-    const vehiclesSnapshot = await vehiclesQuery.get();
-    const vehicles = vehiclesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-    const vehicleIds = vehicles.map(v => v.id);
-    if (vehicleIds.length === 0) {
-      return { vehicles: [], bookings: {} };
+    const serviceIds = services.map(v => v.id);
+    if (serviceIds.length === 0) {
+      return { services: [], appointments: {} };
     }
 
-    const bookingsRef = db.collection('bookings');
-    const bookingsQuery = bookingsRef
-      .where('vehicleId', 'in', vehicleIds)
-      .where('status', 'in', ['awaiting_pickup', 'rented']);
+    const appointmentsRef = db.collection('appointments');
+    const appointmentsQuery = appointmentsRef
+      .where('serviceId', 'in', serviceIds)
+      .where('status', 'in', ['awaiting_confirmation', 'confirmed', 'in_progress']);
       
-    const bookingsSnapshot = await bookingsQuery.get();
+    const appointmentsSnapshot = await appointmentsQuery.get();
 
-    const bookingsMap = {};
-    bookingsSnapshot.forEach(doc => {
-      const booking = doc.data();
-      if (!bookingsMap[booking.vehicleId]) {
-        bookingsMap[booking.vehicleId] = [];
+    const appointmentsMap = {};
+    appointmentsSnapshot.forEach(doc => {
+      const appointment = doc.data();
+      if (!appointmentsMap[appointment.serviceId]) {
+        appointmentsMap[appointment.serviceId] = [];
       }
       
-      const startTime = booking.pickupInfo.dateTime.toDate();
-      const endTime = booking.returnInfo.dateTime.toDate();
+      const startTime = appointment.appointmentInfo.dateTime.toDate();
+      const endTime = new Date(startTime.getTime() + (appointment.appointmentInfo.duration * 60000));
 
-      if (bufferHours > 0) {
-          endTime.setHours(endTime.getHours() + bufferHours);
-      }
-
-      bookingsMap[booking.vehicleId].push({
+      appointmentsMap[appointment.serviceId].push({
         start: startTime.toISOString(),
         end: endTime.toISOString(),
       });
     });
 
     return {
-      vehicles: JSON.parse(JSON.stringify(vehicles)),
-      bookings: bookingsMap,
+      services: JSON.parse(JSON.stringify(services)),
+      appointments: appointmentsMap,
     };
 
   } catch (error) {
-    console.error("Error fetching vehicles with schedules:", error);
-    return { error: "Failed to fetch vehicle data.", details: error.message };
+    console.error("Error fetching services with schedules:", error);
+    return { error: "Failed to fetch service data.", details: error.message };
   }
 }
