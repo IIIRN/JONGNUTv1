@@ -315,6 +315,7 @@ function GeneralInfoContent() {
 
                 {/* Form Card */}
                 <div className="bg-white rounded-2xl p-4 mb-4 shadow-sm border border-gray-100">
+                    <label className="block text-md text-center font-medium text-gray-700 mb-4">ข้อมูลลูกค้า</label>
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div className='flex'>
                             <label className="w-16 block text-sm font-medium text-gray-700 mb-2">ชื่อ-สกุล</label>
@@ -323,7 +324,7 @@ function GeneralInfoContent() {
                                 name="fullName"
                                 value={formData.fullName}
                                 onChange={handleChange}
-                                className="w-full px-4 py-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent"
+                                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent"
                                 required
                             />
                         </div>
@@ -335,7 +336,7 @@ function GeneralInfoContent() {
                                 name="phone"
                                 value={formData.phone}
                                 onChange={handleChange}
-                                className="w-full px-4 py-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent placeholder-gray-500"
+                                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent placeholder-gray-500"
                                 required
                             />
                         </div>
@@ -347,7 +348,7 @@ function GeneralInfoContent() {
                                 name="email"
                                 value={formData.email}
                                 onChange={handleChange}
-                                className="w-full px-4 py-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent placeholder-gray-500"
+                                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent placeholder-gray-500"
                                 
                             />
                         </div>
@@ -359,7 +360,7 @@ function GeneralInfoContent() {
                                 value={formData.note}
                                 onChange={handleChange}
                                 rows={2}
-                                className="w-full px-4 py-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent resize-none placeholder-gray-500"
+                                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent resize-none placeholder-gray-500"
                                
                             />
                         </div>

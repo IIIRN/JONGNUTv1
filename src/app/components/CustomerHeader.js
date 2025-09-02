@@ -29,14 +29,14 @@ export default function CustomerHeader({ showBackButton = false, showActionButto
 
     return (
         <div className="p-3">
-            <header className="rounded-xl p-4 bg-primary-dark text-white shadow-md flex items-center justify-between">
+            <header className="rounded-2xl p-4 bg-gradient-to-br from-[#70676a] via-[#8a8181] to-[#746a6d] text-white shadow-md flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     {profile?.pictureUrl ? (
-                        <div className="w-14 h-14 rounded-full overflow-hidden flex-shrink-0">
+                        <div className="w-16 h-16 rounded-full overflow-hidden flex-shrink-0">
                             <Image src={profile.pictureUrl} width={40} height={40} alt="Profile" className="w-full h-full object-cover" />
                         </div>
                     ) : (
-                        <div className="w-14 h-14 rounded-full bg-white/30 flex-shrink-0" />
+                        <div className="w-16 h-16 rounded-full bg-white/30 flex-shrink-0" />
                     )}
                     <div>
                         <p className="font-medium text-sm opacity-90">สวัสดี</p>
@@ -44,7 +44,7 @@ export default function CustomerHeader({ showBackButton = false, showActionButto
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
-                    <div className="bg-white/90 rounded-full px-4 py-2 text-primary font-bold text-sm">
+                    <div className="bg-white/90 rounded-full px-6 py-2 text-primary font-bold text-md">
                         {customerData?.points ?? 0} <span className="font-normal">พ้อย</span>
                     </div>
                 </div>
@@ -54,13 +54,13 @@ export default function CustomerHeader({ showBackButton = false, showActionButto
                 <div className="mt-4 grid grid-cols-2 gap-4">
                     <button
                         onClick={() => router.push('/appointment')}
-                        className="bg-primary-light text-primary shadow-sm rounded-2xl py-8 font-semibold text-md hover:shadow-md transition-shadow"
+                        className="bg-primary-light text-primary shadow-sm rounded-2xl py-4 font-semibold text-md hover:shadow-md transition-shadow"
                     >
                         จองบริการ
                     </button>
                     <button
                         onClick={() => router.push('/my-coupons')}
-                        className="bg-primary-light text-primary shadow-sm rounded-2xl py-8  font-semibold text-md hover:shadow-md transition-shadow"
+                        className="bg-primary-light text-primary shadow-sm rounded-2xl py-4  font-semibold text-md hover:shadow-md transition-shadow"
                     >
                         คูปองของฉัน
                     </button>
