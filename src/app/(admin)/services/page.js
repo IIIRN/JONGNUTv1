@@ -80,19 +80,6 @@ export default function ServicesListPage() {
     fetchServices();
   }, []);
 
-  const handleDelete = async (vehicleId, vehiclePlate) => {
-    if (window.confirm(`คุณแน่ใจหรือไม่ว่าต้องการลบรถทะเบียน "${vehiclePlate}"?`)) {
-      try {
-        await deleteDoc(doc(db, "vehicles", vehicleId));
-        setAllVehicles(prev => prev.filter(v => v.id !== vehicleId));
-        alert("ลบข้อมูลรถสำเร็จ!");
-      } catch (error) {
-        console.error("Error removing document: ", error);
-        alert("เกิดข้อผิดพลาดในการลบข้อมูล");
-      }
-    }
-  };
-
   if (loading) return <div className="text-center mt-20">กำลังโหลดข้อมูลบริการ...</div>;
 
   return (
@@ -109,11 +96,11 @@ export default function ServicesListPage() {
               <div key={service.id} className="bg-white rounded-lg shadow-md p-4 flex flex-col justify-between">
                   <div>
                       <div className="relative w-full h-40 mb-3">
-                                  <Image src={service.imageUrl || '/placeholder.png'} alt={service.name || 'service'} fill style={{ objectFit: 'cover' }} className="rounded-md" />
+                                  <Image src={service.imageUrl || '/placeholder.png'} alt={service.serviceName || service.name || 'service'} fill style={{ objectFit: 'cover' }} className="rounded-md" />
                       </div>
                       <div className="flex justify-between items-start">
                           <div>
-                              <p className="font-bold text-lg text-gray-800">{service.name}</p>
+                              <p className="font-bold text-lg text-gray-800">{service.serviceName || service.name}</p>
                               <p className="text-xs text-gray-400">{service.category}</p>
                           </div>
                           <div className="text-sm font-semibold bg-pink-500 text-white px-3 py-1 rounded">{formatPrice(service.price)} บาท</div>
@@ -146,7 +133,7 @@ export default function ServicesListPage() {
                       <StatusButton status={service.status} />
                       <div className="flex gap-2">
                           <Link href={`/services/edit/${service.id}`} className="text-sm bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-1 px-3 rounded-md">แก้ไข</Link>
-                          <button onClick={() => handleDeleteService(service.id, service.name)} className="text-sm bg-red-500 hover:bg-red-600 text-white font-semibold py-1 px-3 rounded-md">ลบ</button>
+                          <button onClick={() => handleDeleteService(service.id, service.serviceName || service.name)} className="text-sm bg-red-500 hover:bg-red-600 text-white font-semibold py-1 px-3 rounded-md">ลบ</button>
                       </div>
                   </div>
               </div>

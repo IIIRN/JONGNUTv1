@@ -495,3 +495,58 @@ export async function findAppointmentById(appointmentId) {
         return { success: false, error: error.message };
     }
 }
+
+
+// Appended to src/app/actions/appointmentActions.js
+
+/**
+ * Confirms an appointment by the user who owns it.
+ * @param {string} appointmentId - The ID of the appointment to confirm.
+ * @param {string} userId - The LINE User ID of the customer.
+ * @returns {Promise<{success: boolean, error?: string}>}
+ */
+export async function confirmAppointmentByUser(appointmentId, userId) {
+    if (!appointmentId || !userId) {
+        return { success: false, error: 'Appointment ID and User ID are required.' };
+    }
+
+    const appointmentRef = db.collection('appointments').doc(appointmentId);
+
+    try {
+        const appointmentDoc = await appointmentRef.get();
+        if (!appointmentDoc.exists) {
+            throw new Error("Appointment not found.");
+        }
+
+        const appointmentData = appointmentDoc.data();
+
+        if (appointmentData.userId !== userId) {
+            throw new Error("You do not have permission to confirm this appointment.");
+        }
+
+        if (appointmentData.status !== 'awaiting_confirmation') {
+            throw new Error("This appointment cannot be confirmed as it's not awaiting confirmation.");
+        }
+
+        await appointmentRef.update({
+            status: 'confirmed',
+            updatedAt: FieldValue.serverTimestamp(),
+        });
+        
+        // Notify admins
+        const notificationData = {
+            customerName: appointmentData.customerInfo?.name || 'ลูกค้า',
+            serviceName: appointmentData.serviceInfo?.name || 'บริการ',
+            appointmentDate: appointmentData.date,
+            appointmentTime: appointmentData.time,
+            totalPrice: appointmentData.paymentInfo?.totalPrice ?? 0
+        };
+        await sendBookingNotification(notificationData, 'newBooking'); // Re-using newBooking notification for simplicity
+
+        return { success: true };
+
+    } catch (error) {
+        console.error("Error confirming appointment by user:", error);
+        return { success: false, error: error.message };
+    }
+}

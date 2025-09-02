@@ -21,7 +21,7 @@ export default function AppointmentPage() {
             // Try ordering by serviceName first, as it's more logical for display
             const q = query(servicesRef, orderBy('serviceName'));
             const querySnapshot = await getDocs(q);
-            
+
             let items = querySnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
 
             // Fallback if the ordered query fails or returns nothing
@@ -62,37 +62,37 @@ export default function AppointmentPage() {
 
     return (
         <div>
-            <CustomerHeader />
+            <CustomerHeader showBackButton={true} showActionButtons={false} />
             <div className="px-4 pb-4">
                 <div className="grid grid-cols-2 gap-3">
-                {services.map(service => (
-                    <div
-                        key={service.id}
-                        onClick={() => handleSelectService(service)}
-                        className="rounded-2xl overflow-hidden shadow-md cursor-pointer transform hover:scale-105 transition-transform duration-200 bg-transparent p-0 m-0"
-                        style={{ minHeight: 0 }}
-                    >
-                        <div className="relative w-full" style={{ aspectRatio: '4/3', minHeight: 0 }}>
-                            <Image
-                                src={service.imageUrl || 'https://via.placeholder.com/300'}
-                                alt={service.serviceName}
-                                fill
-                                className="object-cover w-full h-full"
-                                priority
-                            />
-                            {/* overlay gradient + text */}
-                            <div className="absolute bottom-0 left-0 w-full px-2 py-2 bg-gradient-to-t from-purple-600/90 to-transparent">
-                                <div className="text-white font-semibold text-sm truncate drop-shadow">
-                                    {service.serviceName}
-                                </div>
-                                <div className="text-white text-xs mt-0.5 drop-shadow">
-                                    ({service.duration || '-'} นาที | ฿{(service.price ?? service.basePrice ?? 0).toLocaleString()})
+                    {services.map(service => (
+                        <div
+                            key={service.id}
+                            onClick={() => handleSelectService(service)}
+                            className="rounded-2xl overflow-hidden shadow-md cursor-pointer transform hover:scale-105 transition-transform duration-200 bg-transparent p-0 m-0"
+                            style={{ minHeight: 0 }}
+                        >
+                            <div className="relative w-full" style={{ aspectRatio: '4/3', minHeight: 0 }}>
+                                <Image
+                                    src={service.imageUrl || 'https://via.placeholder.com/300'}
+                                    alt={service.serviceName}
+                                    fill
+                                    className="object-cover w-full h-full"
+                                    priority
+                                />
+                                {/* overlay gradient + text */}
+                                <div className="absolute bottom-0 left-0 w-full px-2 py-2 bg-gradient-to-t from-purple-600/90 to-transparent">
+                                    <div className="text-white font-semibold text-sm truncate drop-shadow">
+                                        {service.serviceName}
+                                    </div>
+                                    <div className="text-white text-xs mt-0.5 drop-shadow">
+                                        ({service.duration || '-'} นาที | ฿{(service.price ?? service.basePrice ?? 0).toLocaleString()})
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                ))}
-            </div>
+                    ))}
+                </div>
             </div>
         </div>
     );

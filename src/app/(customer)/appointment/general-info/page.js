@@ -370,7 +370,7 @@ function GeneralInfoContent() {
                 <button
                     onClick={handleSubmit}
                     disabled={isSubmitting}
-                    className="w-full bg-gradient-to-r from-purple-400 via-violet-400 to-pink-300 text-white py-4 rounded-2xl font-semibold text-lg shadow-lg disabled:opacity-50"
+                    className="w-full bg-violet-800 text-white py-4 rounded-2xl font-semibold text-lg shadow-lg disabled:opacity-50"
                 >
                     {isSubmitting ? 'กำลังดำเนินการ...' : 'ยืนยันการนัดหมาย'}
                 </button>

@@ -94,6 +94,7 @@ function ServiceDetailContent() {
     return (
         <div>
             <CustomerHeader showBackButton={true} showActionButtons={false} />
+            
             <div className="px-4 pb-24">
             {/* รูปภาพบริการ */}
             <div className="relative w-full h-48 rounded-2xl overflow-hidden mb-4">
