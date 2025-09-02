@@ -141,7 +141,7 @@ export default function AdminSettingsPage() {
 
     return (
         <div className="container mx-auto p-4 md:p-6">
-            <div className="flex justify-between items-center mb-6">
+            <div className="flex justify-between items-center mb-6 ">
                 <h1 className="text-2xl font-bold text-slate-800">ตั้งค่าระบบ</h1>
                 <button
                     onClick={handleSave}
@@ -155,7 +155,7 @@ export default function AdminSettingsPage() {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
                 {/* --- Column 1: Booking & Time --- */}
-                <div className="space-y-6">
+                <div className="space-y-6 text-black">
                     <SettingsCard title="โหมดและคิวการจอง">
                         <Toggle 
                             label="โหมดเลือกช่าง" 
@@ -207,7 +207,7 @@ export default function AdminSettingsPage() {
                     </SettingsCard>
                     <SettingsCard title="วันหยุดพิเศษ">
                         <div className="flex gap-2 items-end">
-                            <div className="flex-1">
+                            <div className="flex-1 text-black">
                                 <label className="block text-xs font-medium text-gray-600 mb-1">เลือกวันที่</label>
                                 <input type="date" value={bookingSettings._newHolidayDate || ''} onChange={e => setBookingSettings(prev => ({ ...prev, _newHolidayDate: e.target.value }))} className="border rounded-md px-2 py-1 w-full text-sm" min={new Date().toISOString().split('T')[0]}/>
                             </div>

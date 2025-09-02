@@ -314,7 +314,7 @@ function GeneralInfoContent() {
                 </div>
 
                 {/* Form Card */}
-                <div className="bg-white rounded-2xl p-4 mb-4 shadow-sm border border-gray-100">
+                <div className="bg-white text-black rounded-2xl p-4 mb-4 shadow-sm  border border-gray-100">
                     <label className="block text-md text-center font-medium text-gray-700 mb-4">ข้อมูลลูกค้า</label>
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div className='flex'>

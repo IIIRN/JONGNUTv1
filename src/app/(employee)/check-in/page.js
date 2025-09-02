@@ -82,26 +82,53 @@ export default function CheckInPage() {
     };
 
     const handleScan = async () => {
-        if (liff && liff.isInClient()) {
-            try {
-                const result = await liff.scanCodeV2();
-                if (result.value) {
-                    setLoading(true);
-                    setMessage('');
-                    setAppointments([]);
-                    const searchResult = await findAppointmentById(result.value);
-                    if (searchResult.success) {
-                        setAppointments([searchResult.appointment]);
-                    } else {
-                        setMessage(`ไม่พบข้อมูลจาก QR Code: ${searchResult.error}`);
-                    }
-                    setLoading(false);
-                }
-            } catch (error) {
-                setMessage(`Scan failed: ${error.message}`);
-            }
-        } else {
+        // Check if LIFF is available and initialized
+        if (!liff) {
+            setMessage('กำลังโหลด LIFF กรุณารอสักครู่...');
+            return;
+        }
+
+        // Check if running in LINE app
+        if (!liff.isInClient()) {
             setMessage('ฟังก์ชันสแกน QR ใช้งานได้บน LINE เท่านั้น');
+            return;
+        }
+
+        try {
+            setMessage('กำลังเปิดกล้องเพื่อสแกน QR Code...');
+            
+            // Use scanCodeV2 with error handling
+            const result = await liff.scanCodeV2();
+            
+            if (result && result.value) {
+                setLoading(true);
+                setMessage('กำลังค้นหาข้อมูลจาก QR Code...');
+                setAppointments([]);
+                
+                const searchResult = await findAppointmentById(result.value);
+                if (searchResult.success) {
+                    setAppointments([searchResult.appointment]);
+                    setMessage('');
+                } else {
+                    setMessage(`ไม่พบข้อมูลจาก QR Code: ${searchResult.error}`);
+                }
+                setLoading(false);
+            } else {
+                setMessage('ไม่ได้รับข้อมูลจาก QR Code หรือยกเลิกการสแกน');
+            }
+        } catch (error) {
+            console.error('QR Scan Error:', error);
+            
+            // More specific error handling
+            if (error.type === 'PermissionError') {
+                setMessage('ไม่สามารถเข้าถึงกล้องได้ กรุณาอนุญาตการใช้งานกล้องในแอป LINE');
+            } else if (error.type === 'NotSupportedError') {
+                setMessage('อุปกรณ์นี้ไม่รองรับฟังก์ชันสแกน QR Code');
+            } else if (error.message && error.message.includes('scanCode')) {
+                setMessage('เกิดข้อผิดพลาดในการสแกน QR Code กรุณาลองใหม่อีกครั้ง');
+            } else {
+                setMessage(`เกิดข้อผิดพลาด: ${error.message || 'ไม่สามารถสแกน QR Code ได้'}`);
+            }
         }
     };
     
@@ -151,11 +178,14 @@ export default function CheckInPage() {
                     <p className="mb-2 text-gray-600">หรือ</p>
                     <button
                         onClick={handleScan}
-                        className="w-full max-w-xs mx-auto bg-gray-800 text-white font-bold py-3 rounded-lg hover:bg-gray-700 transition-colors"
-                        disabled={liffLoading}
+                        className="w-full max-w-xs mx-auto bg-gray-800 text-white font-bold py-3 rounded-lg hover:bg-gray-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                        disabled={liffLoading || loading}
                     >
-                        สแกน QR Code
+                        {liffLoading ? 'กำลังโหลด LIFF...' : loading ? 'กำลังสแกน...' : 'สแกน QR Code'}
                     </button>
+                    {!liff && !liffLoading && (
+                        <p className="text-sm text-red-500 mt-2">LIFF ไม่พร้อมใช้งาน</p>
+                    )}
                 </div>
 
                 {/* Results */}

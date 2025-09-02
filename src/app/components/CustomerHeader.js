@@ -29,7 +29,7 @@ export default function CustomerHeader({ showBackButton = false, showActionButto
 
     return (
         <div className="p-3">
-            <header className="rounded-2xl p-4 bg-gradient-to-br from-[#70676a] via-[#8a8181] to-[#746a6d] text-white shadow-md flex items-center justify-between">
+            <header className="rounded-2xl p-4 bg-gradient-to-r from-[#7F7679] via-[#CAB6BD] to-[#A8999E] text-white shadow-md flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     {profile?.pictureUrl ? (
                         <div className="w-16 h-16 rounded-full overflow-hidden flex-shrink-0">

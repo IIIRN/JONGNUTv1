@@ -91,9 +91,18 @@ export default function AdminDashboardPage() {
     const [appointmentToCancel, setAppointmentToCancel] = useState(null);
     const [activeTab, setActiveTab] = useState('in_progress');
     const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'table'
+    // Set default startDate to first day of current month, endDate to last day of current month
+    const getMonthRange = () => {
+        const now = new Date();
+        const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+        const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        return {
+            startDate: format(firstDay, 'yyyy-MM-dd'),
+            endDate: format(lastDay, 'yyyy-MM-dd'),
+        };
+    };
     const [filters, setFilters] = useState({
-        startDate: format(startOfDay(new Date()), 'yyyy-MM-dd'),
-        endDate: format(endOfDay(new Date()), 'yyyy-MM-dd'),
+        ...getMonthRange(),
         search: '',
     });
     const router = useRouter(); // Correct: Initialize hook at the top level
@@ -142,14 +151,14 @@ export default function AdminDashboardPage() {
     if (loading) return <div className="text-center p-10">Loading Dashboard...</div>;
 
     return (
-        <div className="p-4 md:p-6">
+        <div className="container mx-auto p-4 md:p-8">
             {appointmentToCancel && <CancelAppointmentModal appointment={appointmentToCancel} onClose={() => setAppointmentToCancel(null)} onConfirm={handleConfirmCancel} />}
             
             <header className="pb-4 border-b mb-4">
                 <h1 className="text-2xl font-bold text-slate-800">ภาพรวมการนัดหมาย</h1>
-                <div className="flex flex-wrap items-center gap-4 mt-4">
+                <div className="flex flex-wrap items-center gap-4 mt-4 text-black">
                      <div>
-                        <label className="text-sm font-medium mr-2">วันที่เริ่มต้น:</label>
+                        <label className=" text-sm font-medium mr-2">วันที่เริ่มต้น:</label>
                         <input type="date" name="startDate" value={filters.startDate} onChange={handleFilterChange} className="p-2 border rounded-md"/>
                     </div>
                     <div>
@@ -173,7 +182,7 @@ export default function AdminDashboardPage() {
                         </button>
                     ))}
                 </div>
-                <div className="flex items-center gap-2 p-1 bg-gray-200 rounded-md">
+                <div className="flex items-center gap-2 p-1 bg-gray-200 text-black rounded-md">
                     <button onClick={() => setViewMode('grid')} className={`px-3 py-1 rounded ${viewMode === 'grid' ? 'bg-white shadow' : ''}`}>แถว</button>
                     <button onClick={() => setViewMode('table')} className={`px-3 py-1 rounded ${viewMode === 'table' ? 'bg-white shadow' : ''}`}>ตาราง</button>
                 </div>

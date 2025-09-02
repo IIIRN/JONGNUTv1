@@ -21,7 +21,7 @@ const StarRating = ({ rating, setRating }) => {
                         fill="currentColor"
                         viewBox="0 0 20 20"
                     >
-                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.957a1 1 0 00.95.69h4.16c.969 0 1.371 1.24.588 1.81l-3.363 2.44a1 1 0 00-.364 1.118l1.287 3.957c.3.921-.755 1.688-1.539 1.118l-3.362-2.44a1 1 0 00-1.176 0l-3.362 2.44c-.783.57-1.838-.197-1.539-1.118l1.287-3.957a1 1 0 00-.364-1.118L2.07 9.39c-.783-.57-.38-1.81.588-1.81h4.16a1 1 0 00.95-.69L9.049 2.927z" />
+                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.957a1 1 0 00.95.69h4.16c.969 0 1.371 1.24.588 1.81l-3.363 2.44a1 1 0 00-.364 1.118l1.287 3.957c.3.921-.755 1.688-1.539 1.118l-3.362-2.44a1 1 0 00-1.176 0l-3.362-2.44c-.783.57-1.838-.197-1.539-1.118l1.287-3.957a1 1 0 00-.364-1.118L2.07 9.39c-.783-.57-.38-1.81.588-1.81h4.16a1 1 0 00.95-.69L9.049 2.927z" />
                     </svg>
                 </button>
             ))}
@@ -36,22 +36,22 @@ function ReviewContent() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState(false);
-    const [bookingId, setBookingId] = useState(null);
+    const [appointmentId, setAppointmentId] = useState(null);
     
     const params = useParams();
     const searchParams = useSearchParams();
     const router = useRouter();
 
     useEffect(() => {
-        const getBookingId = () => {
-            // 1. Try to get bookingId from the dynamic route parameter first (will be undefined here, but good practice)
-            if (params.bookingId) {
-                return params.bookingId;
+        const getAppointmentId = () => {
+            // 1. Try to get appointmentId from the dynamic route parameter first (will be undefined here, but good practice)
+            if (params.appointmentId) {
+                return params.appointmentId;
             }
             // 2. If not found, try to get it from liff.state after a redirect
             const liffState = searchParams.get('liff.state');
             if (liffState) {
-                // Example liffState: "/review/some-booking-id"
+                // Example liffState: "/review/some-appointment-id"
                 const parts = liffState.split('/');
                 if (parts.length > 2 && parts[1] === 'review') {
                     return parts[2];
@@ -60,11 +60,11 @@ function ReviewContent() {
             return null;
         };
 
-        const id = getBookingId();
+        const id = getAppointmentId();
         if (id) {
-            setBookingId(id);
+            setAppointmentId(id);
         } else if (!liffLoading) {
-            setError('ไม่พบ Booking ID');
+            setError('ไม่พบ Appointment ID');
         }
     }, [params, searchParams, liffLoading]);
 
@@ -83,7 +83,7 @@ function ReviewContent() {
         setError('');
 
         const reviewData = {
-            bookingId: bookingId,
+            appointmentId: appointmentId,
             userId: profile.userId,
             rating: rating,
             comment: comment,
@@ -103,7 +103,7 @@ function ReviewContent() {
         return <div className="p-4 text-center">กำลังโหลด...</div>
     }
 
-    if (error && !bookingId) {
+    if (error && !appointmentId) {
         return (
             <div className="bg-white p-8 rounded-lg shadow-lg text-center">
                 <h1 className="text-2xl font-bold text-red-600 mb-2">เกิดข้อผิดพลาด</h1>
@@ -112,8 +112,8 @@ function ReviewContent() {
         )
     }
 
-    if (!bookingId) {
-        return <div className="p-4 text-center">กำลังค้นหาข้อมูลการจอง...</div>
+    if (!appointmentId) {
+        return <div className="p-4 text-center">กำลังค้นหาข้อมูลการนัดหมาย...</div>
     }
 
     if (success) {
@@ -127,8 +127,8 @@ function ReviewContent() {
 
     return (
         <div className="bg-white p-6 rounded-lg shadow-lg">
-            <h1 className="text-2xl font-bold text-center mb-2">รีวิวการเดินทาง</h1>
-            <p className="text-center text-gray-500 mb-6">Booking ID: {bookingId.substring(0, 6).toUpperCase()}</p>
+            <h1 className="text-2xl font-bold text-center mb-2">รีวิวบริการ</h1>
+            <p className="text-center text-gray-500 mb-6">Appointment ID: {appointmentId.substring(0, 6).toUpperCase()}</p>
 
             <form onSubmit={handleSubmit} className="space-y-6">
                 <div>

@@ -13,23 +13,23 @@ const PROMPTPAY_ID = '0623733306'; // <--- แก้ไขตรงนี้
 
 // Component ที่จะจัดการ useSearchParams
 function PaymentContent() {
-    const [booking, setBooking] = useState(null);
+    const [appointment, setAppointment] = useState(null);
     const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const searchParams = useSearchParams();
 
-    const getBookingId = () => {
+    const getAppointmentId = () => {
         // ลอง query parameter ก่อน
-        const bookingIdFromQuery = searchParams.get('bookingId');
-        if (bookingIdFromQuery) {
-            return bookingIdFromQuery;
+        const appointmentIdFromQuery = searchParams.get('appointmentId');
+        if (appointmentIdFromQuery) {
+            return appointmentIdFromQuery;
         }
 
         // ลอง liff.state
         const liffState = searchParams.get('liff.state');
         if (liffState) {
-            // ลบ slash แรกออกเพื่อใช้เป็น bookingId
+            // ลบ slash แรกออกเพื่อใช้เป็น appointmentId
             return liffState.replace(/^\//, '');
         }
 
@@ -37,32 +37,32 @@ function PaymentContent() {
     };
 
     useEffect(() => {
-        const bookingId = getBookingId();
+        const appointmentId = getAppointmentId();
         
-        if (!bookingId) {
-            setError('ไม่พบ Booking ID');
+        if (!appointmentId) {
+            setError('ไม่พบ Appointment ID');
             setLoading(false);
             return;
         }
 
-        console.log('Found Booking ID:', bookingId);
+        console.log('Found Appointment ID:', appointmentId);
 
-        const fetchBookingAndGenerateQR = async () => {
+        const fetchAppointmentAndGenerateQR = async () => {
             setLoading(true);
             try {
-                const bookingRef = doc(db, 'bookings', bookingId);
-                const bookingSnap = await getDoc(bookingRef);
+                const appointmentRef = doc(db, 'appointments', appointmentId);
+                const appointmentSnap = await getDoc(appointmentRef);
 
-                if (!bookingSnap.exists()) {
-                    throw new Error('ไม่พบข้อมูลการจอง');
+                if (!appointmentSnap.exists()) {
+                    throw new Error('ไม่พบข้อมูลการนัดหมาย');
                 }
                 
-                const bookingData = { id: bookingSnap.id, ...bookingSnap.data() };
-                setBooking(bookingData);
+                const appointmentData = { id: appointmentSnap.id, ...appointmentSnap.data() };
+                setAppointment(appointmentData);
 
                 console.log('PROMPTPAY_ID:', PROMPTPAY_ID);
 
-                const amount = bookingData.paymentInfo.totalPrice;
+                const amount = appointmentData.paymentInfo.totalPrice;
                 const dataUrl = await generateQrCodePayload(PROMPTPAY_ID, amount);
                 
                 setQrCodeDataUrl(dataUrl);
@@ -75,7 +75,7 @@ function PaymentContent() {
             }
         };
 
-        fetchBookingAndGenerateQR();
+        fetchAppointmentAndGenerateQR();
     }, [searchParams]);
 
     if (loading) {
@@ -107,13 +107,13 @@ function PaymentContent() {
             <div className="bg-white rounded-lg shadow-lg p-6 text-center">
                 <h1 className="text-2xl font-bold text-gray-800 mb-2">ใบแจ้งค่าบริการ</h1>
                 <p className="text-sm text-gray-500 mb-4">
-                    Booking ID: {booking?.id.substring(0, 6).toUpperCase()}
+                    Appointment ID: {appointment?.id.substring(0, 6).toUpperCase()}
                 </p>
                 
                 <div className="my-6">
                     <p className="text-gray-600">ยอดชำระทั้งหมด</p>
                     <p className="text-5xl font-bold text-slate-800">
-                        {booking?.paymentInfo.totalPrice.toLocaleString()}
+                        {appointment?.paymentInfo.totalPrice.toLocaleString()}
                         <span className="text-2xl font-medium ml-1">บาท</span>
                     </p>
                 </div>
@@ -134,13 +134,13 @@ function PaymentContent() {
                     สแกน QR Code นี้เพื่อชำระเงินผ่านแอปพลิเคชันของธนาคาร
                 </p>
 
-                {booking && (
+                {appointment && (
                     <div className="mt-6 text-left bg-gray-50 p-4 rounded-lg text-sm">
                         <h3 className="font-semibold mb-2">สรุปรายการ</h3>
-                        <p><strong>ลูกค้า:</strong> {booking.customerInfo.name}</p>
-                        <p><strong>การเดินทาง:</strong> {booking.pickupInfo.name || booking.pickupInfo.address} ไปยัง {booking.dropoffInfo.address}</p>
-                        <p><strong>วันที่:</strong> {booking.pickupInfo.dateTime.toDate().toLocaleDateString('th-TH')}</p>
-                        <p><strong>เวลา:</strong> {booking.pickupInfo.dateTime.toDate().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}</p>
+                        <p><strong>ลูกค้า:</strong> {appointment.customerInfo.name}</p>
+                        <p><strong>บริการ:</strong> {appointment.serviceInfo.name}</p>
+                        <p><strong>วันที่:</strong> {appointment.appointmentInfo.dateTime.toDate().toLocaleDateString('th-TH')}</p>
+                        <p><strong>เวลา:</strong> {appointment.appointmentInfo.dateTime.toDate().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}</p>
                     </div>
                 )}
 

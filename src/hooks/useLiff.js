@@ -18,6 +18,19 @@ const useLiff = (liffId) => {
         const initializeLiff = async () => {
             if (process.env.NODE_ENV === 'development') {
                 console.warn("LIFF mock mode is active.");
+                // Mock LIFF object with scanCodeV2 function for development
+                const mockLiff = {
+                    isInClient: () => true,
+                    scanCodeV2: async () => {
+                        // Simulate scan result
+                        return new Promise((resolve) => {
+                            setTimeout(() => {
+                                resolve({ value: 'mock-appointment-id-12345' });
+                            }, 1000);
+                        });
+                    }
+                };
+                setLiffObject(mockLiff);
                 setProfile(MOCK_PROFILE);
                 setLoading(false);
                 return;
@@ -60,7 +73,7 @@ const useLiff = (liffId) => {
         initializeLiff();
     }, [liffId]);
 
-    return { liffObject, profile, loading, error };
+    return { liff: liffObject, profile, loading, error };
 };
 
 export default useLiff;

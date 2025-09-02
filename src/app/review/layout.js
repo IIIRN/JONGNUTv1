@@ -9,7 +9,7 @@ function ReviewHeader() {
     if (loading || error) {
         return (
             <div className="p-4">
-                <div className="bg-[#22252A] text-white p-2 shadow-lg flex items-center space-x-4 rounded-full animate-pulse">
+                <div className="rounded-2xl p-4 bg-gradient-to-r from-[#7F7679] via-[#CAB6BD] to-[#A8999E] text-white shadow-md flex items-center justify-between">
                     <div className="w-12 h-12 rounded-full bg-gray-500 flex-shrink-0"></div>
                     <div className="flex-grow space-y-2">
                         <div className="h-2 bg-gray-500 rounded w-1/4"></div>
@@ -22,7 +22,7 @@ function ReviewHeader() {
 
     return (
         <div className="p-4">
-            <header className="bg-[#22252A] text-white p-2 shadow-lg flex items-center space-x-3 rounded-full">
+            <header className="rounded-2xl p-4 bg-gradient-to-r from-[#7F7679] via-[#CAB6BD] to-[#A8999E] text-white shadow-md flex items-center justify-between">
                 {profile?.pictureUrl && (
                     <Image src={profile.pictureUrl} width={48} height={48} alt="Profile" className="w-12 h-12 rounded-full"/>
                 )}

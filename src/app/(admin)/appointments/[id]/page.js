@@ -5,7 +5,39 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { db } from '@/app/lib/firebase';
 import { doc, getDoc, deleteDoc } from 'firebase/firestore';
-import { updateAppointmentStatusByAdmin } from '@/app/actions/appointmentActions';
+import { updateAppointmentStatusByAdmin, confirmAppointmentAndPaymentByAdmin } from '@/app/actions/appointmentActions';
+// Modal for editing payment info
+function EditPaymentModal({ open, onClose, onSave, defaultAmount, defaultMethod }) {
+  const [amount, setAmount] = useState(defaultAmount || '');
+  const [method, setMethod] = useState(defaultMethod || 'เงินสด');
+  const [saving, setSaving] = useState(false);
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 w-full max-w-sm">
+        <h2 className="text-lg font-bold mb-4">แก้ไขข้อมูลการชำระเงิน</h2>
+        <div className="mb-3">
+          <label className="block text-sm font-medium mb-1">ยอดชำระ (บาท)</label>
+          <input type="number" className="w-full border rounded px-2 py-1" value={amount} onChange={e => setAmount(e.target.value)} min="0" />
+        </div>
+        <div className="mb-3">
+          <label className="block text-sm font-medium mb-1">ช่องทางชำระ</label>
+          <select className="w-full border rounded px-2 py-1" value={method} onChange={e => setMethod(e.target.value)}>
+            <option value="เงินสด">เงินสด</option>
+            <option value="โอนเงิน">โอนเงิน</option>
+            <option value="บัตรเครดิต">บัตรเครดิต</option>
+            <option value="PromptPay">PromptPay</option>
+            <option value="อื่นๆ">อื่นๆ</option>
+          </select>
+        </div>
+        <div className="flex justify-end gap-2 mt-4">
+          <button onClick={onClose} className="px-4 py-2 bg-gray-200 rounded">ยกเลิก</button>
+          <button onClick={async () => { setSaving(true); await onSave(amount, method); setSaving(false); }} className="px-4 py-2 bg-green-600 text-white rounded" disabled={saving}>{saving ? 'กำลังบันทึก...' : 'บันทึก'}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
 const STATUS_OPTIONS = [
   { value: 'awaiting_confirmation', label: 'รอยืนยัน' },
   { value: 'confirmed', label: 'ยืนยันแล้ว' },
@@ -56,6 +88,32 @@ export default function AdminAppointmentDetail() {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [showEditPayment, setShowEditPayment] = useState(false);
+  // Save payment info
+  const handleSavePayment = async (amount, method) => {
+    if (!appointment?.id) return;
+    try {
+      const result = await confirmAppointmentAndPaymentByAdmin(appointment.id, 'admin', { amount: Number(amount), method });
+      if (result.success) {
+        alert('อัพเดตข้อมูลการชำระเงินสำเร็จ');
+        setAppointment(prev => ({
+          ...prev,
+          paymentInfo: {
+            ...prev.paymentInfo,
+            amountPaid: Number(amount),
+            paymentMethod: method,
+            paymentStatus: 'paid',
+            paidAt: new Date(),
+          },
+        }));
+        setShowEditPayment(false);
+      } else {
+        alert('เกิดข้อผิดพลาด: ' + result.error);
+      }
+    } catch (err) {
+      alert('เกิดข้อผิดพลาด: ' + err.message);
+    }
+  };
 
   const handleStatusChange = async (e) => {
     const newStatus = e.target.value;
@@ -135,7 +193,7 @@ export default function AdminAppointmentDetail() {
     <div className="container mx-auto p-4 md:p-8">
       <div className="mb-6 flex flex-col md:flex-row md:items-start md:justify-between gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold">รายละเอียดนัดหมาย #{appointment.id.substring(0,6).toUpperCase()}</h1>
+          <h1 className="text-2xl text-black md:text-3xl font-bold">รายละเอียดนัดหมาย #{appointment.id.substring(0,6).toUpperCase()}</h1>
           <div className="mt-2">
             <span className={`px-3 py-1 text-sm font-semibold rounded-full ${statusInfo.color}`}>
               {statusInfo.label}
@@ -157,7 +215,11 @@ export default function AdminAppointmentDetail() {
           <h2 className="text-xl font-bold mb-2">ข้อมูลลูกค้า</h2>
           <InfoRow label="ชื่อ" value={appointment.customerInfo?.fullName || appointment.customerInfo?.name || '-'} />
           <InfoRow label="เบอร์โทร" value={appointment.customerInfo?.phone} />
-          <InfoRow label="LINE ID" value={appointment.userId} />
+          <InfoRow label="LINE ID" value={
+            appointment.userId
+              ? <span className="text-green-600 font-semibold">เชื่อมต่อ LINEOA แล้ว</span>
+              : '-'
+          } />
           <InfoRow label="หมายเหตุ" value={appointment.customerInfo?.note || appointment.note || '-'} />
           <div className="flex items-center gap-2 text-gray-500 mt-4 border-t pt-4">
             <span>เปลี่ยนสถานะ:</span>
@@ -218,7 +280,7 @@ export default function AdminAppointmentDetail() {
         </div>
 
         {/* สรุปการชำระเงิน */}
-        <div className="bg-white p-6 rounded-lg shadow-md space-y-2">
+        <div className="bg-white text-black p-6 rounded-lg shadow-md space-y-2">
           <h2 className="text-xl font-bold mb-2">สรุปการชำระเงิน</h2>
           <InfoRow label="ราคาบริการ" value={
             appointment.paymentInfo?.originalPrice
@@ -256,16 +318,29 @@ export default function AdminAppointmentDetail() {
                 : '-'
           } />
           <InfoRow label="ช่องทางชำระ" value={appointment.paymentInfo?.paymentMethod || '-'} />
-          <InfoRow label="สถานะชำระเงิน" value={appointment.paymentInfo?.paymentStatus || '-'} />
+          <InfoRow label="สถานะชำระเงิน" value={
+            appointment.paymentInfo?.paymentStatus === 'paid' ? 'ชำระแล้ว'
+            : appointment.paymentInfo?.paymentStatus === 'unpaid' ? 'ยังไม่ชำระ'
+            : appointment.paymentInfo?.paymentStatus === 'invoiced' ? 'ออกใบแจ้งหนี้แล้ว'
+            : appointment.paymentInfo?.paymentStatus === 'pending' ? 'รอดำเนินการ'
+            : appointment.paymentInfo?.paymentStatus || '-'
+          } />
           <div className="border-t mt-3 pt-3 space-y-1">
             <InfoRow label="สร้างเมื่อ" value={safeDate(appointment.createdAt) ? format(safeDate(appointment.createdAt), 'dd MMM yyyy, HH:mm', { locale: th }) : '-'} />
             <InfoRow label="อัพเดตล่าสุด" value={safeDate(appointment.updatedAt) ? format(safeDate(appointment.updatedAt), 'dd MMM yyyy, HH:mm', { locale: th }) : '-'} />
             <button 
-                onClick={() => alert('ฟังก์ชันแก้ไขการชำระเงินยังไม่เปิดให้บริการ')}
+                onClick={() => setShowEditPayment(true)}
                 className="w-full bg-yellow-500 text-white py-2 rounded-md mt-2"
             >
                 แก้ไขการชำระเงิน
             </button>
+            <EditPaymentModal
+              open={showEditPayment}
+              onClose={() => setShowEditPayment(false)}
+              onSave={handleSavePayment}
+              defaultAmount={appointment.paymentInfo?.amountPaid || appointment.paymentInfo?.totalPrice || ''}
+              defaultMethod={appointment.paymentInfo?.paymentMethod || 'เงินสด'}
+            />
           </div>
         </div>
       </div>

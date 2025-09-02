@@ -39,19 +39,21 @@ export default function AdminReviewsPage() {
                 const reviewsData = await Promise.all(reviewsSnapshot.docs.map(async (reviewDoc) => {
                     const review = { id: reviewDoc.id, ...reviewDoc.data() };
                     
-                    // Fetch booking details
-                    const bookingRef = doc(db, 'bookings', review.bookingId);
-                    const bookingSnap = await getDoc(bookingRef);
-                    if (bookingSnap.exists()) {
-                        review.bookingInfo = bookingSnap.data();
+                    // Fetch appointment details
+                    if (review.appointmentId) {
+                        const appointmentRef = doc(db, 'appointments', review.appointmentId);
+                        const appointmentSnap = await getDoc(appointmentRef);
+                        if (appointmentSnap.exists()) {
+                            review.appointmentInfo = appointmentSnap.data();
+                        }
                     }
 
-                    // Fetch driver details if driverId exists
-                    if (review.driverId) {
-                        const driverRef = doc(db, 'drivers', review.driverId);
-                        const driverSnap = await getDoc(driverRef);
-                        if (driverSnap.exists()) {
-                            review.driverInfo = driverSnap.data();
+                    // Fetch beautician details if beauticianId exists
+                    if (review.beauticianId) {
+                        const beauticianRef = doc(db, 'beauticians', review.beauticianId);
+                        const beauticianSnap = await getDoc(beauticianRef);
+                        if (beauticianSnap.exists()) {
+                            review.beauticianInfo = beauticianSnap.data();
                         }
                     }
                     return review;
@@ -113,8 +115,8 @@ export default function AdminReviewsPage() {
                         <p className="text-gray-600 text-sm mb-4 flex-grow italic">"{review.comment || 'ไม่มีความคิดเห็นเพิ่มเติม'}"</p>
 
                         <div className="border-t pt-3 mt-auto text-xs text-gray-500">
-                           <p><strong>รถ:</strong> {review.bookingInfo?.vehicleInfo.brand} {review.bookingInfo?.vehicleInfo.model}</p>
-                           <p><strong>คนขับ:</strong> {review.driverInfo ? `${review.driverInfo.firstName} ${review.driverInfo.lastName}` : 'N/A'}</p>
+                           <p><strong>บริการ:</strong> {review.appointmentInfo?.serviceInfo.name}</p>
+                           <p><strong>ช่างเสริมสวย:</strong> {review.beauticianInfo ? `${review.beauticianInfo.firstName} ${review.beauticianInfo.lastName}` : 'N/A'}</p>
                         </div>
                     </div>
                 )) : (
