@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
+import { useParams } from 'next/navigation';
 import { db } from '@/app/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { generateQrCodePayload } from '@/app/actions/paymentActions';
@@ -10,14 +11,13 @@ import Image from 'next/image';
 // --- ใส่เบอร์ PromptPay ของคุณที่นี่ ---
 const PROMPTPAY_ID = '0623733306'; // <--- แก้ไขตรงนี้
 
-export default function PaymentPage({ params }) {
+function PaymentContent() {
     const [appointment, setAppointment] = useState(null);
     const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-
-    // ใช้ React.use() สำหรับ Next.js 15+ เพื่อ unwrap params
-    const { appointmentId } = React.use(params);
+    const params = useParams();
+    const appointmentId = params.appointmentId;
 
     useEffect(() => {
         if (!appointmentId) {
@@ -39,9 +39,6 @@ export default function PaymentPage({ params }) {
                 const appointmentData = { id: appointmentSnap.id, ...appointmentSnap.data() };
                 setAppointment(appointmentData);
 
-                console.log('PROMPTPAY_ID:', PROMPTPAY_ID);
-                console.log('Appointment ID:', appointmentId);
-
                 const amount = appointmentData.paymentInfo.totalPrice;
                 const dataUrl = await generateQrCodePayload(PROMPTPAY_ID, amount);
                 
@@ -60,9 +57,9 @@ export default function PaymentPage({ params }) {
 
     if (loading) {
         return (
-            <div className="text-center">
+            <div className="text-center p-10">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-800 mx-auto mb-4"></div>
-                <p>กำลังสร้าง QR Code สำหรับชำระเงิน...</p>
+                <p>กำลังสร้าง QR Code...</p>
             </div>
         );
     }
@@ -83,8 +80,8 @@ export default function PaymentPage({ params }) {
     }
 
     return (
-        <div className="bg-gray-100 max-w-md mx-auto rounded-2xl shadow-lg  ">
-            <div className="p-6 text-center">
+        <div className="max-w-md mx-auto p-4">
+            <div className="bg-white rounded-lg shadow-lg p-6 text-center">
                 <h1 className="text-2xl font-bold text-gray-800 mb-2">ใบแจ้งค่าบริการ</h1>
                 <p className="text-sm text-gray-500 mb-4">
                     Appointment ID: {appointment?.id.substring(0, 6).toUpperCase()}
@@ -123,14 +120,21 @@ export default function PaymentPage({ params }) {
                         <p><strong>เวลา:</strong> {appointment.appointmentInfo.dateTime.toDate().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}</p>
                     </div>
                 )}
-
-                <button 
-                    onClick={() => window.location.reload()} 
-                    className="mt-6 w-full px-4 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition"
-                >
-                    รีเฟรชหน้า
-                </button>
             </div>
         </div>
+    );
+}
+
+// Main component that wraps PaymentContent with Suspense
+export default function PaymentPage() {
+    return (
+        <Suspense fallback={
+            <div className="text-center p-10">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-800 mx-auto mb-4"></div>
+                <p>กำลังโหลด...</p>
+            </div>
+        }>
+            <PaymentContent />
+        </Suspense>
     );
 }

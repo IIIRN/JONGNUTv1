@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, Suspense } from 'react';
-import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { useLiffContext } from '@/context/LiffProvider';
 import { submitReview } from '@/app/actions/reviewActions';
 import { db } from '@/app/lib/firebase';
@@ -38,16 +38,16 @@ function ReviewContent() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState(false);
-    const [appointmentId, setAppointmentId] = useState(null);
     const [appointment, setAppointment] = useState(null); 
 
     const params = useParams();
     const searchParams = useSearchParams();
+    const appointmentId = params.appointmentId;
 
     useEffect(() => {
         const getAppointmentId = () => {
-            if (params.appointmentId) {
-                return params.appointmentId;
+            if (appointmentId) {
+                return appointmentId;
             }
             const liffState = searchParams.get('liff.state');
             if (liffState) {
@@ -61,12 +61,11 @@ function ReviewContent() {
 
         const id = getAppointmentId();
         if (id) {
-            setAppointmentId(id);
             const fetchAppointment = async () => {
                 const appointmentRef = doc(db, 'appointments', id);
                 const appointmentSnap = await getDoc(appointmentRef);
                 if (appointmentSnap.exists()) {
-                    setAppointment(appointmentSnap.data());
+                    setAppointment({id, ...appointmentSnap.data()});
                 } else {
                     setError('ไม่พบข้อมูลการนัดหมาย');
                 }
@@ -75,7 +74,7 @@ function ReviewContent() {
         } else if (!liffLoading) {
             setError('ไม่พบ Appointment ID');
         }
-    }, [params, searchParams, liffLoading]);
+    }, [appointmentId, searchParams, liffLoading]);
 
 
     const handleSubmit = async (e) => {
@@ -92,7 +91,7 @@ function ReviewContent() {
         setError('');
 
         const reviewData = {
-            appointmentId: appointmentId,
+            appointmentId: appointment.id,
             userId: profile.userId,
             beauticianId: appointment.beauticianId || null,
             rating: rating,
