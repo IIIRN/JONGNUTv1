@@ -1,3 +1,4 @@
+// src/app/(admin)/appointments/[id]/page.js
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -8,6 +9,7 @@ import { updateAppointmentStatusByAdmin } from '@/app/actions/appointmentActions
 const STATUS_OPTIONS = [
   { value: 'awaiting_confirmation', label: 'รอยืนยัน' },
   { value: 'confirmed', label: 'ยืนยันแล้ว' },
+  { value: 'in_progress', label: 'กำลังใช้บริการ' },
   { value: 'completed', label: 'เสร็จสิ้น' },
   { value: 'cancelled', label: 'ยกเลิก' },
 ];
@@ -35,6 +37,15 @@ const formatPrice = (v) => {
   if (typeof v === 'number') return v.toLocaleString();
   const n = Number(v);
   return Number.isFinite(n) ? n.toLocaleString() : String(v);
+};
+
+// --- Status & Color Definitions (Added for badge consistency) ---
+const STATUSES = {
+    awaiting_confirmation: { label: 'รอยืนยัน', color: 'bg-yellow-100 text-yellow-800' },
+    confirmed: { label: 'ยืนยันแล้ว', color: 'bg-blue-100 text-blue-800' },
+    in_progress: { label: 'กำลังใช้บริการ', color: 'bg-purple-100 text-purple-800' },
+    completed: { label: 'เสร็จสิ้น', color: 'bg-green-100 text-green-800' },
+    cancelled: { label: 'ยกเลิก', color: 'bg-red-100 text-red-800' },
 };
 
 export default function AdminAppointmentDetail() {
@@ -117,16 +128,23 @@ export default function AdminAppointmentDetail() {
   const dateTime = appointment.appointmentInfo?.dateTime && typeof appointment.appointmentInfo.dateTime.toDate === 'function'
     ? appointment.appointmentInfo.dateTime.toDate()
     : appointment.appointmentInfo?.dateTime ? new Date(appointment.appointmentInfo.dateTime) : null;
+    
+  const statusInfo = STATUSES[appointment.status] || { label: appointment.status, color: 'bg-gray-100 text-gray-800' };
 
   return (
     <div className="container mx-auto p-4 md:p-8">
-      <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+      <div className="mb-6 flex flex-col md:flex-row md:items-start md:justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold">รายละเอียดนัดหมาย #{appointment.id.substring(0,6).toUpperCase()}</h1>
+          <div className="mt-2">
+            <span className={`px-3 py-1 text-sm font-semibold rounded-full ${statusInfo.color}`}>
+              {statusInfo.label}
+            </span>
+          </div>
         </div>
         <button
           onClick={handleDelete}
-          className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md disabled:bg-red-300"
+          className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md disabled:bg-red-300 self-start md:self-center"
           disabled={deleting}
         >
           {deleting ? 'กำลังลบ...' : 'ลบการจอง'}
@@ -141,8 +159,8 @@ export default function AdminAppointmentDetail() {
           <InfoRow label="เบอร์โทร" value={appointment.customerInfo?.phone} />
           <InfoRow label="LINE ID" value={appointment.userId} />
           <InfoRow label="หมายเหตุ" value={appointment.customerInfo?.note || appointment.note || '-'} />
-          <div className="flex items-center gap-2 text-gray-500 mt-1">
-            <span>สถานะ:</span>
+          <div className="flex items-center gap-2 text-gray-500 mt-4 border-t pt-4">
+            <span>เปลี่ยนสถานะ:</span>
             <select
               className="border rounded px-2 py-1 text-sm"
               value={appointment.status || ''}
@@ -184,7 +202,6 @@ export default function AdminAppointmentDetail() {
               <InfoRow label="คิว" value={appointment.queue ?? appointment.appointmentInfo?.queue ?? appointment.queueNumber ?? '-'} />
             </div>
           </div>
-          {/* บริการเสริม */}
           {((appointment.appointmentInfo && appointment.appointmentInfo.addOns && appointment.appointmentInfo.addOns.length) || (appointment.addOns && appointment.addOns.length)) && (
             <div className="mt-2 bg-gray-50 p-3 rounded-md">
               <h3 className="font-semibold mb-2">บริการเสริม</h3>

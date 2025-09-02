@@ -1,3 +1,4 @@
+// src/app/page.js
 "use client";
 
 import { useState } from 'react';
@@ -64,7 +65,7 @@ export default function LoginPage() {
         <div className="p-6 border rounded-lg bg-gray-50">
           <h2 className="text-xl font-semibold text-center text-gray-700 mb-4">สำหรับลูกค้าและช่างเสริมสวย</h2>
           <button 
-            onClick={() => router.push('/my-appointments')} // Redirect ไปหน้าลูกค้าเพื่อเริ่ม LIFF flow
+            onClick={() => router.push('/dashboard')} // Changed this line
             className="w-full flex items-center justify-center py-3 px-4 bg-pink-500 text-white rounded-lg font-semibold hover:bg-pink-600 transition-colors"
           >
             <svg className="w-6 h-6 mr-2" fill="currentColor" viewBox="0 0 24 24">

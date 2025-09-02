@@ -433,3 +433,65 @@ export async function confirmPayment(appointmentId) {
         return { success: false, error: error.message };
     }
 }
+
+
+// Appended to src/app/actions/appointmentActions.js
+// src/app/actions/appointmentActions.js
+
+/**
+ * Finds appointments based on a customer's phone number.
+ * This version removes the date filter to find all upcoming appointments.
+ */
+export async function findAppointmentsByPhone(phoneNumber) {
+    if (!phoneNumber) {
+        return { success: false, error: "กรุณาระบุเบอร์โทรศัพท์" };
+    }
+    try {
+        const todayStr = new Date().toISOString().split('T')[0];
+
+        const q = db.collection('appointments')
+            .where('customerInfo.phone', '==', phoneNumber)
+            // No longer filtering by today's date, but ensuring we don't pull very old appointments.
+            .where('date', '>=', todayStr) 
+            .where('status', 'in', ['confirmed', 'awaiting_confirmation'])
+            .orderBy('date', 'asc')
+            .orderBy('time', 'asc');
+
+        const snapshot = await q.get();
+        if (snapshot.empty) {
+            return { success: true, appointments: [] };
+        }
+        const appointments = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        }));
+        
+        return { success: true, appointments: JSON.parse(JSON.stringify(appointments)) };
+    } catch (error) {
+        console.error("Error finding appointments by phone:", error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Finds a single appointment by its ID.
+ */
+export async function findAppointmentById(appointmentId) {
+    if (!appointmentId) {
+        return { success: false, error: "กรุณาระบุ ID การนัดหมาย" };
+    }
+    try {
+        const docRef = db.collection('appointments').doc(appointmentId);
+        const docSnap = await docRef.get();
+
+        if (docSnap.exists()) {
+            const appointment = { id: docSnap.id, ...docSnap.data() };
+            return { success: true, appointment: JSON.parse(JSON.stringify(appointment)) };
+        } else {
+            return { success: false, error: "ไม่พบข้อมูลการนัดหมาย" };
+        }
+    } catch (error) {
+        console.error("Error finding appointment by ID:", error);
+        return { success: false, error: error.message };
+    }
+}
