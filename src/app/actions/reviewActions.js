@@ -1,3 +1,5 @@
+// src/app/actions/reviewActions.js
+
 'use server';
 
 import { db } from '@/app/lib/firebaseAdmin';
@@ -44,7 +46,7 @@ export async function submitReview(reviewData) {
         appointmentId,
         userId,
         beauticianId: beauticianId || null,
-        customerName: appointmentData.customerInfo.name,
+        customerName: appointmentData.customerInfo.fullName || appointmentData.customerInfo.name,
         rating: Number(rating),
         comment: comment || '',
         createdAt: FieldValue.serverTimestamp(),
