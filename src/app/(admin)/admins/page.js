@@ -3,10 +3,11 @@
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { fetchAdmins, deleteAdmin } from '@/app/actions/adminActions';
-import { auth, db } from '@/app/lib/firebase';  
+import { auth, db } from '@/app/lib/firebase';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { collection, doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/app/components/Toast';
+import { ConfirmationModal } from '@/app/components/common/NotificationComponent';
 
 export default function AdminsPage() {
   const [admins, setAdmins] = useState([]);
@@ -22,6 +23,8 @@ export default function AdminsPage() {
   });
   const [formLoading, setFormLoading] = useState(false);
   const { showToast } = useToast();
+  const [adminToDelete, setAdminToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     loadAdmins();
@@ -45,22 +48,30 @@ export default function AdminsPage() {
     }
   };
 
-  const handleDeleteAdmin = async (adminId) => {
-    if (confirm('คุณแน่ใจหรือไม่ว่าต้องการลบผู้ดูแลระบบนี้?')) {
-      try {
-        const result = await deleteAdmin(adminId);
-        if (result.success) {
-          showToast('ลบผู้ดูแลระบบสำเร็จ', 'success');
-          loadAdmins();
-        } else {
-          showToast('เกิดข้อผิดพลาดในการลบผู้ดูแลระบบ', 'error');
-        }
-      } catch (error) {
-        console.error('Error deleting admin:', error);
+  const handleDeleteAdmin = (admin) => {
+    setAdminToDelete(admin);
+  };
+
+  const confirmDeleteAdmin = async () => {
+    if (!adminToDelete) return;
+    setIsDeleting(true);
+    try {
+      const result = await deleteAdmin(adminToDelete.id);
+      if (result.success) {
+        showToast('ลบผู้ดูแลระบบสำเร็จ', 'success');
+        loadAdmins();
+      } else {
         showToast('เกิดข้อผิดพลาดในการลบผู้ดูแลระบบ', 'error');
       }
+    } catch (error) {
+      console.error('Error deleting admin:', error);
+      showToast('เกิดข้อผิดพลาดในการลบผู้ดูแลระบบ', 'error');
+    } finally {
+      setIsDeleting(false);
+      setAdminToDelete(null);
     }
   };
+
 
   const handleFormChange = (e) => {
     const { name, value } = e.target;
@@ -141,6 +152,14 @@ export default function AdminsPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
+      <ConfirmationModal
+          show={!!adminToDelete}
+          title="ยืนยันการลบ"
+          message={`คุณแน่ใจหรือไม่ว่าต้องการลบผู้ดูแลระบบ "${adminToDelete?.firstName}"?`}
+          onConfirm={confirmDeleteAdmin}
+          onCancel={() => setAdminToDelete(null)}
+          isProcessing={isDeleting}
+      />
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-800">จัดการผู้ดูแลระบบ</h1>
         <button 
@@ -309,7 +328,7 @@ export default function AdminsPage() {
                       แก้ไข
                     </button>
                     <button 
-                      onClick={() => handleDeleteAdmin(admin.id)}
+                      onClick={() => handleDeleteAdmin(admin)}
                       className="text-red-600 hover:text-red-900"
                     >
                       ลบ

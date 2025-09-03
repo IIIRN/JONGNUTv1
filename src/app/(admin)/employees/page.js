@@ -3,10 +3,11 @@
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { fetchEmployees, deleteEmployee, updateEmployeeStatus } from '@/app/actions/employeeActions';
-import { auth, db } from '@/app/lib/firebase';  
+import { auth, db } from '@/app/lib/firebase';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { collection, doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/app/components/Toast';
+import { ConfirmationModal } from '@/app/components/common/NotificationComponent';
 
 // Helper Component: StatusBadge
 const StatusBadge = ({ status }) => {
@@ -37,6 +38,8 @@ export default function EmployeesPage() {
   });
   const [formLoading, setFormLoading] = useState(false);
   const { showToast } = useToast();
+  const [employeeToDelete, setEmployeeToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     loadEmployees();
@@ -60,20 +63,27 @@ export default function EmployeesPage() {
     }
   };
 
-  const handleDeleteEmployee = async (employeeId) => {
-    if (confirm('คุณแน่ใจหรือไม่ว่าต้องการลบพนักงานนี้?')) {
-      try {
-        const result = await deleteEmployee(employeeId);
-        if (result.success) {
-          showToast('ลบพนักงานสำเร็จ', 'success');
-          loadEmployees();
-        } else {
-          showToast('เกิดข้อผิดพลาดในการลบพนักงาน', 'error');
-        }
-      } catch (error) {
-        console.error('Error deleting employee:', error);
+  const handleDeleteEmployee = (employee) => {
+    setEmployeeToDelete(employee);
+  };
+
+  const confirmDeleteEmployee = async () => {
+    if (!employeeToDelete) return;
+    setIsDeleting(true);
+    try {
+      const result = await deleteEmployee(employeeToDelete.id);
+      if (result.success) {
+        showToast('ลบพนักงานสำเร็จ', 'success');
+        loadEmployees();
+      } else {
         showToast('เกิดข้อผิดพลาดในการลบพนักงาน', 'error');
       }
+    } catch (error) {
+      console.error('Error deleting employee:', error);
+      showToast('เกิดข้อผิดพลาดในการลบพนักงาน', 'error');
+    } finally {
+      setIsDeleting(false);
+      setEmployeeToDelete(null);
     }
   };
 
@@ -178,6 +188,14 @@ export default function EmployeesPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
+      <ConfirmationModal
+          show={!!employeeToDelete}
+          title="ยืนยันการลบ"
+          message={`คุณแน่ใจหรือไม่ว่าต้องการลบพนักงาน "${employeeToDelete?.firstName}"?`}
+          onConfirm={confirmDeleteEmployee}
+          onCancel={() => setEmployeeToDelete(null)}
+          isProcessing={isDeleting}
+      />
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-800">จัดการพนักงาน</h1>
         <button 
@@ -381,7 +399,7 @@ export default function EmployeesPage() {
                       แก้ไข
                     </button>
                     <button 
-                      onClick={() => handleDeleteEmployee(employee.id)}
+                      onClick={() => handleDeleteEmployee(employee)}
                       className="text-red-600 hover:text-red-900"
                     >
                       ลบ

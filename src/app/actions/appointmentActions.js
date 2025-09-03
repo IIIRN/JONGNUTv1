@@ -84,7 +84,7 @@ export async function createAppointmentWithSlotCheck(appointmentData) {
 
         if (userId) {
             const customerMessage = `การนัดหมายบริการ ${appointmentData.serviceInfo.name} ของคุณในวันที่ ${date} เวลา ${time} ได้รับการบันทึกแล้วค่ะ ขณะนี้กำลังรอการยืนยันจากทางร้านนะคะ`;
-            await sendLineMessage(userId, customerMessage);
+            await sendLineMessage(userId, customerMessage, 'appointmentConfirmed');
         }
 
         try {
@@ -133,7 +133,7 @@ export async function completeAppointmentByAdmin(appointmentId, adminId, complet
         });
         
         let notificationMessage = `บริการ ${appointmentData.serviceInfo.name} ของคุณเสร็จสมบูรณ์แล้ว\nขอบคุณที่ใช้บริการค่ะ`;
-        await sendLineMessage(appointmentData.userId, notificationMessage);
+        await sendLineMessage(appointmentData.userId, notificationMessage, 'appointmentConfirmed');
         await sendReviewRequestToCustomer(appointmentId);
 
         return { success: true };
@@ -171,8 +171,8 @@ export async function confirmAppointmentAndPaymentByAdmin(appointmentId, adminId
             updatedAt: FieldValue.serverTimestamp(),
         });
 
-        const customerMessage = `การนัดหมายบริการ ${appointmentData.serviceInfo.name} ของคุณได้รับการยืนยันแล้วค่ะ`;
-        await sendLineMessage(appointmentData.userId, customerMessage);
+        const customerMessage = `✅ ได้รับการชำระเงินเรียบร้อยแล้วค่ะ\n\nการนัดหมายบริการ "${appointmentData.serviceInfo.name}" ของคุณในวันที่ ${appointmentData.date} เวลา ${appointmentData.time} ได้รับการยืนยันแล้วค่ะ\n\nขอบคุณที่ใช้บริการค่ะ ✨`;
+        await sendLineMessage(appointmentData.userId, customerMessage, 'appointmentConfirmed');
 
         try {
             const notificationData = {
@@ -215,7 +215,7 @@ export async function cancelAppointmentByAdmin(appointmentId, reason) {
 
         if (appointmentData.userId) {
             const customerMessage = `ขออภัยค่ะ การนัดหมายของคุณ (ID: ${appointmentId.substring(0, 6).toUpperCase()}) ถูกยกเลิกเนื่องจาก: "${reason}"\n\nกรุณาติดต่อแอดมินสำหรับข้อมูลเพิ่มเติม`;
-            await sendLineMessage(appointmentData.userId, customerMessage);
+            await sendLineMessage(appointmentData.userId, customerMessage, 'appointmentCancelled');
         }
         return { success: true };
     } catch (error) {
@@ -249,6 +249,7 @@ export async function updateAppointmentStatusByAdmin(appointmentId, newStatus) {
         // Send notification to customer
         if (appointmentData.userId) {
             let customerMessage = '';
+            let notificationType = '';
             const serviceName = appointmentData.serviceInfo?.name || 'บริการของคุณ';
             const appointmentDate = appointmentData.date;
             const appointmentTime = appointmentData.time;
@@ -256,19 +257,21 @@ export async function updateAppointmentStatusByAdmin(appointmentId, newStatus) {
             switch (newStatus) {
                 case 'confirmed':
                     customerMessage = `✅ การนัดหมายบริการ "${serviceName}" ในวันที่ ${appointmentDate} เวลา ${appointmentTime} ของคุณได้รับการยืนยันแล้วค่ะ`;
+                    notificationType = 'appointmentConfirmed';
                     break;
                 case 'completed':
                     customerMessage = `✨ บริการ "${serviceName}" ของคุณเสร็จสมบูรณ์แล้ว ขอบคุณที่ใช้บริการค่ะ`;
-                    // Also send a review request when completed
+                    notificationType = 'appointmentConfirmed'; // Or a new type like 'appointmentCompleted'
                     await sendReviewRequestToCustomer(appointmentId);
                     break;
                 case 'cancelled':
                     customerMessage = `❌ ขออภัยค่ะ การนัดหมายบริการ "${serviceName}" ของคุณถูกยกเลิกโดยผู้ดูแลระบบ กรุณาติดต่อสอบถามข้อมูลเพิ่มเติม`;
+                    notificationType = 'appointmentCancelled';
                     break;
             }
 
-            if (customerMessage) {
-                await sendLineMessage(appointmentData.userId, customerMessage);
+            if (customerMessage && notificationType) {
+                await sendLineMessage(appointmentData.userId, customerMessage, notificationType);
             }
         }
 
@@ -298,7 +301,7 @@ export async function sendReviewRequestToCustomer(appointmentId) {
 
         const reviewLiffUrl = `https://liff.line.me/${process.env.NEXT_PUBLIC_REVIEW_LIFF_ID}/${appointmentId}`;
         const reviewMessage = `รบกวนสละเวลารีวิวบริการของคุณ เพื่อนำไปพัฒนาบริการให้ดียิ่งขึ้น\n${reviewLiffUrl}`;
-        await sendLineMessage(appointmentData.userId, reviewMessage);
+        await sendLineMessage(appointmentData.userId, reviewMessage, 'reviewRequest');
 
         return { success: true };
     } catch (error) {
@@ -337,7 +340,7 @@ export async function updateAppointmentStatusByEmployee(appointmentId, employeeI
             let customerMessage = '';
             if (newStatus === 'completed') {
                 const thankYouMessage = `บริการของคุณเสร็จสิ้นแล้ว ขอบคุณที่ใช้บริการค่ะ`;
-                await sendLineMessage(appointmentData.userId, thankYouMessage);
+                await sendLineMessage(appointmentData.userId, thankYouMessage, 'appointmentConfirmed');
                 await sendReviewRequestToCustomer(appointmentId);
             }
             if (customerMessage) {
@@ -377,7 +380,7 @@ export async function cancelAppointmentByUser(appointmentId, userId) {
         });
         
         const customerMessage = `การนัดหมายของคุณ (ID: ${appointmentId.substring(0, 6).toUpperCase()}) ได้ถูกยกเลิกเรียบร้อยแล้วค่ะ`;
-        await sendLineMessage(userId, customerMessage);
+        await sendLineMessage(userId, customerMessage, 'appointmentCancelled');
         
         const adminMessage = `🚫 การนัดหมายถูกยกเลิกโดยลูกค้า\n\n*ลูกค้า:* ${customerName}\n*บริการ:* ${serviceName}\n*Appointment ID:* ${appointmentId.substring(0, 6).toUpperCase()}`;
         await sendTelegramMessageToAdmin(adminMessage);
@@ -407,7 +410,7 @@ export async function sendInvoiceToCustomer(appointmentId) {
         });
 
         const customerMessage = `เรียนคุณ ${appointmentData.customerInfo.name},\n\nนี่คือใบแจ้งค่าบริการสำหรับบริการของคุณ\nยอดชำระ: ${appointmentData.paymentInfo.totalPrice.toLocaleString()} บาท\n\nกรุณาคลิกที่ลิงก์เพื่อชำระเงิน:\n${liffUrl}`;
-        await sendLineMessage(appointmentData.userId, customerMessage);
+        await sendLineMessage(appointmentData.userId, customerMessage, 'paymentInvoice');
 
         return { success: true };
     } catch (error) {

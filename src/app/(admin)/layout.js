@@ -6,18 +6,21 @@ import { auth, db } from '@/app/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import AdminNavbar from '@/app/components/AdminNavbar';
-import { ToastProvider } from '@/app/components/Toast';
+import { ToastProvider, useToast } from '@/app/components/Toast';
 import { markAllNotificationsAsRead, clearAllNotifications } from '@/app/actions/notificationActions';
+import { ConfirmationModal } from '@/app/components/common/NotificationComponent';
 
-export default function AdminLayout({ children }) {
+// Inner component to use Toast context within the provider
+function AdminLayoutContent({ children }) {
   const [loading, setLoading] = useState(true);
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
   const router = useRouter();
+  const { showToast } = useToast();
 
   useEffect(() => {
-    // ตรวจสอบสิทธิ์การเข้าถึง
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
       if (user) {
         const adminDocRef = doc(db, 'admins', user.uid);
@@ -33,40 +36,45 @@ export default function AdminLayout({ children }) {
       setLoading(false);
     });
 
-    // ดึงข้อมูลการแจ้งเตือนแบบ Real-time
     const notifQuery = query(collection(db, 'notifications'), orderBy('createdAt', 'desc'));
     const unsubscribeNotifs = onSnapshot(notifQuery, (querySnapshot) => {
         const notifsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setNotifications(notifsData);
-        // คำนวณจำนวนการแจ้งเตือนที่ยังไม่ได้อ่าน
         const unread = notifsData.filter(n => !n.isRead).length;
         setUnreadCount(unread);
     });
 
-    // Cleanup listeners เมื่อ component ถูกปิด
     return () => {
         unsubscribeAuth();
         unsubscribeNotifs();
     };
   }, [router]);
   
-  // ฟังก์ชันสำหรับเรียก Action 'อ่านทั้งหมด'
   const handleMarkAsRead = async () => {
       if (unreadCount > 0) {
-          await markAllNotificationsAsRead();
-          // onSnapshot จะอัปเดต unreadCount เป็น 0 ให้อัตโนมัติ
+          const result = await markAllNotificationsAsRead();
+          if(!result.success) showToast("เกิดข้อผิดพลาดในการอัปเดต", "error");
+      }
+  };
+  
+  const handleClearAllClick = () => {
+      if (notifications.length > 0) {
+          setShowClearConfirm(true);
+      } else {
+          showToast("ไม่มีการแจ้งเตือนให้ลบ", "info");
       }
   };
 
-  // ฟังก์ชันสำหรับเรียก Action 'ลบทั้งหมด'
   const handleClearAll = async () => {
-      if (notifications.length > 0 && window.confirm("คุณแน่ใจหรือไม่ว่าต้องการลบการแจ้งเตือนทั้งหมด?")) {
-          await clearAllNotifications();
-          // onSnapshot จะอัปเดต notifications เป็น [] ให้อัตโนมัติ
+      const result = await clearAllNotifications();
+      if(result.success){
+        showToast("ลบการแจ้งเตือนทั้งหมดแล้ว", "success");
+      } else {
+        showToast("เกิดข้อผิดพลาดในการลบ", "error");
       }
+      setShowClearConfirm(false);
   };
 
-  // UI ขณะกำลังตรวจสอบสิทธิ์
   if (loading) {
     return (
         <div className="flex items-center justify-center min-h-screen bg-gray-100">
@@ -77,23 +85,36 @@ export default function AdminLayout({ children }) {
     );
   }
 
-  // แสดง Layout ของ Admin เมื่อมีสิทธิ์เท่านั้น
   if (isAuthorized) {
     return (
-      <ToastProvider>
         <div className="min-h-screen bg-gray-100">
+          <ConfirmationModal
+              show={showClearConfirm}
+              title="ยืนยันการลบ"
+              message="คุณแน่ใจหรือไม่ว่าต้องการลบการแจ้งเตือนทั้งหมด?"
+              onConfirm={handleClearAll}
+              onCancel={() => setShowClearConfirm(false)}
+              isProcessing={false} 
+          />
           <AdminNavbar 
               notifications={notifications} 
               unreadCount={unreadCount} 
               onMarkAsRead={handleMarkAsRead}
-              onClearAll={handleClearAll}
+              onClearAll={handleClearAllClick}
           />
           <main>{children}</main>
         </div>
-      </ToastProvider>
     );
   }
 
-  // ถ้าไม่มีสิทธิ์ จะไม่แสดงอะไรเลย (เพราะถูก redirect ไปแล้ว)
   return null;
+}
+
+// Main Layout component that provides the Toast context
+export default function AdminLayout({ children }) {
+    return (
+        <ToastProvider>
+            <AdminLayoutContent>{children}</AdminLayoutContent>
+        </ToastProvider>
+    )
 }

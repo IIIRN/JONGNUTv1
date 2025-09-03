@@ -22,13 +22,15 @@ async function getNotificationSettings() {
     
     // Default settings if document doesn't exist
     return {
+      allNotifications: { enabled: true },
       adminNotifications: { enabled: true, newBooking: true, bookingCancelled: true, paymentReceived: true },
-      customerNotifications: { enabled: true, appointmentConfirmed: true, appointmentCancelled: true, appointmentReminder: true },
+      customerNotifications: { enabled: true, appointmentConfirmed: true, appointmentCancelled: true, appointmentReminder: true, reviewRequest: true, paymentInvoice: true },
     };
   } catch (error) {
     console.error('Error fetching notification settings:', error);
     // Return default enabled settings on error to avoid blocking critical notifications
     return {
+      allNotifications: { enabled: true },
       adminNotifications: { enabled: true },
       customerNotifications: { enabled: true },
     };
@@ -38,16 +40,16 @@ async function getNotificationSettings() {
 /**
  * Sends a push message to a single LINE user, checking customer notification settings first.
  */
-export async function sendLineMessage(to, messageText) {
+export async function sendLineMessage(to, messageText, notificationType) {
   if (!to || !messageText) {
     console.error("Missing 'to' or 'messageText'");
     return { success: false, error: "Missing recipient or message." };
   }
   
   const settings = await getNotificationSettings();
-  if (!settings.customerNotifications?.enabled) {
-      console.log("Customer LINE notifications are disabled. Skipping message.");
-      return { success: true, message: "Customer notifications disabled." };
+  if (!settings.allNotifications?.enabled || !settings.customerNotifications?.enabled || (notificationType && !settings.customerNotifications[notificationType])) {
+      console.log(`Customer LINE notifications are disabled for type: ${notificationType || 'general'}. Skipping message.`);
+      return { success: true, message: "Customer notifications disabled for this type." };
   }
 
   try {
@@ -65,7 +67,7 @@ export async function sendLineMessage(to, messageText) {
  */
 export async function sendLineMessageToAllAdmins(messageText) {
   const settings = await getNotificationSettings();
-  if (!settings.adminNotifications?.enabled) {
+  if (!settings.allNotifications?.enabled || !settings.adminNotifications?.enabled) {
       console.log("Admin LINE notifications are disabled. Skipping message.");
       return { success: true, message: "Admin notifications disabled." };
   }
@@ -100,7 +102,7 @@ export async function sendLineMessageToAllAdmins(messageText) {
  */
 export async function sendBookingNotification(bookingData, notificationType) {
   const settings = await getNotificationSettings();
-  if (!settings.adminNotifications?.enabled || !settings.adminNotifications?.[notificationType]) {
+  if (!settings.allNotifications?.enabled || !settings.adminNotifications?.enabled || !settings.adminNotifications?.[notificationType]) {
     console.log(`Admin notification type "${notificationType}" is disabled.`);
     return { success: true, message: "Notification type disabled for admins." };
   }
@@ -145,25 +147,5 @@ export async function sendBookingNotification(bookingData, notificationType) {
  * Send reminder notification to customer
  */
 export async function sendReminderNotification(customerLineId, bookingData) {
-  const settings = await getNotificationSettings();
-  if (!settings.customerNotifications?.enabled || !settings.customerNotifications?.appointmentReminder) {
-      console.log("Customer reminder notifications are disabled. Skipping message.");
-      return { success: true, message: "Customer reminder notifications disabled." };
-  }
-
-  if (!customerLineId) {
-    return { success: false, error: "No customer LINE ID" };
-  }
-
-  const { serviceName, appointmentDate, appointmentTime, shopName = 'ร้านเสริมสวย' } = bookingData;
-  
-  const message = `🔔 แจ้งเตือนการนัดหมาย\n\n` +
-                 `สวัสดีค่ะ! อีก 1 ชั่วโมงจะถึงเวลานัดหมายของคุณแล้ว\n\n` +
-                 `💅 บริการ: ${serviceName}\n` +
-                 `📅 วันที่: ${appointmentDate}\n` +
-                 `⏰ เวลา: ${appointmentTime}\n` +
-                 `🏪 ${shopName}\n\n` +
-                 `กรุณามาตรงเวลานะคะ ขอบคุณค่ะ ✨`;
-
-  return await sendLineMessage(customerLineId, message);
+    return await sendLineMessage(customerLineId, `🔔 แจ้งเตือนการนัดหมาย\n\nสวัสดีค่ะ! อีก 1 ชั่วโมงจะถึงเวลานัดหมายของคุณแล้ว\n\n💅 บริการ: ${bookingData.serviceName}\n📅 วันที่: ${bookingData.appointmentDate}\n⏰ เวลา: ${bookingData.appointmentTime}\n🏪 ${bookingData.shopName || 'ร้านเสริมสวย'}\n\nกรุณามาตรงเวลานะคะ ขอบคุณค่ะ ✨`, 'appointmentReminder');
 }

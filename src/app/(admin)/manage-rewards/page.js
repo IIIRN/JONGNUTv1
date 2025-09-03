@@ -4,10 +4,15 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { db } from '@/app/lib/firebase';
 import { collection, getDocs, query, orderBy, doc, deleteDoc } from 'firebase/firestore';
+import { ConfirmationModal } from '@/app/components/common/NotificationComponent';
+import { useToast } from '@/app/components/Toast';
 
 export default function AdminRewardsPage() {
     const [rewards, setRewards] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [rewardToDelete, setRewardToDelete] = useState(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const { showToast } = useToast();
 
     useEffect(() => {
         const fetchRewards = async () => {
@@ -18,6 +23,7 @@ export default function AdminRewardsPage() {
                 setRewards(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
             } catch (error) {
                 console.error("Error fetching rewards: ", error);
+                showToast("เกิดข้อผิดพลาดในการโหลดข้อมูลของรางวัล", "error");
             } finally {
                 setLoading(false);
             }
@@ -25,15 +31,22 @@ export default function AdminRewardsPage() {
         fetchRewards();
     }, []);
 
-    const handleDelete = async (id, name) => {
-        if (window.confirm(`คุณแน่ใจหรือไม่ว่าต้องการลบของรางวัล "${name}"?`)) {
-            try {
-                await deleteDoc(doc(db, 'rewards', id));
-                setRewards(prev => prev.filter(r => r.id !== id));
-                alert('ลบของรางวัลสำเร็จ!');
-            } catch (error) {
-                alert(`เกิดข้อผิดพลาด: ${error.message}`);
-            }
+    const handleDelete = (reward) => {
+        setRewardToDelete(reward);
+    };
+
+    const confirmDelete = async () => {
+        if (!rewardToDelete) return;
+        setIsDeleting(true);
+        try {
+            await deleteDoc(doc(db, 'rewards', rewardToDelete.id));
+            setRewards(prev => prev.filter(r => r.id !== rewardToDelete.id));
+            showToast('ลบของรางวัลสำเร็จ!', 'success');
+        } catch (error) {
+            showToast(`เกิดข้อผิดพลาด: ${error.message}`, 'error');
+        } finally {
+            setIsDeleting(false);
+            setRewardToDelete(null);
         }
     };
     
@@ -41,6 +54,14 @@ export default function AdminRewardsPage() {
 
     return (
         <div className="container mx-auto p-4 md:p-8">
+            <ConfirmationModal
+                show={!!rewardToDelete}
+                title="ยืนยันการลบ"
+                message={`คุณแน่ใจหรือไม่ว่าต้องการลบของรางวัล "${rewardToDelete?.name}"?`}
+                onConfirm={confirmDelete}
+                onCancel={() => setRewardToDelete(null)}
+                isProcessing={isDeleting}
+            />
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-bold text-slate-800">จัดการของรางวัล</h1>
                 <Link href="/manage-rewards/add" className="bg-slate-800 text-white px-5 py-2 rounded-lg font-semibold shadow hover:bg-slate-700">
@@ -64,7 +85,7 @@ export default function AdminRewardsPage() {
                              <div className="flex justify-between items-center">
                                 <p className="text-xl font-bold text-gray-800">{reward.pointsRequired} <span className="text-sm font-normal text-gray-500">คะแนน</span></p>
                                 <button
-                                    onClick={() => handleDelete(reward.id, reward.name)}
+                                    onClick={() => handleDelete(reward)}
                                     className="text-sm bg-red-100 text-red-700 px-3 py-1 rounded-md hover:bg-red-200"
                                 >
                                     ลบ

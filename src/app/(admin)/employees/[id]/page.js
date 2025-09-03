@@ -6,7 +6,9 @@ import { db } from '@/app/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import Image from 'next/image';
 import Link from 'next/link';
-import { promoteEmployeeToAdmin } from '@/app/actions/employeeActions'; // [!code focus]
+import { promoteEmployeeToAdmin } from '@/app/actions/employeeActions';
+import { ConfirmationModal } from '@/app/components/common/NotificationComponent';
+import { useToast } from '@/app/components/Toast';
 
 const DetailRow = ({ label, value }) => (
     <div className="flex justify-between items-center py-2 border-b">
@@ -18,10 +20,12 @@ const DetailRow = ({ label, value }) => (
 export default function EmployeeDetailPage() {
     const [employee, setEmployee] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [isPromoting, setIsPromoting] = useState(false); // [!code focus]
+    const [isPromoting, setIsPromoting] = useState(false);
+    const [showPromoteConfirm, setShowPromoteConfirm] = useState(false);
     const params = useParams();
     const router = useRouter();
     const { id } = params;
+    const { showToast } = useToast();
 
     useEffect(() => {
         if (!id) return;
@@ -32,45 +36,48 @@ export default function EmployeeDetailPage() {
             if (docSnap.exists()) {
                 setEmployee({ id: docSnap.id, ...docSnap.data() });
             } else {
-                // If not found in employees, check if they are already an admin
                 const adminRef = doc(db, 'admins', id);
                 const adminSnap = await getDoc(adminRef);
                 if(adminSnap.exists()){
-                     alert("บุคคลนี้เป็น Admin อยู่แล้ว");
-                     router.push('/employees'); // Redirect back to employee list
+                     showToast("บุคคลนี้เป็น Admin อยู่แล้ว", "warning");
+                     router.push('/employees');
                 } else {
-                    alert("ไม่พบข้อมูลผู้ใช้");
+                    showToast("ไม่พบข้อมูลผู้ใช้", "error");
                     router.push('/employees');
                 }
             }
             setLoading(false);
         };
         fetchEmployee();
-    }, [id, router]);
+    }, [id, router, showToast]);
 
-    // [!code focus start]
     const handlePromote = async () => {
         if (!employee) return;
-        if (window.confirm(`คุณต้องการเลื่อนตำแหน่ง ${employee.firstName} เป็น Admin ใช่หรือไม่?`)) {
-            setIsPromoting(true);
-            const result = await promoteEmployeeToAdmin(employee.id);
-            if (result.success) {
-                alert('เลื่อนตำแหน่งสำเร็จ!');
-                router.push('/employees');
-            } else {
-                alert(`เกิดข้อผิดพลาด: ${result.error}`);
-                setIsPromoting(false);
-            }
+        setIsPromoting(true);
+        const result = await promoteEmployeeToAdmin(employee.id);
+        if (result.success) {
+            showToast('เลื่อนตำแหน่งสำเร็จ!', 'success');
+            router.push('/employees');
+        } else {
+            showToast(`เกิดข้อผิดพลาด: ${result.error}`, 'error');
+            setIsPromoting(false);
         }
+        setShowPromoteConfirm(false);
     };
-    // [!code focus end]
-
 
     if (loading) return <div className="text-center mt-20">กำลังโหลดข้อมูล...</div>;
     if (!employee) return null;
 
     return (
         <div className="container mx-auto p-4 md:p-8">
+            <ConfirmationModal
+                show={showPromoteConfirm}
+                title="ยืนยันการเลื่อนตำแหน่ง"
+                message={`คุณต้องการเลื่อนตำแหน่ง ${employee.firstName} เป็น Admin ใช่หรือไม่?`}
+                onConfirm={handlePromote}
+                onCancel={() => setShowPromoteConfirm(false)}
+                isProcessing={isPromoting}
+            />
             <div className="max-w-xl mx-auto bg-white rounded-lg shadow-md p-6">
                 <div className="flex flex-col items-center">
                     <Image
@@ -89,10 +96,9 @@ export default function EmployeeDetailPage() {
                     <DetailRow label="LINE User ID" value={employee.lineUserId} />
                     <DetailRow label="Email" value={employee.email} />
                 </div>
-                 {/* [!code focus start] */}
                  <div className="mt-6 flex justify-end gap-4">
                     <button
-                        onClick={handlePromote}
+                        onClick={() => setShowPromoteConfirm(true)}
                         disabled={isPromoting}
                         className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 disabled:bg-gray-400"
                     >
@@ -102,7 +108,6 @@ export default function EmployeeDetailPage() {
                         แก้ไขข้อมูล
                     </Link>
                 </div>
-                 {/* [!code focus end] */}
             </div>
         </div>
     );

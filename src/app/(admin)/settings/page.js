@@ -6,6 +6,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { saveNotificationSettings, saveBookingSettings } from '@/app/actions/settingsActions';
 import { fetchAllAdmins } from '@/app/actions/adminActions';
 import { sendDailyReportNow } from '@/app/actions/reportActions'; 
+import { useToast } from '@/app/components/Toast';
 
 // --- Helper Components ---
 
@@ -16,23 +17,25 @@ const SettingsCard = ({ title, children, className = '' }) => (
     </div>
 );
 
-const Toggle = ({ label, checked, onChange }) => (
+const Toggle = ({ label, checked, onChange, disabled = false }) => (
     <div className="flex items-center justify-between">
-        <span className="font-medium text-gray-700">{label}</span>
+        <span className={`font-medium ${disabled ? 'text-gray-400' : 'text-gray-700'}`}>{label}</span>
         <label className="relative inline-flex items-center cursor-pointer">
-            <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} className="sr-only peer" />
-            <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+            <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} className="sr-only peer" disabled={disabled} />
+            <div className={`w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all ${disabled ? 'peer-checked:bg-gray-400' : 'peer-checked:bg-blue-600'}`}></div>
         </label>
     </div>
 );
+
 
 // --- Main Page Component ---
 
 export default function AdminSettingsPage() {
     const [settings, setSettings] = useState({
+        allNotifications: { enabled: true },
         reportRecipients: [],
         adminNotifications: { enabled: true, newBooking: true, bookingCancelled: true, paymentReceived: true },
-        customerNotifications: { enabled: true, appointmentConfirmed: true, appointmentCancelled: true, appointmentReminder: true },
+        customerNotifications: { enabled: true, appointmentConfirmed: true, appointmentCancelled: true, appointmentReminder: true, reviewRequest: true, paymentInvoice: true },
     });
     const [bookingSettings, setBookingSettings] = useState({ 
         useBeautician: false,
@@ -45,7 +48,7 @@ export default function AdminSettingsPage() {
     const [loading, setLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [isSending, setIsSending] = useState(false); 
-    const [message, setMessage] = useState('');
+    const { showToast } = useToast();
 
     useEffect(() => {
         const fetchInitialData = async () => {
@@ -70,13 +73,13 @@ export default function AdminSettingsPage() {
 
             } catch (error) {
                 console.error("Error fetching initial data:", error);
-                setMessage('เกิดข้อผิดพลาดในการโหลดข้อมูล');
+                showToast('เกิดข้อผิดพลาดในการโหลดข้อมูล', 'error');
             } finally {
                 setLoading(false);
             }
         };
         fetchInitialData();
-    }, []);
+    }, [showToast]);
 
     const handleNotificationChange = (group, key, value) => {
         setSettings(prev => ({
@@ -95,9 +98,7 @@ export default function AdminSettingsPage() {
 
     const handleSave = async () => {
         setIsSaving(true);
-        setMessage('');
         try {
-            // Create clean copies of the settings objects without Timestamp fields
             const { updatedAt: nUpdatedAt, ...notificationData } = settings;
             const { updatedAt: bUpdatedAt, ...cleanBookingSettings } = bookingSettings;
 
@@ -107,33 +108,30 @@ export default function AdminSettingsPage() {
                 saveBookingSettings(cleanBookingSettings)
             ]);
             if (results.every(r => r.success)) {
-                setMessage('บันทึกการตั้งค่าสำเร็จ!');
+                showToast('บันทึกการตั้งค่าสำเร็จ!', 'success');
             } else {
                 throw new Error('มีข้อผิดพลาดในการบันทึก');
             }
         } catch (error) {
-            setMessage(`เกิดข้อผิดพลาด: ${error.message}`);
+            showToast(`เกิดข้อผิดพลาด: ${error.message}`, 'error');
         } finally {
             setIsSaving(false);
-            setTimeout(() => setMessage(''), 3000);
         }
     };
     
     const handleSendNow = async () => {
         setIsSending(true);
-        setMessage('');
         try {
             const result = await sendDailyReportNow();
             if (result.success) {
-                setMessage(result.message || 'ส่ง Report สำเร็จ!');
+                showToast(result.message || 'ส่ง Report สำเร็จ!', 'success');
             } else {
                 throw new Error(result.error);
             }
         } catch (error) {
-             setMessage(`เกิดข้อผิดพลาด: ${error.message}`);
+             showToast(`เกิดข้อผิดพลาด: ${error.message}`, 'error');
         } finally {
             setIsSending(false);
-            setTimeout(() => setMessage(''), 5000);
         }
     };
 
@@ -151,7 +149,6 @@ export default function AdminSettingsPage() {
                     {isSaving ? 'กำลังบันทึก...' : 'บันทึกการตั้งค่า'}
                 </button>
             </div>
-             {message && <p className="text-center text-sm text-green-600 mb-4">{message}</p>}
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
                 {/* --- Column 1: Booking & Time --- */}
@@ -182,6 +179,22 @@ export default function AdminSettingsPage() {
                                 ))}
                             </div>
                         </div>
+                    </SettingsCard>
+                                <SettingsCard title="ตั้งค่า Report สรุปรายวัน">
+                        <div>
+                            <label className="block text-xs font-medium text-gray-700">เลือกผู้รับ Report</label>
+                            <div className="mt-1 space-y-1 border p-2 rounded-md max-h-24 overflow-y-auto">
+                                {allAdmins.map(admin => (
+                                    <div key={admin.id} className="flex items-center">
+                                        <input id={`admin-${admin.id}`} type="checkbox" value={admin.id} checked={(settings.reportRecipients || []).includes(admin.id)} onChange={handleRecipientChange} className="h-4 w-4 text-indigo-600 border-gray-300 rounded"/>
+                                        <label htmlFor={`admin-${admin.id}`} className="ml-2 text-sm text-gray-900">{admin.firstName} {admin.lastName}</label>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                        <button onClick={handleSendNow} disabled={isSending} className="w-full bg-green-600 text-white px-4 py-2 rounded-lg font-semibold shadow hover:bg-green-700 disabled:bg-gray-400 text-sm">
+                            {isSending ? 'กำลังส่ง...' : 'ส่ง Report วันนี้ทันที'}
+                        </button>
                     </SettingsCard>
                 </div>
 
@@ -227,40 +240,29 @@ export default function AdminSettingsPage() {
                 {/* --- Column 3: Notifications & Reports --- */}
                 <div className="space-y-6">
                     <SettingsCard title="การแจ้งเตือน LINE">
-                        <Toggle label="แจ้งเตือน Admin ทั้งหมด" checked={settings.adminNotifications.enabled} onChange={(value) => handleNotificationChange('adminNotifications', 'enabled', value)}/>
+                        <Toggle label="เปิดการแจ้งเตือนทั้งหมด" checked={settings.allNotifications.enabled} onChange={(value) => handleNotificationChange('allNotifications', 'enabled', value)}/>
+                        <hr/>
+                        <Toggle label="แจ้งเตือน Admin" checked={settings.adminNotifications.enabled} onChange={(value) => handleNotificationChange('adminNotifications', 'enabled', value)} disabled={!settings.allNotifications.enabled} />
                         {settings.adminNotifications.enabled && (
                             <div className="pl-4 border-l-2 ml-4 space-y-2 text-xs">
-                                <Toggle label="เมื่อมีการจองใหม่" checked={settings.adminNotifications.newBooking} onChange={(value) => handleNotificationChange('adminNotifications', 'newBooking', value)} />
-                                <Toggle label="เมื่อมีการยกเลิก" checked={settings.adminNotifications.bookingCancelled} onChange={(value) => handleNotificationChange('adminNotifications', 'bookingCancelled', value)} />
-                                <Toggle label="เมื่อมีการชำระเงิน" checked={settings.adminNotifications.paymentReceived} onChange={(value) => handleNotificationChange('adminNotifications', 'paymentReceived', value)} />
+                                <Toggle label="เมื่อมีการจองใหม่" checked={settings.adminNotifications.newBooking} onChange={(value) => handleNotificationChange('adminNotifications', 'newBooking', value)} disabled={!settings.allNotifications.enabled} />
+                                <Toggle label="เมื่อมีการยกเลิก" checked={settings.adminNotifications.bookingCancelled} onChange={(value) => handleNotificationChange('adminNotifications', 'bookingCancelled', value)} disabled={!settings.allNotifications.enabled}/>
+                                <Toggle label="เมื่อมีการชำระเงิน" checked={settings.adminNotifications.paymentReceived} onChange={(value) => handleNotificationChange('adminNotifications', 'paymentReceived', value)} disabled={!settings.allNotifications.enabled}/>
                             </div>
                         )}
                         <hr/>
-                        <Toggle label="แจ้งเตือนลูกค้า ทั้งหมด" checked={settings.customerNotifications.enabled} onChange={(value) => handleNotificationChange('customerNotifications', 'enabled', value)}/>
+                        <Toggle label="แจ้งเตือนลูกค้า" checked={settings.customerNotifications.enabled} onChange={(value) => handleNotificationChange('customerNotifications', 'enabled', value)} disabled={!settings.allNotifications.enabled}/>
                         {settings.customerNotifications.enabled && (
                             <div className="pl-4 border-l-2 ml-4 space-y-2 text-xs">
-                                <Toggle label="เมื่อยืนยันการนัดหมาย" checked={settings.customerNotifications.appointmentConfirmed} onChange={(value) => handleNotificationChange('customerNotifications', 'appointmentConfirmed', value)} />
-                                <Toggle label="เมื่อยกเลิกการนัดหมาย" checked={settings.customerNotifications.appointmentCancelled} onChange={(value) => handleNotificationChange('customerNotifications', 'appointmentCancelled', value)} />
-                                <Toggle label="แจ้งเตือนล่วงหน้า 1 ชม." checked={settings.customerNotifications.appointmentReminder} onChange={(value) => handleNotificationChange('customerNotifications', 'appointmentReminder', value)} />
+                                <Toggle label="เมื่อยืนยันการนัดหมาย" checked={settings.customerNotifications.appointmentConfirmed} onChange={(value) => handleNotificationChange('customerNotifications', 'appointmentConfirmed', value)} disabled={!settings.allNotifications.enabled}/>
+                                <Toggle label="เมื่อยกเลิกการนัดหมาย" checked={settings.customerNotifications.appointmentCancelled} onChange={(value) => handleNotificationChange('customerNotifications', 'appointmentCancelled', value)} disabled={!settings.allNotifications.enabled}/>
+                                <Toggle label="แจ้งเตือนล่วงหน้า 1 ชม." checked={settings.customerNotifications.appointmentReminder} onChange={(value) => handleNotificationChange('customerNotifications', 'appointmentReminder', value)} disabled={!settings.allNotifications.enabled}/>
+                                <Toggle label="แจ้งเตือนชำระเงิน" checked={settings.customerNotifications.paymentInvoice} onChange={(value) => handleNotificationChange('customerNotifications', 'paymentInvoice', value)} disabled={!settings.allNotifications.enabled}/>
+                                <Toggle label="แจ้งเตือนขอรีวิว" checked={settings.customerNotifications.reviewRequest} onChange={(value) => handleNotificationChange('customerNotifications', 'reviewRequest', value)} disabled={!settings.allNotifications.enabled}/>
                             </div>
                         )}
                     </SettingsCard>
-                    <SettingsCard title="ตั้งค่า Report สรุปรายวัน">
-                        <div>
-                            <label className="block text-xs font-medium text-gray-700">เลือกผู้รับ Report</label>
-                            <div className="mt-1 space-y-1 border p-2 rounded-md max-h-24 overflow-y-auto">
-                                {allAdmins.map(admin => (
-                                    <div key={admin.id} className="flex items-center">
-                                        <input id={`admin-${admin.id}`} type="checkbox" value={admin.id} checked={(settings.reportRecipients || []).includes(admin.id)} onChange={handleRecipientChange} className="h-4 w-4 text-indigo-600 border-gray-300 rounded"/>
-                                        <label htmlFor={`admin-${admin.id}`} className="ml-2 text-sm text-gray-900">{admin.firstName} {admin.lastName}</label>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                        <button onClick={handleSendNow} disabled={isSending} className="w-full bg-green-600 text-white px-4 py-2 rounded-lg font-semibold shadow hover:bg-green-700 disabled:bg-gray-400 text-sm">
-                            {isSending ? 'กำลังส่ง...' : 'ส่ง Report วันนี้ทันที'}
-                        </button>
-                    </SettingsCard>
+        
                 </div>
             </div>
         </div>

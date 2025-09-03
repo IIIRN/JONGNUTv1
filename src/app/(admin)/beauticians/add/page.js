@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { db } from '@/app/lib/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import Link from 'next/link';
+import { useToast } from '@/app/components/Toast';
 
 export default function AddBeauticianPage() {
   const [formData, setFormData] = useState({ 
@@ -17,6 +18,7 @@ export default function AddBeauticianPage() {
   });
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const { showToast } = useToast();
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -27,7 +29,7 @@ export default function AddBeauticianPage() {
     e.preventDefault();
     setLoading(true);
     if (!formData.firstName || !formData.phoneNumber) {
-      alert("กรุณากรอกชื่อ และเบอร์โทร");
+      showToast("กรุณากรอกชื่อ และเบอร์โทร", "error");
       setLoading(false);
       return;
     }
@@ -36,11 +38,11 @@ export default function AddBeauticianPage() {
         ...formData,
         createdAt: serverTimestamp(),
       });
-      alert("เพิ่มช่างใหม่สำเร็จ!");
-    router.push('/beauticians');
+      showToast("เพิ่มช่างใหม่สำเร็จ!", "success");
+      router.push('/beauticians');
     } catch (error) {
       console.error("Error adding document: ", error);
-      alert("เกิดข้อผิดพลาด: " + error.message);
+      showToast("เกิดข้อผิดพลาด: " + error.message, "error");
       setLoading(false);
     }
   };

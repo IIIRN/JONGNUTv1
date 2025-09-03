@@ -5,7 +5,13 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { db } from '@/app/lib/firebase';
 import { doc, getDoc, deleteDoc } from 'firebase/firestore';
-import { updateAppointmentStatusByAdmin, confirmAppointmentAndPaymentByAdmin } from '@/app/actions/appointmentActions';
+import { updateAppointmentStatusByAdmin, confirmAppointmentAndPaymentByAdmin, sendInvoiceToCustomer } from '@/app/actions/appointmentActions';
+import { ConfirmationModal } from '@/app/components/common/NotificationComponent';
+import { useToast } from '@/app/components/Toast';
+import { format } from 'date-fns';
+import { th } from 'date-fns/locale';
+import Image from 'next/image';
+
 // Modal for editing payment info
 function EditPaymentModal({ open, onClose, onSave, defaultAmount, defaultMethod }) {
   const [amount, setAmount] = useState(defaultAmount || '');
@@ -45,9 +51,6 @@ const STATUS_OPTIONS = [
   { value: 'completed', label: 'เสร็จสิ้น' },
   { value: 'cancelled', label: 'ยกเลิก' },
 ];
-import { format } from 'date-fns';
-import { th } from 'date-fns/locale';
-import Image from 'next/image';
 
 const InfoRow = ({ label, value }) => (
   <div className="flex justify-between items-start text-sm py-1">
@@ -71,7 +74,6 @@ const formatPrice = (v) => {
   return Number.isFinite(n) ? n.toLocaleString() : String(v);
 };
 
-// --- Status & Color Definitions (Added for badge consistency) ---
 const STATUSES = {
     awaiting_confirmation: { label: 'รอยืนยัน', color: 'bg-yellow-100 text-yellow-800' },
     confirmed: { label: 'ยืนยันแล้ว', color: 'bg-blue-100 text-blue-800' },
@@ -89,15 +91,20 @@ export default function AdminAppointmentDetail() {
   const [updating, setUpdating] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showEditPayment, setShowEditPayment] = useState(false);
-  // Save payment info
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [statusChangeInfo, setStatusChangeInfo] = useState(null);
+  const [isSendingInvoice, setIsSendingInvoice] = useState(false);
+  const { showToast } = useToast();
+
   const handleSavePayment = async (amount, method) => {
     if (!appointment?.id) return;
     try {
       const result = await confirmAppointmentAndPaymentByAdmin(appointment.id, 'admin', { amount: Number(amount), method });
       if (result.success) {
-        alert('อัพเดตข้อมูลการชำระเงินสำเร็จ');
+        showToast('อัพเดตข้อมูลการชำระเงินสำเร็จ', 'success');
         setAppointment(prev => ({
           ...prev,
+          status: 'confirmed', // Update status to confirmed
           paymentInfo: {
             ...prev.paymentInfo,
             amountPaid: Number(amount),
@@ -108,55 +115,75 @@ export default function AdminAppointmentDetail() {
         }));
         setShowEditPayment(false);
       } else {
-        alert('เกิดข้อผิดพลาด: ' + result.error);
+        showToast(`เกิดข้อผิดพลาด: ${result.error}`, 'error');
       }
     } catch (err) {
-      alert('เกิดข้อผิดพลาด: ' + err.message);
+      showToast(`เกิดข้อผิดพลาด: ${err.message}`, 'error');
     }
   };
 
-  const handleStatusChange = async (e) => {
-    const newStatus = e.target.value;
-    const currentStatus = appointment.status;
-    if (!appointment?.id || newStatus === currentStatus) return;
-
+  const handleStatusChange = (newStatus) => {
+    if (newStatus === appointment.status) return;
     const statusLabel = STATUS_OPTIONS.find(opt => opt.value === newStatus)?.label || newStatus;
+    setStatusChangeInfo({ newStatus, statusLabel });
+  };
 
-    if (window.confirm(`คุณแน่ใจหรือไม่ว่าต้องการเปลี่ยนสถานะเป็น "${statusLabel}"? การดำเนินการนี้จะส่งการแจ้งเตือนไปยังลูกค้า`)) {
-        setUpdating(true);
-        try {
-            const result = await updateAppointmentStatusByAdmin(appointment.id, newStatus);
-            if (result.success) {
-                alert('อัพเดทสถานะสำเร็จ และส่งการแจ้งเตือนแล้ว');
-                setAppointment(prev => ({ ...prev, status: newStatus, updatedAt: new Date() }));
-            } else {
-                throw new Error(result.error);
-            }
-        } catch (err) {
-            alert(`อัพเดทสถานะไม่สำเร็จ: ${err.message}`);
-            e.target.value = currentStatus;
-        } finally {
-            setUpdating(false);
-        }
-    } else {
-        e.target.value = currentStatus;
+  const confirmStatusChange = async () => {
+    if (!statusChangeInfo) return;
+    const { newStatus } = statusChangeInfo;
+    setUpdating(true);
+    try {
+      const result = await updateAppointmentStatusByAdmin(appointment.id, newStatus);
+      if (result.success) {
+        showToast('อัพเดทสถานะสำเร็จ และส่งการแจ้งเตือนแล้ว', 'success');
+        setAppointment(prev => ({ ...prev, status: newStatus, updatedAt: new Date() }));
+      } else {
+        throw new Error(result.error);
+      }
+    } catch (err) {
+      showToast(`อัพเดทสถานะไม่สำเร็จ: ${err.message}`, 'error');
+    } finally {
+      setUpdating(false);
+      setStatusChangeInfo(null);
     }
   };
 
   const handleDelete = async () => {
     if (!appointment?.id) return;
-    if (!window.confirm('ยืนยันการลบการจองนี้?')) return;
     setDeleting(true);
     try {
       await deleteDoc(doc(db, 'appointments', appointment.id));
-      alert('ลบการจองสำเร็จ');
+      showToast('ลบการจองสำเร็จ', 'success');
       router.push('/dashboard');
     } catch (err) {
-      alert('ลบการจองไม่สำเร็จ');
+      showToast('ลบการจองไม่สำเร็จ', 'error');
     } finally {
       setDeleting(false);
+      setShowDeleteConfirm(false);
     }
   };
+
+  const handleSendInvoice = async () => {
+    if (!appointment?.id) return;
+    setIsSendingInvoice(true);
+    try {
+        const result = await sendInvoiceToCustomer(appointment.id);
+        if(result.success) {
+            showToast('ส่งลิงก์ชำระเงินให้ลูกค้าแล้ว', 'success');
+            setAppointment(prev => ({
+                ...prev,
+                paymentInfo: { ...prev.paymentInfo, paymentStatus: 'invoiced' }
+            }));
+        } else {
+            throw new Error(result.error);
+        }
+    } catch (err) {
+        showToast(`เกิดข้อผิดพลาด: ${err.message}`, 'error');
+    } finally {
+        setIsSendingInvoice(false);
+    }
+  };
+
 
   useEffect(() => {
     if (!id) return;
@@ -166,7 +193,7 @@ export default function AdminAppointmentDetail() {
         const ref = doc(db, 'appointments', id);
         const snap = await getDoc(ref);
         if (!snap.exists()) {
-          alert('ไม่พบข้อมูลการนัดหมาย');
+          showToast('ไม่พบข้อมูลการนัดหมาย', 'error');
           router.push('/dashboard');
           return;
         }
@@ -178,7 +205,7 @@ export default function AdminAppointmentDetail() {
       }
     };
     fetchData();
-  }, [id, router]);
+  }, [id, router, showToast]);
 
   if (loading) return <div className="text-center mt-20">กำลังโหลดข้อมูล...</div>;
   if (!appointment) return <div className="text-center mt-20">ไม่พบข้อมูลการนัดหมาย</div>;
@@ -191,6 +218,22 @@ export default function AdminAppointmentDetail() {
 
   return (
     <div className="container mx-auto p-4 md:p-8">
+        <ConfirmationModal
+            show={showDeleteConfirm}
+            title="ยืนยันการลบ"
+            message="คุณแน่ใจหรือไม่ว่าต้องการลบการจองนี้?"
+            onConfirm={handleDelete}
+            onCancel={() => setShowDeleteConfirm(false)}
+            isProcessing={deleting}
+        />
+        <ConfirmationModal
+            show={!!statusChangeInfo}
+            title="ยืนยันการเปลี่ยนสถานะ"
+            message={`คุณต้องการเปลี่ยนสถานะเป็น "${statusChangeInfo?.statusLabel}" หรือไม่? การดำเนินการนี้จะส่งแจ้งเตือนไปยังลูกค้า`}
+            onConfirm={confirmStatusChange}
+            onCancel={() => setStatusChangeInfo(null)}
+            isProcessing={updating}
+        />
       <div className="mb-6 flex flex-col md:flex-row md:items-start md:justify-between gap-4">
         <div>
           <h1 className="text-2xl text-black md:text-3xl font-bold">รายละเอียดนัดหมาย #{appointment.id.substring(0,6).toUpperCase()}</h1>
@@ -201,7 +244,7 @@ export default function AdminAppointmentDetail() {
           </div>
         </div>
         <button
-          onClick={handleDelete}
+          onClick={() => setShowDeleteConfirm(true)}
           className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md disabled:bg-red-300 self-start md:self-center"
           disabled={deleting}
         >
@@ -210,7 +253,7 @@ export default function AdminAppointmentDetail() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {/* ข้อมูลลูกค้า */}
+        {/* Customer Information */}
         <div className="bg-white p-6 rounded-lg shadow-md space-y-2">
           <h2 className="text-xl font-bold mb-2">ข้อมูลลูกค้า</h2>
           <InfoRow label="ชื่อ" value={appointment.customerInfo?.fullName || appointment.customerInfo?.name || '-'} />
@@ -221,24 +264,29 @@ export default function AdminAppointmentDetail() {
               : '-'
           } />
           <InfoRow label="หมายเหตุ" value={appointment.customerInfo?.note || appointment.note || '-'} />
-          <div className="flex items-center gap-2 text-gray-500 mt-4 border-t pt-4">
+          <div className="flex flex-wrap items-center gap-2 text-gray-500 mt-4 border-t pt-4">
             <span>เปลี่ยนสถานะ:</span>
-            <select
-              className="border rounded px-2 py-1 text-sm"
-              value={appointment.status || ''}
-              onChange={handleStatusChange}
-              disabled={updating}
-            >
-              <option value="">-</option>
-              {STATUS_OPTIONS.map(opt => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
+            <div className="flex flex-wrap gap-2">
+                {STATUS_OPTIONS.map(opt => (
+                    <button
+                        key={opt.value}
+                        onClick={() => handleStatusChange(opt.value)}
+                        disabled={updating || appointment.status === opt.value}
+                        className={`px-3 py-1 text-xs font-semibold rounded-full ${
+                            appointment.status === opt.value
+                                ? 'bg-blue-600 text-white cursor-not-allowed'
+                                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        } disabled:opacity-50 disabled:cursor-not-allowed`}
+                    >
+                        {opt.label}
+                    </button>
+                ))}
+            </div>
             {updating && <span className="text-xs text-blue-500 ml-2">กำลังอัพเดท...</span>}
           </div>
         </div>
 
-        {/* ข้อมูลบริการ */}
+        {/* Service Information */}
         <div className="bg-white p-6 rounded-lg shadow-md space-y-2">
           <h2 className="text-xl font-bold mb-2">ข้อมูลบริการ</h2>
           <div className="flex items-start gap-4 mb-2">
@@ -279,7 +327,7 @@ export default function AdminAppointmentDetail() {
           )}
         </div>
 
-        {/* สรุปการชำระเงิน */}
+        {/* Payment Summary */}
         <div className="bg-white text-black p-6 rounded-lg shadow-md space-y-2">
           <h2 className="text-xl font-bold mb-2">สรุปการชำระเงิน</h2>
           <InfoRow label="ราคาบริการ" value={
@@ -325,12 +373,19 @@ export default function AdminAppointmentDetail() {
             : appointment.paymentInfo?.paymentStatus === 'pending' ? 'รอดำเนินการ'
             : appointment.paymentInfo?.paymentStatus || '-'
           } />
-          <div className="border-t mt-3 pt-3 space-y-1">
+          <div className="border-t mt-3 pt-3 space-y-2">
             <InfoRow label="สร้างเมื่อ" value={safeDate(appointment.createdAt) ? format(safeDate(appointment.createdAt), 'dd MMM yyyy, HH:mm', { locale: th }) : '-'} />
             <InfoRow label="อัพเดตล่าสุด" value={safeDate(appointment.updatedAt) ? format(safeDate(appointment.updatedAt), 'dd MMM yyyy, HH:mm', { locale: th }) : '-'} />
+            <button
+                onClick={handleSendInvoice}
+                disabled={isSendingInvoice || appointment.paymentInfo?.paymentStatus === 'paid'}
+                className="w-full bg-blue-600 text-white py-2 rounded-md mt-2 hover:bg-blue-700 disabled:bg-gray-400"
+            >
+                {isSendingInvoice ? 'กำลังส่ง...' : 'ส่งลิงก์ชำระเงิน'}
+            </button>
             <button 
                 onClick={() => setShowEditPayment(true)}
-                className="w-full bg-yellow-500 text-white py-2 rounded-md mt-2"
+                className="w-full bg-yellow-500 text-white py-2 rounded-md mt-2 hover:bg-yellow-600"
             >
                 แก้ไขการชำระเงิน
             </button>

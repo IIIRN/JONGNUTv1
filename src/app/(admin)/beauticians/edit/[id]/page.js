@@ -5,12 +5,14 @@ import { useRouter, useParams } from 'next/navigation';
 import { db } from '@/app/lib/firebase';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import Link from 'next/link';
+import { useToast } from '@/app/components/Toast';
 
 export default function EditBeauticianPage() {
   const [formData, setFormData] = useState(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const { id } = useParams();
+  const { showToast } = useToast();
 
   useEffect(() => {
     if (!id) return;
@@ -22,17 +24,18 @@ export default function EditBeauticianPage() {
         if (docSnap.exists()) {
           setFormData(docSnap.data());
         } else {
-          alert("ไม่พบข้อมูลช่าง");
+          showToast("ไม่พบข้อมูลช่าง", "error");
           router.push('/beauticians');
         }
       } catch (error) {
         console.error("Error fetching document:", error);
+        showToast("เกิดข้อผิดพลาดในการโหลดข้อมูล", "error");
       } finally {
         setLoading(false);
       }
     };
   fetchBeautician();
-  }, [id, router]);
+  }, [id, router, showToast]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -43,13 +46,13 @@ export default function EditBeauticianPage() {
     e.preventDefault();
     setLoading(true);
     try {
-  const docRef = doc(db, "beauticians", id);
-      await updateDoc(docRef, formData);
-  alert("อัปเดตข้อมูลช่างสำเร็จ!");
-  router.push('/beauticians');
+        const docRef = doc(db, "beauticians", id);
+        await updateDoc(docRef, formData);
+        showToast("อัปเดตข้อมูลช่างสำเร็จ!", "success");
+        router.push('/beauticians');
     } catch (error) {
       console.error("Error updating document: ", error);
-      alert("เกิดข้อผิดพลาด: " + error.message);
+      showToast("เกิดข้อผิดพลาด: " + error.message, "error");
       setLoading(false);
     }
   };

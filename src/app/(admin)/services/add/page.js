@@ -1,10 +1,10 @@
-
 "use client";
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { db } from '@/app/lib/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { useToast } from '@/app/components/Toast';
 
 
 export default function AddServicePage() {
@@ -18,6 +18,7 @@ export default function AddServicePage() {
   });
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const { showToast } = useToast();
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -50,7 +51,7 @@ export default function AddServicePage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.serviceName || !formData.price || !formData.duration) {
-      alert("กรุณากรอกชื่อบริการ ราคา และระยะเวลาให้ครบถ้วน");
+      showToast("กรุณากรอกชื่อบริการ ราคา และระยะเวลาให้ครบถ้วน", "error");
       return;
     }
     setLoading(true);
@@ -62,11 +63,11 @@ export default function AddServicePage() {
         addOnServices: (formData.addOnServices || []).map(a => ({ ...a, price: Number(a.price) || 0, duration: Number(a.duration) || 0 })),
         createdAt: serverTimestamp(),
       });
-      alert("เพิ่มบริการใหม่สำเร็จ!");
+      showToast("เพิ่มบริการใหม่สำเร็จ!", "success");
       router.push('/services');
     } catch (error) {
       console.error("Error adding document: ", error);
-      alert("เกิดข้อผิดพลาด: " + error.message);
+      showToast("เกิดข้อผิดพลาด: " + error.message, "error");
     } finally {
       setLoading(false);
     }

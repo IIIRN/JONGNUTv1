@@ -7,6 +7,8 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { format } from 'date-fns';
 import { th } from 'date-fns/locale';
+import { ConfirmationModal } from '@/app/components/common/NotificationComponent';
+import { useToast } from '@/app/components/Toast';
 
 // --- Helper Components ---
 const StatusButton = ({ status }) => {
@@ -47,18 +49,28 @@ export default function ServicesListPage() {
   const [allServices, setAllServices] = useState([]);
   const [filteredServices, setFilteredServices] = useState([]);
   const [loading, setLoading] = useState(true);
-  
-  // delete a service and update state
-  const handleDeleteService = async (serviceId, serviceName) => {
-    if (!window.confirm(`คุณแน่ใจหรือไม่ว่าต้องการลบบริการ "${serviceName}"?`)) return;
+  const [serviceToDelete, setServiceToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const { showToast } = useToast();
+
+  const handleDeleteService = (service) => {
+    setServiceToDelete(service);
+  };
+
+  const confirmDeleteService = async () => {
+    if (!serviceToDelete) return;
+    setIsDeleting(true);
     try {
-      await deleteDoc(doc(db, 'services', serviceId));
-      setAllServices(prev => prev.filter(s => s.id !== serviceId));
-      setFilteredServices(prev => prev.filter(s => s.id !== serviceId));
-      alert('ลบข้อมูลบริการสำเร็จ!');
+      await deleteDoc(doc(db, 'services', serviceToDelete.id));
+      setAllServices(prev => prev.filter(s => s.id !== serviceToDelete.id));
+      setFilteredServices(prev => prev.filter(s => s.id !== serviceToDelete.id));
+      showToast('ลบข้อมูลบริการสำเร็จ!', 'success');
     } catch (error) {
       console.error('Error removing document: ', error);
-      alert('เกิดข้อผิดพลาดในการลบข้อมูล');
+      showToast('เกิดข้อผิดพลาดในการลบข้อมูล', 'error');
+    } finally {
+        setIsDeleting(false);
+        setServiceToDelete(null);
     }
   };
 
@@ -73,17 +85,26 @@ export default function ServicesListPage() {
         setFilteredServices(servicesData);
       } catch (err) {
         console.error("Error fetching services: ", err);
+        showToast("ไม่สามารถโหลดข้อมูลบริการได้", "error");
       } finally {
         setLoading(false);
       }
     };
     fetchServices();
-  }, []);
+  }, [showToast]);
 
   if (loading) return <div className="text-center mt-20">กำลังโหลดข้อมูลบริการ...</div>;
 
   return (
     <div className="container mx-auto p-4 md:p-8">
+        <ConfirmationModal
+            show={!!serviceToDelete}
+            title="ยืนยันการลบ"
+            message={`คุณแน่ใจหรือไม่ว่าต้องการลบบริการ "${serviceToDelete?.serviceName || serviceToDelete?.name}"?`}
+            onConfirm={confirmDeleteService}
+            onCancel={() => setServiceToDelete(null)}
+            isProcessing={isDeleting}
+        />
       <div className="flex flex-col md:flex-row justify-between md:items-center mb-6 gap-4">
         <h1 className="text-2xl font-bold text-slate-800">จัดการข้อมูลบริการ</h1>
         <Link href="/services/add" className="bg-slate-800 text-white px-5 py-2 rounded-lg font-semibold shadow hover:bg-slate-700">
@@ -133,7 +154,7 @@ export default function ServicesListPage() {
                       <StatusButton status={service.status} />
                       <div className="flex gap-2">
                           <Link href={`/services/edit/${service.id}`} className="text-sm bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-1 px-3 rounded-md">แก้ไข</Link>
-                          <button onClick={() => handleDeleteService(service.id, service.serviceName || service.name)} className="text-sm bg-red-500 hover:bg-red-600 text-white font-semibold py-1 px-3 rounded-md">ลบ</button>
+                          <button onClick={() => handleDeleteService(service)} className="text-sm bg-red-500 hover:bg-red-600 text-white font-semibold py-1 px-3 rounded-md">ลบ</button>
                       </div>
                   </div>
               </div>

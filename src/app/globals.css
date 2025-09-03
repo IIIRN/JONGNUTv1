@@ -22,7 +22,7 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #171717;
-    --foreground: #ffffff;
+    --foreground: #000000;
     --card: #2a2a2a;
     --border: var(--primary-dark);
   }

@@ -5,6 +5,8 @@ import { db } from '@/app/lib/firebase';
 import { collection, getDocs, query, orderBy, doc, deleteDoc } from 'firebase/firestore';
 import Image from 'next/image';
 import Link from 'next/link';
+import { ConfirmationModal } from '@/app/components/common/NotificationComponent';
+import { useToast } from '@/app/components/Toast';
 
 // --- Helper Components (แก้ไขใหม่) ---
 const StatusBadge = ({ status }) => {
@@ -48,6 +50,10 @@ export default function BeauticiansListPage() {
   const [filteredBeauticians, setFilteredBeauticians] = useState([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('available');
+  const [beauticianToDelete, setBeauticianToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const { showToast } = useToast();
+
 
   useEffect(() => {
     const fetchBeauticians = async () => {
@@ -59,6 +65,7 @@ export default function BeauticiansListPage() {
           setAllBeauticians(beauticiansData);
         } catch (err) {
           console.error("Error fetching beauticians: ", err);
+          showToast("เกิดข้อผิดพลาดในการโหลดข้อมูล", "error");
         } finally {
           setLoading(false);
         }
@@ -74,46 +81,23 @@ export default function BeauticiansListPage() {
       setFilteredBeauticians(filtered);
   }, [statusFilter, allBeauticians]);
 
-  const StatusBadge = ({ status }) => {
-    let text = '';
-    let colorClasses = '';
-    switch (status) {
-        case 'available':
-            text = 'พร้อมให้บริการ';
-            colorClasses = 'bg-green-100 text-green-800';
-            break;
-        case 'busy':
-            text = 'ไม่ว่าง';
-            colorClasses = 'bg-blue-100 text-blue-800';
-            break;
-        case 'unavailable':
-            text = 'ไม่พร้อมให้บริการ';
-            colorClasses = 'bg-yellow-100 text-yellow-800';
-            break;
-        default:
-            text = status || 'ไม่ระบุ';
-            colorClasses = 'bg-gray-100 text-gray-700';
-    }
-    return <span className={`px-2 py-1 text-xs font-semibold rounded-full ${colorClasses}`}>{text}</span>;
-};
+  const handleDelete = (beautician) => {
+    setBeauticianToDelete(beautician);
+  };
 
-const statusFilters = [
-    { key: 'available', label: 'พร้อมให้บริการ' },
-    { key: 'busy', label: 'ไม่ว่าง' },
-    { key: 'unavailable', label: 'ไม่พร้อมให้บริการ' },
-    { key: 'all', label: 'ทั้งหมด' }
-];
-
-const handleDelete = async (beauticianId, beauticianName) => {
-    if (window.confirm(`คุณแน่ใจหรือไม่ว่าต้องการลบช่างเสริมสวย "${beauticianName}"?`)) {
-      try {
-        await deleteDoc(doc(db, "beauticians", beauticianId));
-        setAllBeauticians(prev => prev.filter(b => b.id !== beauticianId));
-        alert("ลบข้อมูลช่างเสริมสวยสำเร็จ!");
-      } catch (error) {
-        console.error("Error removing document: ", error);
-        alert("เกิดข้อผิดพลาดในการลบข้อมูล");
-      }
+  const confirmDelete = async () => {
+    if (!beauticianToDelete) return;
+    setIsDeleting(true);
+    try {
+      await deleteDoc(doc(db, "beauticians", beauticianToDelete.id));
+      setAllBeauticians(prev => prev.filter(b => b.id !== beauticianToDelete.id));
+      showToast("ลบข้อมูลช่างเสริมสวยสำเร็จ!", "success");
+    } catch (error) {
+      console.error("Error removing document: ", error);
+      showToast("เกิดข้อผิดพลาดในการลบข้อมูล", "error");
+    } finally {
+      setIsDeleting(false);
+      setBeauticianToDelete(null);
     }
   };
 
@@ -121,12 +105,20 @@ const handleDelete = async (beauticianId, beauticianName) => {
 
   return (
     <div className="container mx-auto p-4 md:p-8">
+        <ConfirmationModal
+            show={!!beauticianToDelete}
+            title="ยืนยันการลบ"
+            message={`คุณแน่ใจหรือไม่ว่าต้องการลบช่างเสริมสวย "${beauticianToDelete?.firstName} ${beauticianToDelete?.lastName}"?`}
+            onConfirm={confirmDelete}
+            onCancel={() => setBeauticianToDelete(null)}
+            isProcessing={isDeleting}
+        />
         <div className="flex flex-col md:flex-row justify-between md:items-center mb-6 gap-4">
             <h1 className="text-2xl font-bold text-slate-800">จัดการช่างเสริมสวย</h1>
             <div className="flex items-center gap-4 flex-wrap">
                 <div className="flex items-center gap-2 bg-gray-100 rounded-lg p-1">
                     {statusFilters.map(filter => (
-                        <button 
+                        <button
                             key={filter.key}
                             onClick={() => setStatusFilter(filter.key)}
                             className={`px-3 py-1 text-sm rounded-md font-semibold whitespace-nowrap ${statusFilter === filter.key ? 'bg-white text-slate-800 shadow' : 'bg-transparent text-gray-600'}`}
@@ -175,7 +167,7 @@ const handleDelete = async (beauticianId, beauticianName) => {
                             <td className="px-6 py-4 whitespace-nowrap"><StatusBadge status={beautician.status} /></td>
                             <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-4">
                                 <Link href={`/beauticians/edit/${beautician.id}`} className="text-indigo-600 hover:text-indigo-900">แก้ไข</Link>
-                                <button onClick={() => handleDelete(beautician.id, `${beautician.firstName} ${beautician.lastName}`)} className="text-red-600 hover:text-red-900">ลบ</button>
+                                <button onClick={() => handleDelete(beautician)} className="text-red-600 hover:text-red-900">ลบ</button>
                             </td>
                         </tr>
                     ))}

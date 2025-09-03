@@ -1,16 +1,17 @@
-
 "use client";
 
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { db } from '@/app/lib/firebase';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { useToast } from '@/app/components/Toast';
 
 export default function EditServicePage() {
   const [formData, setFormData] = useState(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const { id } = useParams();
+  const { showToast } = useToast();
 
   useEffect(() => {
     if (!id) return;
@@ -31,13 +32,13 @@ export default function EditServicePage() {
           }))
         });
       } else {
-        alert("ไม่พบข้อมูลบริการนี้");
+        showToast("ไม่พบข้อมูลบริการนี้", "error");
         router.push('/services');
       }
       setLoading(false);
     };
     fetchService();
-  }, [id, router]);
+  }, [id, router, showToast]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -70,7 +71,7 @@ export default function EditServicePage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.serviceName || !formData.price || !formData.duration) {
-      alert('กรุณากรอกชื่อบริการ ราคา และระยะเวลาให้ครบถ้วน');
+      showToast('กรุณากรอกชื่อบริการ ราคา และระยะเวลาให้ครบถ้วน', 'error');
       return;
     }
     setLoading(true);
@@ -82,10 +83,10 @@ export default function EditServicePage() {
         duration: Number(formData.duration) || 0,
         addOnServices: (formData.addOnServices || []).map(a => ({ ...a, price: Number(a.price) || 0, duration: Number(a.duration) || 0 })),
       });
-      alert('แก้ไขบริการสำเร็จ!');
+      showToast('แก้ไขบริการสำเร็จ!', 'success');
       router.push('/services');
     } catch (error) {
-      alert('เกิดข้อผิดพลาด: ' + error.message);
+      showToast('เกิดข้อผิดพลาด: ' + error.message, 'error');
     } finally {
       setLoading(false);
     }
