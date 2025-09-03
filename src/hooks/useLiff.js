@@ -1,3 +1,5 @@
+// src/hooks/useLiff.js
+
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -54,7 +56,7 @@ const useLiff = (liffId) => {
                 }
 
                 if (!liff.isLoggedIn()) {
-                    liff.login();
+                    liff.login({ redirectUri: window.location.href, scope: 'profile openid chat_message.write scan_qr' });
                     return;
                 }
 
