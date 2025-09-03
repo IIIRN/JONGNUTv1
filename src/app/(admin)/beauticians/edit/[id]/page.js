@@ -1,3 +1,4 @@
+// src/app/(admin)/beauticians/edit/[id]/page.js
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -8,7 +9,16 @@ import Link from 'next/link';
 import { useToast } from '@/app/components/Toast';
 
 export default function EditBeauticianPage() {
-  const [formData, setFormData] = useState(null);
+  // [!code focus start]
+  const [formData, setFormData] = useState({
+    firstName: '',
+    lastName: '',
+    phoneNumber: '',
+    lineUserId: '',
+    imageUrl: '',
+    status: 'available'
+  });
+  // [!code focus end]
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const { id } = useParams();
@@ -22,7 +32,18 @@ export default function EditBeauticianPage() {
         const docRef = doc(db, "beauticians", id);
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
-          setFormData(docSnap.data());
+          // [!code focus start]
+          const data = docSnap.data();
+          // ตั้งค่า state โดยให้มีค่า fallback เป็นสตริงว่างเสมอ
+          setFormData({
+            firstName: data.firstName || '',
+            lastName: data.lastName || '',
+            phoneNumber: data.phoneNumber || '',
+            lineUserId: data.lineUserId || '',
+            imageUrl: data.imageUrl || '',
+            status: data.status || 'available',
+          });
+          // [!code focus end]
         } else {
           showToast("ไม่พบข้อมูลช่าง", "error");
           router.push('/beauticians');
@@ -57,7 +78,7 @@ export default function EditBeauticianPage() {
     }
   };
 
-  if (loading || !formData) {
+  if (loading) { // [!code focus]
     return <div className="text-center mt-20">กำลังโหลดข้อมูล...</div>;
   }
 

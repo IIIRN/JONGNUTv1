@@ -37,12 +37,14 @@ function formatTimeAgo(timestamp) {
     return date.toLocaleDateString("th-TH");
 }
 
-// --- Nav Links with Grouping (modernized) ---
 const navLinks = [
   { name: "แดชบอร์ด", href: "/dashboard" },
   {
     name: "ข้อมูลหลัก",
     items: [
+      // [!code focus start]
+      { name: "สร้างการนัดหมาย", href: "/create-appointment" },
+      // [!code focus end]
       { name: "บริการ", href: "/services" },
       { name: "ช่างเสริมสวย", href: "/beauticians" },
       { name: "ลูกค้า", href: "/customers" },
@@ -51,7 +53,7 @@ const navLinks = [
   {
     name: "วิเคราะห์/รีวิว",
     items: [
-      { name: "ของรางวัล", href: "/manage-rewards" }, // <-- เพิ่มลิงก์ฃ
+      { name: "ของรางวัล", href: "/manage-rewards" },
       { name: "วิเคราะห์", href: "/analytics" },
       { name: "รีวิวลูกค้า", href: "/reviews" },
     ]

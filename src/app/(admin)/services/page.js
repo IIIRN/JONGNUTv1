@@ -91,7 +91,7 @@ export default function ServicesListPage() {
       }
     };
     fetchServices();
-  }, [showToast]);
+  }, []);
 
   if (loading) return <div className="text-center mt-20">กำลังโหลดข้อมูลบริการ...</div>;
 

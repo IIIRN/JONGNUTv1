@@ -130,7 +130,7 @@ function ServiceDetailContent() {
             {(service.addOnServices && service.addOnServices.length > 0) && (
                 <div className="py2">
                     <h2 className="text-sm font-bold mb-1">รายการเสริม</h2>
-                    <div className="space-y-1">
+                    <div className="space-y-2">
                         {service.addOnServices.map((addOn, idx) => (
                             <AddOnCard
                                 key={idx}

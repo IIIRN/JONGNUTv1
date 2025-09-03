@@ -7,8 +7,6 @@ import { sendTelegramMessageToAdmin } from '@/app/actions/telegramActions';
 
 /**
  * Creates a new appointment, checking for slot availability.
- * @param {object} appointmentData - The complete data for the new appointment.
- * @returns {Promise<object>} - The result of the appointment creation process.
  */
 export async function createAppointmentWithSlotCheck(appointmentData) {
     const { date, time, serviceId, beauticianId, userId } = appointmentData;
@@ -89,7 +87,7 @@ export async function createAppointmentWithSlotCheck(appointmentData) {
 
         try {
             const notificationData = {
-                customerName: appointmentData.customerInfo?.name || 'ลูกค้า',
+                customerName: appointmentData.customerInfo?.fullName || 'ลูกค้า',
                 serviceName: appointmentData.serviceInfo?.name || 'บริการ',
                 appointmentDate: date,
                 appointmentTime: time,
@@ -108,40 +106,79 @@ export async function createAppointmentWithSlotCheck(appointmentData) {
 }
 
 /**
- * Marks an appointment as completed by an admin.
+ * NEW: Updates an existing appointment by an admin.
  */
-export async function completeAppointmentByAdmin(appointmentId, adminId, completionData) {
-    if (!appointmentId || !adminId || !completionData) {
-        return { success: false, error: 'ข้อมูลไม่ครบถ้วน' };
+export async function updateAppointmentByAdmin(appointmentId, updateData) {
+    if (!appointmentId || !updateData) {
+        return { success: false, error: 'Appointment ID and update data are required.' };
     }
-    const appointmentRef = db.collection('appointments').doc(appointmentId);
-    try {
-        const appointmentDoc = await appointmentRef.get();
-        if (!appointmentDoc.exists) throw new Error("ไม่พบข้อมูลการนัดหมาย");
-        const appointmentData = appointmentDoc.data();
 
-        if (appointmentData.status !== 'confirmed') {
-            throw new Error("สถานะการนัดหมายไม่ถูกต้อง ไม่สามารถดำเนินการได้");
+    const { date, time, beauticianId, serviceId, addOnNames, customerInfo } = updateData;
+    const appointmentRef = db.collection('appointments').doc(appointmentId);
+
+    try {
+        // Re-check for slot availability, excluding the current appointment
+        const q = db.collection('appointments')
+            .where('date', '==', date)
+            .where('time', '==', time)
+            .where('beauticianId', '==', beauticianId)
+            .where('status', 'in', ['confirmed', 'awaiting_confirmation', 'in_progress']);
+        
+        const snapshot = await q.get();
+        const conflictingAppointments = snapshot.docs.filter(doc => doc.id !== appointmentId);
+
+        if (conflictingAppointments.length > 0) {
+            return { success: false, error: 'ช่างเสริมสวยไม่ว่างในวันและเวลาที่เลือกใหม่' };
         }
+
+        const serviceDoc = await db.collection('services').doc(serviceId).get();
+        if (!serviceDoc.exists) throw new Error("Service not found.");
+        const serviceData = serviceDoc.data();
+
+        const selectedAddOns = (serviceData.addOnServices || []).filter(a => addOnNames.includes(a.name));
+        const basePrice = serviceData.price || 0;
+        const addOnsTotal = selectedAddOns.reduce((sum, a) => sum + (a.price || 0), 0);
+        const totalPrice = basePrice + addOnsTotal;
+        const totalDuration = (serviceData.duration || 0) + selectedAddOns.reduce((sum, a) => sum + (a.duration || 0), 0);
+
+        const beauticianDoc = await db.collection('beauticians').doc(beauticianId).get();
+        const beauticianData = beauticianDoc.exists ? beauticianDoc.data() : { firstName: 'N/A', lastName: '' };
         
-        await appointmentRef.update({
-            status: 'completed',
-            'completionInfo.employeeId': adminId,
-            'completionInfo.timestamp': FieldValue.serverTimestamp(),
-            'completionInfo.notes': completionData.notes || '',
+        const finalUpdateData = {
+            customerInfo,
+            serviceId,
+            beauticianId,
+            date,
+            time,
+            'serviceInfo.id': serviceId,
+            'serviceInfo.name': serviceData.serviceName,
+            'serviceInfo.imageUrl': serviceData.imageUrl || '',
+            'appointmentInfo.beauticianId': beauticianId,
+            'appointmentInfo.employeeId': beauticianId,
+            'appointmentInfo.beauticianInfo': { firstName: beauticianData.firstName, lastName: beauticianData.lastName },
+            'appointmentInfo.dateTime': Timestamp.fromDate(new Date(`${date}T${time}`)),
+            'appointmentInfo.addOns': selectedAddOns,
+            'appointmentInfo.duration': totalDuration,
+            'paymentInfo.basePrice': basePrice,
+            'paymentInfo.addOnsTotal': addOnsTotal,
+            'paymentInfo.originalPrice': totalPrice,
+            'paymentInfo.totalPrice': totalPrice, // Assuming discount is reset on edit
+            'paymentInfo.discount': 0,
+            'paymentInfo.couponId': null,
+            'paymentInfo.couponName': null,
             updatedAt: FieldValue.serverTimestamp()
-        });
+        };
         
-        let notificationMessage = `บริการ ${appointmentData.serviceInfo.name} ของคุณเสร็จสมบูรณ์แล้ว\nขอบคุณที่ใช้บริการค่ะ`;
-        await sendLineMessage(appointmentData.userId, notificationMessage, 'appointmentConfirmed');
-        await sendReviewRequestToCustomer(appointmentId);
+        await appointmentRef.update(finalUpdateData);
 
         return { success: true };
+
     } catch (error) {
-        console.error("Error completing appointment by admin:", error);
+        console.error("Error updating appointment by admin:", error);
         return { success: false, error: error.message };
     }
 }
+
 
 /**
  * Confirms an appointment and its payment by an admin.
@@ -156,10 +193,12 @@ export async function confirmAppointmentAndPaymentByAdmin(appointmentId, adminId
         if (!appointmentDoc.exists) throw new Error("ไม่พบข้อมูลการนัดหมาย");
         const appointmentData = appointmentDoc.data();
 
-        if (appointmentData.status !== 'awaiting_confirmation') {
+        if (appointmentData.status !== 'awaiting_confirmation' && appointmentData.status !== 'confirmed') {
             throw new Error("สถานะการนัดหมายไม่ถูกต้อง ไม่สามารถดำเนินการได้");
         }
         
+        const wasAwaitingConfirmation = appointmentData.status === 'awaiting_confirmation';
+
         await appointmentRef.update({
             status: 'confirmed',
             'appointmentInfo.employeeId': adminId, 
@@ -171,12 +210,19 @@ export async function confirmAppointmentAndPaymentByAdmin(appointmentId, adminId
             updatedAt: FieldValue.serverTimestamp(),
         });
 
-        const customerMessage = `✅ ได้รับการชำระเงินเรียบร้อยแล้วค่ะ\n\nการนัดหมายบริการ "${appointmentData.serviceInfo.name}" ของคุณในวันที่ ${appointmentData.date} เวลา ${appointmentData.time} ได้รับการยืนยันแล้วค่ะ\n\nขอบคุณที่ใช้บริการค่ะ ✨`;
-        await sendLineMessage(appointmentData.userId, customerMessage, 'appointmentConfirmed');
+        if (appointmentData.userId) {
+            let customerMessage = '';
+            if (wasAwaitingConfirmation) {
+                 customerMessage = `✅ ได้รับการชำระเงินเรียบร้อยแล้วค่ะ\n\nการนัดหมายบริการ "${appointmentData.serviceInfo.name}" ของคุณในวันที่ ${appointmentData.date} เวลา ${appointmentData.time} ได้รับการยืนยันแล้วค่ะ\n\nขอบคุณที่ใช้บริการค่ะ ✨`;
+            } else {
+                 customerMessage = `✅ ได้รับการชำระเงินสำหรับบริการ "${appointmentData.serviceInfo.name}" ในวันที่ ${appointmentData.date} เรียบร้อยแล้วค่ะ\n\nขอบคุณที่ใช้บริการค่ะ ✨`;
+            }
+            await sendLineMessage(appointmentData.userId, customerMessage, 'appointmentConfirmed');
+        }
 
         try {
             const notificationData = {
-                customerName: appointmentData.customerInfo?.name || 'ลูกค้า',
+                customerName: appointmentData.customerInfo?.fullName || 'ลูกค้า',
                 serviceName: appointmentData.serviceInfo?.name || 'บริการ',
                 appointmentDate: appointmentData.date,
                 appointmentTime: appointmentData.time,
@@ -225,7 +271,7 @@ export async function cancelAppointmentByAdmin(appointmentId, reason) {
 }
 
 /**
- * (ฟังก์ชันใหม่) Updates an appointment's status by an admin and notifies the customer.
+ * Updates an appointment's status by an admin and notifies the customer.
  */
 export async function updateAppointmentStatusByAdmin(appointmentId, newStatus) {
     if (!appointmentId || !newStatus) {
@@ -246,7 +292,6 @@ export async function updateAppointmentStatusByAdmin(appointmentId, newStatus) {
             updatedAt: FieldValue.serverTimestamp()
         });
 
-        // Send notification to customer
         if (appointmentData.userId) {
             let customerMessage = '';
             let notificationType = '';
@@ -261,7 +306,7 @@ export async function updateAppointmentStatusByAdmin(appointmentId, newStatus) {
                     break;
                 case 'completed':
                     customerMessage = `✨ บริการ "${serviceName}" ของคุณเสร็จสมบูรณ์แล้ว ขอบคุณที่ใช้บริการค่ะ`;
-                    notificationType = 'appointmentConfirmed'; // Or a new type like 'appointmentCompleted'
+                    notificationType = 'appointmentConfirmed'; 
                     await sendReviewRequestToCustomer(appointmentId);
                     break;
                 case 'cancelled':
@@ -376,7 +421,7 @@ export async function cancelAppointmentByUser(appointmentId, userId) {
                 cancellationInfo: { cancelledBy: 'customer', reason: 'Cancelled by customer.', timestamp: FieldValue.serverTimestamp() },
                 updatedAt: FieldValue.serverTimestamp()
             });
-            return { customerName: appointmentData.customerInfo.name, serviceName: appointmentData.serviceInfo.name };
+            return { customerName: appointmentData.customerInfo.fullName, serviceName: appointmentData.serviceInfo.name };
         });
         
         const customerMessage = `การนัดหมายของคุณ (ID: ${appointmentId.substring(0, 6).toUpperCase()}) ได้ถูกยกเลิกเรียบร้อยแล้วค่ะ`;
@@ -409,7 +454,7 @@ export async function sendInvoiceToCustomer(appointmentId) {
             updatedAt: FieldValue.serverTimestamp()
         });
 
-        const customerMessage = `เรียนคุณ ${appointmentData.customerInfo.name},\n\nนี่คือใบแจ้งค่าบริการสำหรับบริการของคุณ\nยอดชำระ: ${appointmentData.paymentInfo.totalPrice.toLocaleString()} บาท\n\nกรุณาคลิกที่ลิงก์เพื่อชำระเงิน:\n${liffUrl}`;
+        const customerMessage = `เรียนคุณ ${appointmentData.customerInfo.fullName},\n\nนี่คือใบแจ้งค่าบริการสำหรับบริการของคุณ\nยอดชำระ: ${appointmentData.paymentInfo.totalPrice.toLocaleString()} บาท\n\nกรุณาคลิกที่ลิงก์เพื่อชำระเงิน:\n${liffUrl}`;
         await sendLineMessage(appointmentData.userId, customerMessage, 'paymentInvoice');
 
         return { success: true };
@@ -438,12 +483,8 @@ export async function confirmPayment(appointmentId) {
 }
 
 
-// Appended to src/app/actions/appointmentActions.js
-// src/app/actions/appointmentActions.js
-
 /**
  * Finds appointments based on a customer's phone number.
- * This version removes the date filter to find all upcoming appointments.
  */
 export async function findAppointmentsByPhone(phoneNumber) {
     if (!phoneNumber) {
@@ -454,7 +495,6 @@ export async function findAppointmentsByPhone(phoneNumber) {
 
         const q = db.collection('appointments')
             .where('customerInfo.phone', '==', phoneNumber)
-            // No longer filtering by today's date, but ensuring we don't pull very old appointments.
             .where('date', '>=', todayStr) 
             .where('status', 'in', ['confirmed', 'awaiting_confirmation'])
             .orderBy('date', 'asc')
@@ -500,13 +540,8 @@ export async function findAppointmentById(appointmentId) {
 }
 
 
-// Appended to src/app/actions/appointmentActions.js
-
 /**
  * Confirms an appointment by the user who owns it.
- * @param {string} appointmentId - The ID of the appointment to confirm.
- * @param {string} userId - The LINE User ID of the customer.
- * @returns {Promise<{success: boolean, error?: string}>}
  */
 export async function confirmAppointmentByUser(appointmentId, userId) {
     if (!appointmentId || !userId) {
@@ -536,15 +571,14 @@ export async function confirmAppointmentByUser(appointmentId, userId) {
             updatedAt: FieldValue.serverTimestamp(),
         });
         
-        // Notify admins
         const notificationData = {
-            customerName: appointmentData.customerInfo?.name || 'ลูกค้า',
+            customerName: appointmentData.customerInfo?.fullName || 'ลูกค้า',
             serviceName: appointmentData.serviceInfo?.name || 'บริการ',
             appointmentDate: appointmentData.date,
             appointmentTime: appointmentData.time,
             totalPrice: appointmentData.paymentInfo?.totalPrice ?? 0
         };
-        await sendBookingNotification(notificationData, 'newBooking'); // Re-using newBooking notification for simplicity
+        await sendBookingNotification(notificationData, 'customerConfirmed'); 
 
         return { success: true };
 

@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { db } from '@/app/lib/firebase';
 import { doc, getDoc, deleteDoc } from 'firebase/firestore';
 import { updateAppointmentStatusByAdmin, confirmAppointmentAndPaymentByAdmin, sendInvoiceToCustomer } from '@/app/actions/appointmentActions';
@@ -12,7 +13,7 @@ import { format } from 'date-fns';
 import { th } from 'date-fns/locale';
 import Image from 'next/image';
 
-// Modal for editing payment info
+// --- Modal Component for editing payment info ---
 function EditPaymentModal({ open, onClose, onSave, defaultAmount, defaultMethod }) {
   const [amount, setAmount] = useState(defaultAmount || '');
   const [method, setMethod] = useState(defaultMethod || 'เงินสด');
@@ -243,13 +244,18 @@ export default function AdminAppointmentDetail() {
             </span>
           </div>
         </div>
-        <button
-          onClick={() => setShowDeleteConfirm(true)}
-          className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md disabled:bg-red-300 self-start md:self-center"
-          disabled={deleting}
-        >
-          {deleting ? 'กำลังลบ...' : 'ลบการจอง'}
-        </button>
+        <div className="flex gap-2 self-start md:self-center">
+            <Link href={`/appointments/edit/${appointment.id}`} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md">
+                แก้ไขการจอง
+            </Link>
+            <button
+            onClick={() => setShowDeleteConfirm(true)}
+            className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md disabled:bg-red-300"
+            disabled={deleting}
+            >
+            {deleting ? 'กำลังลบ...' : 'ลบการจอง'}
+            </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

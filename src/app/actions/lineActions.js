@@ -23,7 +23,7 @@ async function getNotificationSettings() {
     // Default settings if document doesn't exist
     return {
       allNotifications: { enabled: true },
-      adminNotifications: { enabled: true, newBooking: true, bookingCancelled: true, paymentReceived: true },
+      adminNotifications: { enabled: true, newBooking: true, bookingCancelled: true, paymentReceived: true, customerConfirmed: true },
       customerNotifications: { enabled: true, appointmentConfirmed: true, appointmentCancelled: true, appointmentReminder: true, reviewRequest: true, paymentInvoice: true },
     };
   } catch (error) {
@@ -118,6 +118,14 @@ export async function sendBookingNotification(bookingData, notificationType) {
                `📅 วันที่: ${appointmentDate}\n` +
                `⏰ เวลา: ${appointmentTime}\n` +
                `💰 ราคา: ${totalPrice} บาท`;
+      break;
+      
+    case 'customerConfirmed':
+      message = `✅ ลูกค้ายืนยันนัดหมาย\n` +
+               `👤 ลูกค้า: ${customerName}\n` +
+               `💅 บริการ: ${serviceName}\n` +
+               `📅 วันที่: ${appointmentDate}\n` +
+               `⏰ เวลา: ${appointmentTime}`;
       break;
       
     case 'bookingCancelled':

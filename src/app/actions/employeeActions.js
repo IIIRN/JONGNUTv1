@@ -3,6 +3,7 @@
 import { db } from '@/app/lib/firebaseAdmin';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { revalidatePath } from 'next/cache';
+import { sendBookingNotification } from './lineActions'; 
 
 // --- Registration and Status Updates ---
 
@@ -61,22 +62,67 @@ export async function updateAppointmentStatus(appointmentId, newStatus, employee
 }
 
 
+/**
+ * NEW FUNCTION: Updates an appointment's payment status by an employee
+ */
+export async function updatePaymentStatusByEmployee(appointmentId, employeeId) {
+    if (!appointmentId || !employeeId) {
+        return { success: false, error: 'ข้อมูลไม่ครบถ้วน' };
+    }
+
+    const appointmentRef = db.collection('appointments').doc(appointmentId);
+    
+    try {
+        const appointmentDoc = await appointmentRef.get();
+        if (!appointmentDoc.exists) {
+            throw new Error("ไม่พบข้อมูลนัดหมาย!");
+        }
+        const appointmentData = appointmentDoc.data();
+
+        // Update payment status in Firestore
+        await appointmentRef.update({
+            'paymentInfo.paymentStatus': 'paid',
+            'paymentInfo.paidAt': FieldValue.serverTimestamp(),
+            'paymentInfo.paymentReceivedBy': employeeId, // Track who received the payment
+            updatedAt: FieldValue.serverTimestamp()
+        });
+
+        // Send notification to admins
+        try {
+            const notificationData = {
+                customerName: appointmentData.customerInfo?.fullName || 'ลูกค้า',
+                serviceName: appointmentData.serviceInfo?.name || 'บริการ',
+                appointmentDate: appointmentData.date,
+                appointmentTime: appointmentData.time,
+                totalPrice: appointmentData.paymentInfo.totalPrice
+            };
+            await sendBookingNotification(notificationData, 'paymentReceived');
+        } catch (notificationError) {
+            console.error('Error sending payment notification from employee action:', notificationError);
+        }
+
+        return { success: true };
+
+    } catch (error) {
+        console.error("Error updating payment status by employee:", error);
+        return { success: false, error: error.message };
+    }
+}
+
+
 // --- Appointment Lookups ---
 
 export async function findAppointmentsByPhone(phoneNumber) {
     if (!phoneNumber) return { success: false, error: "Phone number is required." };
     try {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const tomorrow = new Date(today);
-        tomorrow.setDate(tomorrow.getDate() + 1);
+        const todayStr = new Date().toISOString().split('T')[0];
 
         const q = db.collection('appointments')
             .where('customerInfo.phone', '==', phoneNumber)
-            .where('status', '==', 'confirmed')
-            .where('appointmentInfo.dateTime', '>=', Timestamp.fromDate(today))
-            .where('appointmentInfo.dateTime', '<', Timestamp.fromDate(tomorrow))
-            .orderBy('appointmentInfo.dateTime', 'asc');
+            .where('status', 'in', ['confirmed', 'awaiting_confirmation'])
+            .where('date', '>=', todayStr)
+            .orderBy('date', 'asc')
+            .orderBy('time', 'asc');
 
         const snapshot = await q.get();
         const appointments = snapshot.docs.map(doc => ({

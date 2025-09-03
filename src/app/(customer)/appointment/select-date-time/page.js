@@ -1,22 +1,20 @@
 "use client";
 
-import { useState, useEffect, Suspense } from 'react'; // Import Suspense
+import { useState, useEffect, Suspense, useCallback } from 'react'; // Import useCallback
 import { useRouter, useSearchParams } from 'next/navigation';
 import { db } from '@/app/lib/firebase';
 import { collection, getDocs, query, where, orderBy, doc, getDoc } from 'firebase/firestore';
-import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
 import { format } from 'date-fns';
-import { th } from 'date-fns/locale';
 import Image from 'next/image';
 import CustomerHeader from '@/app/components/CustomerHeader';
 import { useToast } from '@/app/components/common/Toast';
 
-// --- Beautician Card Component ---
-const BeauticianCard = ({ beautician, isSelected, onSelect }) => (
+// --- Beautician Card Component (ได้รับการแก้ไข) ---
+const BeauticianCard = ({ beautician, isSelected, onSelect, isAvailable }) => (
     <div
-        onClick={() => onSelect(beautician)}
-        className={`rounded-lg p-4 flex items-center space-x-4 border-2 transition-all cursor-pointer w-full ${isSelected ? 'border-primary bg-primary-light' : 'border-gray-200 bg-white'}`}
+        onClick={() => isAvailable && onSelect(beautician)}
+        className={`rounded-lg p-4 flex items-center space-x-4 border-2 transition-all w-full ${!isAvailable ? 'bg-gray-200 opacity-60 cursor-not-allowed' : isSelected ? 'border-primary bg-primary-light cursor-pointer' : 'border-gray-200 bg-white cursor-pointer'}`}
     >
         <div className="relative w-16 h-16 rounded-full overflow-hidden flex-shrink-0">
             <Image
@@ -30,10 +28,10 @@ const BeauticianCard = ({ beautician, isSelected, onSelect }) => (
             <p className="font-bold text-lg text-gray-800">{beautician.firstName}</p>
         </div>
         <div className="flex items-center space-x-3">
-            <p className={`text-sm px-3 py-1 rounded-full ${beautician.status === 'available' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
-                {beautician.status === 'available' ? 'ว่าง' : 'ไม่ว่าง'}
+            <p className={`text-sm px-3 py-1 rounded-full ${isAvailable ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                {isAvailable ? 'ว่าง' : 'ไม่ว่าง'}
             </p>
-            {isSelected && (
+            {isSelected && isAvailable && (
                 <div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center">
                     <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
@@ -44,7 +42,7 @@ const BeauticianCard = ({ beautician, isSelected, onSelect }) => (
     </div>
 );
 
-// --- Time Slot Component ---
+// --- Time Slot Component (คงเดิม) ---
 const TimeSlot = ({ time, isSelected, onSelect }) => (
     <button
         onClick={() => onSelect(time)}
@@ -69,14 +67,15 @@ function SelectDateTimeContent() {
     const [beauticians, setBeauticians] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedBeautician, setSelectedBeautician] = useState(null);
-    const [timeQueues, setTimeQueues] = useState([]); // [{time, count}]
+    const [timeQueues, setTimeQueues] = useState([]);
     const [totalBeauticians, setTotalBeauticians] = useState(1);
-    const [slotCounts, setSlotCounts] = useState({}); // { '09:00': 2, ... }
-    const [useBeautician, setUseBeautician] = useState(false); // โหมดการจอง
-    const [weeklySchedule, setWeeklySchedule] = useState({}); // ตารางเวลาทำการ
-    const [holidayDates, setHolidayDates] = useState([]); // วันหยุดพิเศษ
+    const [slotCounts, setSlotCounts] = useState({});
+    const [useBeautician, setUseBeautician] = useState(false);
+    const [weeklySchedule, setWeeklySchedule] = useState({});
+    const [holidayDates, setHolidayDates] = useState([]);
+    const [unavailableBeauticianIds, setUnavailableBeauticianIds] = useState(new Set());
 
-    // Fetch timeQueues and totalBeauticians from settings/booking
+    // Fetch booking settings
     useEffect(() => {
         const fetchBookingSettings = async () => {
             try {
@@ -86,59 +85,22 @@ function SelectDateTimeContent() {
                     const data = docSnap.data();
                     setTimeQueues(Array.isArray(data.timeQueues) ? data.timeQueues : []);
                     setTotalBeauticians(Number(data.totalBeauticians) || 1);
-                    setUseBeautician(!!data.useBeautician); // โหมดการจอง
+                    setUseBeautician(!!data.useBeautician);
                     setWeeklySchedule(data.weeklySchedule || {});
                     setHolidayDates(Array.isArray(data.holidayDates) ? data.holidayDates : []);
-                } else {
-                    setTimeQueues([]);
-                    setTotalBeauticians(1);
-                    setUseBeautician(false);
-                    setWeeklySchedule({});
-                    setHolidayDates([]);
                 }
             } catch (e) {
-                setTimeQueues([]);
-                setTotalBeauticians(1);
-                setUseBeautician(false);
-                setWeeklySchedule({});
-                setHolidayDates([]);
+                console.error("Error fetching booking settings:", e);
             }
         };
         fetchBookingSettings();
     }, []);
 
-    // Fetch appointment counts for the selected date
-    useEffect(() => {
-        if (!date) return;
-        const fetchSlotCounts = async () => {
-            try {
-                const dateStr = format(date, 'yyyy-MM-dd');
-                const q = query(
-                    collection(db, 'appointments'),
-                    where('date', '==', dateStr),
-                    where('status', 'in', ['pending', 'confirmed', 'awaiting_confirmation'])
-                );
-                const querySnapshot = await getDocs(q);
-                const counts = {};
-                querySnapshot.forEach(doc => {
-                    const appt = doc.data();
-                    if (appt.time) {
-                        counts[appt.time] = (counts[appt.time] || 0) + 1;
-                    }
-                });
-                setSlotCounts(counts);
-            } catch (e) {
-                setSlotCounts({});
-            }
-        };
-        fetchSlotCounts();
-    }, [date]);
-
+    // Fetch beauticians
     useEffect(() => {
         const fetchBeauticians = async () => {
             setLoading(true);
             try {
-                // Fetch only available beauticians
                 const q = query(
                     collection(db, 'beauticians'),
                     where('status', '==', 'available'),
@@ -154,13 +116,64 @@ function SelectDateTimeContent() {
         fetchBeauticians();
     }, []);
 
+    // Fetch appointment counts for the selected date and update beautician availability
+    useEffect(() => {
+        if (!date) return;
+
+        const fetchAppointmentsForDate = async () => {
+            const dateStr = format(date, 'yyyy-MM-dd');
+            const q = query(
+                collection(db, 'appointments'),
+                where('date', '==', dateStr),
+                where('status', 'in', ['pending', 'confirmed', 'awaiting_confirmation'])
+            );
+            const querySnapshot = await getDocs(q);
+            const appointmentsForDay = querySnapshot.docs.map(doc => doc.data());
+            
+            // Calculate total bookings for each time slot
+            const counts = {};
+            appointmentsForDay.forEach(appt => {
+                if (appt.time) {
+                    counts[appt.time] = (counts[appt.time] || 0) + 1;
+                }
+            });
+            setSlotCounts(counts);
+
+            // Update unavailable beauticians for the selected time
+            if (time) {
+                const unavailableIds = new Set(
+                    appointmentsForDay
+                        .filter(appt => appt.time === time && appt.beauticianId)
+                        .map(appt => appt.beauticianId)
+                );
+                setUnavailableBeauticianIds(unavailableIds);
+
+                // If currently selected beautician becomes unavailable, deselect them
+                if (selectedBeautician && unavailableIds.has(selectedBeautician.id)) {
+                    setSelectedBeautician(null);
+                    showToast('ช่างที่เลือกไม่ว่างในเวลานี้แล้ว', 'warning', 'โปรดเลือกช่างใหม่');
+                }
+            } else {
+                setUnavailableBeauticianIds(new Set());
+            }
+        };
+
+        fetchAppointmentsForDate();
+    }, [date, time, selectedBeautician, showToast]);
+    
+    // Reset time and beautician when date changes
+    useEffect(() => {
+        setTime('');
+        setSelectedBeautician(null);
+    }, [date]);
+    
+
     const handleConfirm = () => {
         if (!date || !time) {
             showToast('กรุณาเลือกวันและเวลาที่ต้องการจอง', "warning", "ข้อมูลไม่ครบถ้วน");
             return;
         }
         
-        // ตรวจสอบการเลือกช่างตามโหมด
         if (useBeautician && !selectedBeautician) {
             showToast('กรุณาเลือกช่างเสริมสวยที่ต้องการ', "warning", "ข้อมูลไม่ครบถ้วน");
             return;
@@ -172,34 +185,21 @@ function SelectDateTimeContent() {
         params.set('date', format(date, 'yyyy-MM-dd'));
         params.set('time', time);
         
-        // ส่ง beauticianId เฉพาะเมื่อเป็นโหมดเลือกช่าง
         if (useBeautician && selectedBeautician) {
             params.set('beauticianId', selectedBeautician.id);
         } else {
-            // สำหรับโหมดไม่เลือกช่าง ใส่ค่า default หรือ null
             params.set('beauticianId', 'auto-assign');
         }
         
         router.push(`/appointment/general-info?${params.toString()}`);
     };
 
-    // Helper: get max allowed for a slot
-    const getMaxForSlot = (slot) => {
-        const queue = timeQueues.find(q => q.time === slot);
-        if (queue && queue.count) return queue.count;
-        return totalBeauticians;
-    };
-
-    // Helper: check if a date is open for business
     const isDateOpen = (checkDate) => {
         const dayOfWeek = checkDate.getDay();
         const daySchedule = weeklySchedule[dayOfWeek];
-        
-        // ตรวจสอบตารางเวลาทำการประจำ
         const isRegularlyOpen = daySchedule ? daySchedule.isOpen : true;
         if (!isRegularlyOpen) return false;
         
-        // ตรวจสอบวันหยุดพิเศษ
         const dateStr = format(checkDate, 'yyyy-MM-dd');
         const isHoliday = holidayDates.some(holiday => holiday.date === dateStr);
         if (isHoliday) return false;
@@ -207,7 +207,6 @@ function SelectDateTimeContent() {
         return true;
     };
 
-    // Helper: check if a time slot is within business hours
     const isTimeInBusinessHours = (timeSlot) => {
         if (!date) return true;
         const dayOfWeek = date.getDay();
@@ -332,7 +331,6 @@ function SelectDateTimeContent() {
             <div className="w-full max-w-md mx-auto mt-6">
                 <h2 className="text-base font-bold mb-2 text-primary">เลือกช่วงเวลา</h2>
                 
-                {/* ตรวจสอบว่าวันที่เลือกเปิดทำการหรือไม่ */}
                 {date && !isDateOpen(date) ? (
                     <div className="text-center p-4 bg-red-50 border border-red-200 rounded-lg">
                         {(() => {
@@ -355,10 +353,6 @@ function SelectDateTimeContent() {
                         })()}
                         <p className="text-sm text-gray-500">กรุณาเลือกวันอื่น</p>
                     </div>
-                ) : timeQueues.filter(q => q.time && isTimeInBusinessHours(q.time)).length === 0 ? (
-                    <div className="text-center p-4 bg-gray-100 rounded-lg">
-                        <p className="text-gray-600">ไม่มีช่วงเวลาให้บริการในวันนี้</p>
-                    </div>
                 ) : (
                     <div className="grid grid-cols-3 gap-3">
                         {timeQueues
@@ -366,7 +360,7 @@ function SelectDateTimeContent() {
                             .sort((a, b) => String(a.time).localeCompare(String(b.time)))
                             .map(queue => {
                                 const slot = queue.time;
-                                const max = queue.count || totalBeauticians;
+                                const max = useBeautician ? beauticians.length : (queue.count || totalBeauticians);
                                 const booked = slotCounts[slot] || 0;
                                 const isFull = booked >= max;
                                 return (
@@ -387,8 +381,8 @@ function SelectDateTimeContent() {
                 )}
             </div>
 
-            {/* Beautician Selection - แสดงเฉพาะเมื่อเปิดโหมดเลือกช่าง */}
-            {useBeautician && (
+            {/* Beautician Selection */}
+            {useBeautician && time && (
                 <div className="w-full max-w-md mx-auto mt-6">
                     <h2 className="text-base font-bold mb-2 text-primary">เลือกช่างเสริมสวย</h2>
                     {loading ? (
@@ -403,22 +397,11 @@ function SelectDateTimeContent() {
                                     beautician={beautician}
                                     isSelected={selectedBeautician?.id === beautician.id}
                                     onSelect={setSelectedBeautician}
+                                    isAvailable={!unavailableBeauticianIds.has(beautician.id)}
                                 />
                             ))}
                         </div>
                     )}
-                </div>
-            )}
-
-            {/* ข้อความสำหรับโหมดไม่เลือกช่าง */}
-            {!useBeautician && (
-                <div className="w-full max-w-md mx-auto mt-6 hidden">
-                    <div className="text-center p-4 bg-blue-50 rounded-lg border border-blue-200">
-                        <div className="text-sm text-blue-700">
-                            <strong>โหมดคิวธรรมดา</strong><br/>
-                            ระบบจะจัดช่างที่เหมาะสมให้คุณโดยอัตโนมัติ
-                        </div>
-                    </div>
                 </div>
             )}
 

@@ -1,3 +1,4 @@
+// src/app/(admin)/employees/edit/[id]/page.js
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -13,7 +14,8 @@ export default function EditEmployeePage() {
     phoneNumber: '',
     email: '',
     lineUserId: '',
-    status: 'available'
+    status: 'available',
+    imageUrl: '' // [!code focus]
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -39,7 +41,8 @@ export default function EditEmployeePage() {
           phoneNumber: data.phoneNumber || '',
           email: data.email || '',
           lineUserId: data.lineUserId || '',
-          status: data.status || 'available'
+          status: data.status || 'available',
+          imageUrl: data.imageUrl || '' // [!code focus]
         });
       } else {
         showToast("ไม่พบข้อมูลพนักงาน", 'error');
@@ -69,14 +72,13 @@ export default function EditEmployeePage() {
     setSaving(true);
     try {
       const docRef = doc(db, "employees", id);
+      // [!code focus start]
+      // ส่งข้อมูลทั้งหมดใน formData ไปอัปเดต
       await updateDoc(docRef, {
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        phoneNumber: formData.phoneNumber,
-        lineUserId: formData.lineUserId,
-        status: formData.status,
+        ...formData,
         updatedAt: new Date()
       });
+      // [!code focus end]
       
       showToast("อัปเดตข้อมูลพนักงานสำเร็จ!", 'success');
       router.push('/employees');
@@ -87,7 +89,7 @@ export default function EditEmployeePage() {
     }
   };
 
-  if (loading || !formData) {
+  if (loading) { // [!code focus]
     return <div className="text-center mt-20">กำลังโหลดข้อมูล...</div>;
   }
 
@@ -128,8 +130,8 @@ export default function EditEmployeePage() {
                     <label className="block text-sm font-medium text-gray-700">URL รูปภาพ (ถ้ามี)</label>
                     <input type="url" name="imageUrl" placeholder="https://example.com/photo.jpg" value={formData.imageUrl} onChange={handleChange} className="w-full mt-1 p-2 border rounded-md"/>
                 </div>
-                <button type="submit" disabled={loading} className="w-full bg-indigo-600 text-white p-2 rounded-md hover:bg-indigo-700 disabled:bg-gray-400">
-                  {loading ? 'กำลังบันทึก...' : 'บันทึกการเปลี่ยนแปลง'}
+                <button type="submit" disabled={saving || loading} className="w-full bg-indigo-600 text-white p-2 rounded-md hover:bg-indigo-700 disabled:bg-gray-400">
+                  {saving ? 'กำลังบันทึก...' : 'บันทึกการเปลี่ยนแปลง'}
                 </button>
             </form>
         </div>

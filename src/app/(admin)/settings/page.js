@@ -34,7 +34,7 @@ export default function AdminSettingsPage() {
     const [settings, setSettings] = useState({
         allNotifications: { enabled: true },
         reportRecipients: [],
-        adminNotifications: { enabled: true, newBooking: true, bookingCancelled: true, paymentReceived: true },
+        adminNotifications: { enabled: true, newBooking: true, bookingCancelled: true, paymentReceived: true, customerConfirmed: true },
         customerNotifications: { enabled: true, appointmentConfirmed: true, appointmentCancelled: true, appointmentReminder: true, reviewRequest: true, paymentInvoice: true },
     });
     const [bookingSettings, setBookingSettings] = useState({ 
@@ -79,7 +79,7 @@ export default function AdminSettingsPage() {
             }
         };
         fetchInitialData();
-    }, [showToast]);
+    }, []);
 
     const handleNotificationChange = (group, key, value) => {
         setSettings(prev => ({
@@ -246,6 +246,7 @@ export default function AdminSettingsPage() {
                         {settings.adminNotifications.enabled && (
                             <div className="pl-4 border-l-2 ml-4 space-y-2 text-xs">
                                 <Toggle label="เมื่อมีการจองใหม่" checked={settings.adminNotifications.newBooking} onChange={(value) => handleNotificationChange('adminNotifications', 'newBooking', value)} disabled={!settings.allNotifications.enabled} />
+                                <Toggle label="เมื่อลูกค้ายืนยันนัดหมาย" checked={settings.adminNotifications.customerConfirmed} onChange={(value) => handleNotificationChange('adminNotifications', 'customerConfirmed', value)} disabled={!settings.allNotifications.enabled} />
                                 <Toggle label="เมื่อมีการยกเลิก" checked={settings.adminNotifications.bookingCancelled} onChange={(value) => handleNotificationChange('adminNotifications', 'bookingCancelled', value)} disabled={!settings.allNotifications.enabled}/>
                                 <Toggle label="เมื่อมีการชำระเงิน" checked={settings.adminNotifications.paymentReceived} onChange={(value) => handleNotificationChange('adminNotifications', 'paymentReceived', value)} disabled={!settings.allNotifications.enabled}/>
                             </div>

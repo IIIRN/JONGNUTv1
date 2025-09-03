@@ -209,7 +209,7 @@ function GeneralInfoContent() {
                         </div>
                         <div className="flex justify-between items-center mb-2">
                             <span className="text-sm font-medium">พนักงาน</span>
-                            <span className="text-sm font-semibold">{beautician?.firstName === 'ระบบจัดให้' ? 'บ่อง' : beautician?.firstName}</span>
+                            <span className="text-sm font-semibold">{beautician?.firstName === 'ระบบจัดให้' ? '-' : beautician?.firstName}</span>
                         </div>
                     </div>
 
