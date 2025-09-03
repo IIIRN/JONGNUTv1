@@ -225,9 +225,9 @@ function SelectDateTimeContent() {
         <div>
             <ToastComponent />
             <CustomerHeader showBackButton={true} showActionButtons={false} />
-            <div className="min-h-screen flex flex-col items-center pt-4 px-4">
+            <div className="min-h-screen flex flex-col items-center  px-4">
             {/* Calendar */}
-            <div className="w-full max-w-md mx-auto flex flex-col items-center">
+            <div className="w-full bg-white/30 border border-[#A8999E] p-4 rounded-2xl max-w-md mx-auto flex flex-col items-center">
                 <div className="flex items-center justify-between w-full mb-4">
                     <button
                         onClick={() => setActiveMonth(prev => {
@@ -427,7 +427,7 @@ function SelectDateTimeContent() {
                 <button
                     onClick={handleConfirm}
                     disabled={!date || !time || (useBeautician && !selectedBeautician)}
-                    className="w-full bg-primary-dark text-white py-3 rounded-xl font-bold shadow-lg "
+                    className="w-full bg-primary-dark text-white py-4 rounded-2xl font-bold shadow-lg "
                 >
                     ถัดไป
                 </button>

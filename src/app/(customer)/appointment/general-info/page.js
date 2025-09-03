@@ -45,7 +45,7 @@ function GeneralInfoContent() {
                     getDoc(doc(db, 'services', serviceId)),
                     getDocs(query(collection(db, "customers", profile.userId, "coupons"), where("used", "==", false)))
                 ];
-                
+
                 // เพิ่ม beautician fetch เฉพาะเมื่อไม่ใช่ auto-assign
                 if (beauticianId && beauticianId !== 'auto-assign') {
                     promises.push(getDoc(doc(db, 'beauticians', beauticianId)));
@@ -62,14 +62,14 @@ function GeneralInfoContent() {
                 }
 
                 if (serviceSnap.exists()) setService(serviceSnap.data());
-                
+
                 // ตั้งค่า beautician
                 if (beauticianId === 'auto-assign') {
                     setBeautician({ firstName: 'ระบบจัดให้', lastName: '', id: 'auto-assign' });
                 } else if (beauticianSnap && beauticianSnap.exists()) {
                     setBeautician(beauticianSnap.data());
                 }
-                
+
                 setAvailableCoupons(couponsSnapshot.docs.map(d => ({ id: d.id, ...d.data() })));
             } catch (error) {
                 console.error("Error fetching details:", error);
@@ -86,7 +86,7 @@ function GeneralInfoContent() {
         const addOnsPrice = (service.addOnServices || []).filter(a => selectedAddOns.includes(a.name)).reduce((sum, a) => sum + (a.price || 0), 0);
         const total = base + addOnsPrice;
         const selectedCoupon = availableCoupons.find(c => c.id === selectedCouponId);
-        
+
         let discountAmount = 0;
         if (selectedCoupon) {
             if (selectedCoupon.discountType === 'percentage') {
@@ -97,7 +97,7 @@ function GeneralInfoContent() {
             // ป้องกันส่วนลดเกินราคาสินค้า
             discountAmount = Math.min(discountAmount, total);
         }
-        
+
         return { basePrice: base, addOnsTotal: addOnsPrice, totalPrice: total, finalPrice: Math.max(0, total - discountAmount), discount: discountAmount };
     }, [service, selectedAddOns, selectedCouponId, availableCoupons]);
 
@@ -152,7 +152,7 @@ function GeneralInfoContent() {
 
             // ใช้ฟังก์ชันที่มีการตรวจสอบคิวสูงสุด
             const result = await createAppointmentWithSlotCheck(appointmentData);
-            
+
             if (!result.success) {
                 showToast(result.error, "error", "เกิดข้อผิดพลาด");
                 return;
@@ -222,7 +222,7 @@ function GeneralInfoContent() {
                                 <div className="text-sm text-gray-500">{service?.duration}นาที | {basePrice.toLocaleString()}</div>
                             </div>
                         </div>
-                        
+
                         {selectedAddOns.length > 0 && (
                             <div className="flex justify-between items-center mb-2">
                                 <span className="text-sm font-medium text-primary">บริการเสริม</span>
@@ -255,7 +255,7 @@ function GeneralInfoContent() {
                                 <span>ใช้คูปอง ({availableCoupons.length} ใบ)</span>
                                 <span>{showCoupon ? '▼' : '▶'}</span>
                             </button>
-                            
+
                             {showCoupon && (
                                 <div className="space-y-2">
                                     <div className="bg-gray-50 text-primary rounded-lg p-3">
@@ -349,7 +349,7 @@ function GeneralInfoContent() {
                                 value={formData.email}
                                 onChange={handleChange}
                                 className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent placeholder-gray-500"
-                                
+
                             />
                         </div>
 
@@ -361,7 +361,7 @@ function GeneralInfoContent() {
                                 onChange={handleChange}
                                 rows={2}
                                 className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent resize-none placeholder-gray-500"
-                               
+
                             />
                         </div>
                     </form>
