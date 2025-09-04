@@ -27,6 +27,21 @@ export async function submitReview(reviewData) {
   const reviewRef = db.collection('reviews').doc(appointmentId); // Use appointmentId as reviewId for simplicity
 
   try {
+    // Get point settings first
+    const pointSettingsRef = db.collection('settings').doc('points');
+    const pointSettingsDoc = await pointSettingsRef.get();
+    
+    let pointsToAward = 0;
+    if (pointSettingsDoc.exists()) {
+      const pointSettings = pointSettingsDoc.data();
+      if (pointSettings.enableReviewPoints) {
+        pointsToAward = pointSettings.reviewPoints || 5;
+      }
+    } else {
+      // Default: give 5 points for review if no settings found
+      pointsToAward = 5;
+    }
+
     await db.runTransaction(async (transaction) => {
       const appointmentDoc = await transaction.get(appointmentRef);
       if (!appointmentDoc.exists) {
@@ -49,6 +64,7 @@ export async function submitReview(reviewData) {
         customerName: appointmentData.customerInfo.fullName || appointmentData.customerInfo.name,
         rating: Number(rating),
         comment: comment || '',
+        pointsAwarded: pointsToAward,
         createdAt: FieldValue.serverTimestamp(),
       });
 
@@ -56,11 +72,39 @@ export async function submitReview(reviewData) {
       transaction.update(appointmentRef, {
         'reviewInfo.submitted': true,
         'reviewInfo.rating': Number(rating),
+        'reviewInfo.pointsAwarded': pointsToAward,
         updatedAt: FieldValue.serverTimestamp(),
       });
+
+      // Award points to customer if enabled
+      if (pointsToAward > 0) {
+        const customerRef = db.collection('customers').doc(userId);
+        const customerDoc = await transaction.get(customerRef);
+        
+        if (customerDoc.exists()) {
+          const currentPoints = customerDoc.data().points || 0;
+          transaction.update(customerRef, {
+            points: currentPoints + pointsToAward,
+            updatedAt: FieldValue.serverTimestamp(),
+          });
+        } else {
+          // Create customer record if doesn't exist
+          transaction.set(customerRef, {
+            points: pointsToAward,
+            createdAt: FieldValue.serverTimestamp(),
+            updatedAt: FieldValue.serverTimestamp(),
+          });
+        }
+      }
     });
 
-    const thankYouMessage = 'ขอบคุณสำหรับรีวิวค่ะ! ความคิดเห็นของคุณมีความสำคัญอย่างยิ่งในการพัฒนาบริการของเราให้ดียิ่งขึ้นไปค่ะ';
+    // Send thank you message with points info
+    let thankYouMessage = 'ขอบคุณสำหรับรีวิวค่ะ! ความคิดเห็นของคุณมีความสำคัญอย่างยิ่งในการพัฒนาบริการของเราให้ดียิ่งขึ้นไปค่ะ';
+    
+    if (pointsToAward > 0) {
+      thankYouMessage += `\n\n🎉 คุณได้รับ ${pointsToAward} พ้อยต์จากการรีวิว!`;
+    }
+    
     await sendLineMessage(userId, thankYouMessage);
 
     return { success: true };

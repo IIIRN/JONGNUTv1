@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { db } from '@/app/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
-import { saveNotificationSettings, saveBookingSettings } from '@/app/actions/settingsActions';
+import { saveNotificationSettings, saveBookingSettings, savePointSettings } from '@/app/actions/settingsActions';
 import { fetchAllAdmins } from '@/app/actions/adminActions';
 import { sendDailyReportNow } from '@/app/actions/reportActions'; 
 import { useToast } from '@/app/components/Toast';
@@ -44,6 +44,14 @@ export default function AdminSettingsPage() {
         weeklySchedule: {},
         holidayDates: []
     });
+    const [pointSettings, setPointSettings] = useState({
+        reviewPoints: 5, // พ้อยต์ที่ได้หลังรีวิว
+        pointsPerCurrency: 100, // ราคาเท่าไหร่ต่อ 1 พ้อย (100 บาทต่อ 1 พ้อย)
+        pointsPerVisit: 1, // พ้อยต์ต่อครั้งที่มาใช้บริการ
+        enableReviewPoints: true,
+        enablePurchasePoints: false,
+        enableVisitPoints: false
+    });
     const [allAdmins, setAllAdmins] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
@@ -64,6 +72,12 @@ export default function AdminSettingsPage() {
                 const bookDocSnap = await getDoc(bookSettingsRef);
                 if (bookDocSnap.exists()) {
                     setBookingSettings(prev => ({ ...prev, ...bookDocSnap.data() }));
+                }
+
+                const pointSettingsRef = doc(db, 'settings', 'points');
+                const pointDocSnap = await getDoc(pointSettingsRef);
+                if (pointDocSnap.exists()) {
+                    setPointSettings(prev => ({ ...prev, ...pointDocSnap.data() }));
                 }
                 
                 const adminResult = await fetchAllAdmins();
@@ -101,11 +115,12 @@ export default function AdminSettingsPage() {
         try {
             const { updatedAt: nUpdatedAt, ...notificationData } = settings;
             const { updatedAt: bUpdatedAt, ...cleanBookingSettings } = bookingSettings;
-
+            const { updatedAt: pUpdatedAt, ...cleanPointSettings } = pointSettings;
 
             const results = await Promise.all([
                 saveNotificationSettings(notificationData),
-                saveBookingSettings(cleanBookingSettings)
+                saveBookingSettings(cleanBookingSettings),
+                savePointSettings(cleanPointSettings)
             ]);
             if (results.every(r => r.success)) {
                 showToast('บันทึกการตั้งค่าสำเร็จ!', 'success');
@@ -260,6 +275,71 @@ export default function AdminSettingsPage() {
                                 <Toggle label="แจ้งเตือนล่วงหน้า 1 ชม." checked={settings.customerNotifications.appointmentReminder} onChange={(value) => handleNotificationChange('customerNotifications', 'appointmentReminder', value)} disabled={!settings.allNotifications.enabled}/>
                                 <Toggle label="แจ้งเตือนชำระเงิน" checked={settings.customerNotifications.paymentInvoice} onChange={(value) => handleNotificationChange('customerNotifications', 'paymentInvoice', value)} disabled={!settings.allNotifications.enabled}/>
                                 <Toggle label="แจ้งเตือนขอรีวิว" checked={settings.customerNotifications.reviewRequest} onChange={(value) => handleNotificationChange('customerNotifications', 'reviewRequest', value)} disabled={!settings.allNotifications.enabled}/>
+                            </div>
+                        )}
+                    </SettingsCard>
+                    
+                    <SettingsCard title="ระบบสะสมพ้อยต์">
+                        <Toggle 
+                            label="ให้พ้อยต์หลังรีวิว" 
+                            checked={pointSettings.enableReviewPoints}
+                            onChange={(value) => setPointSettings(prev => ({...prev, enableReviewPoints: value}))}
+                        />
+                        {pointSettings.enableReviewPoints && (
+                            <div className="pl-4 border-l-2 ml-4 space-y-3">
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">พ้อยต์ที่ได้หลังรีวิว</label>
+                                    <input 
+                                        type="number" 
+                                        min={1} 
+                                        value={pointSettings.reviewPoints || ''} 
+                                        onChange={e => setPointSettings(prev => ({...prev, reviewPoints: parseInt(e.target.value) || 1}))} 
+                                        className="border rounded-md px-2 py-1 w-full text-sm"
+                                        placeholder="เช่น 5"
+                                    />
+                                </div>
+                            </div>
+                        )}
+                        
+                        <Toggle 
+                            label="ให้พ้อยต์ตามยอดซื้อ" 
+                            checked={pointSettings.enablePurchasePoints}
+                            onChange={(value) => setPointSettings(prev => ({...prev, enablePurchasePoints: value}))}
+                        />
+                        {pointSettings.enablePurchasePoints && (
+                            <div className="pl-4 border-l-2 ml-4 space-y-3">
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">ยอดซื้อกี่บาทต่อ 1 พ้อย</label>
+                                    <input 
+                                        type="number" 
+                                        min={1} 
+                                        value={pointSettings.pointsPerCurrency || ''} 
+                                        onChange={e => setPointSettings(prev => ({...prev, pointsPerCurrency: parseInt(e.target.value) || 100}))} 
+                                        className="border rounded-md px-2 py-1 w-full text-sm"
+                                        placeholder="เช่น 100 (100 บาทต่อ 1 พ้อย)"
+                                    />
+                                </div>
+                            </div>
+                        )}
+                        
+                        <Toggle 
+                            label="ให้พ้อยต์ต่อครั้งที่มาใช้บริการ" 
+                            checked={pointSettings.enableVisitPoints}
+                            onChange={(value) => setPointSettings(prev => ({...prev, enableVisitPoints: value}))}
+                        />
+                        {pointSettings.enableVisitPoints && (
+                            <div className="pl-4 border-l-2 ml-4 space-y-3">
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">พ้อยต์ต่อครั้งที่มาใช้บริการ</label>
+                                    <input 
+                                        type="number" 
+                                        min={1} 
+                                        value={pointSettings.pointsPerVisit || ''} 
+                                        onChange={e => setPointSettings(prev => ({...prev, pointsPerVisit: parseInt(e.target.value) || 1}))} 
+                                        className="border rounded-md px-2 py-1 w-full text-sm"
+                                        placeholder="เช่น 1"
+                                    />
+                                </div>
                             </div>
                         )}
                     </SettingsCard>

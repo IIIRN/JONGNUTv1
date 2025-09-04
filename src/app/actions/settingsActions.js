@@ -64,3 +64,49 @@ export async function fetchBookingSettings() {
         return { success: false, error: error.message };
     }
 }
+
+/**
+ * Saves point settings to Firestore.
+ */
+export async function savePointSettings(settingsData) {
+  try {
+    const settingsRef = db.collection('settings').doc('points');
+    await settingsRef.set({
+      ...settingsData,
+      updatedAt: FieldValue.serverTimestamp()
+    }, { merge: true });
+    console.log("Successfully saved point settings.");
+    return { success: true };
+  } catch (error) {
+    console.error("Error saving point settings:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Fetches point settings from Firestore.
+ */
+export async function fetchPointSettings() {
+  try {
+    const settingsRef = db.collection('settings').doc('points');
+    const docSnap = await settingsRef.get();
+    if (docSnap.exists()) {
+      return { success: true, settings: JSON.parse(JSON.stringify(docSnap.data())) };
+    }
+    // Return default settings
+    return { 
+      success: true, 
+      settings: { 
+        reviewPoints: 5, 
+        pointsPerCurrency: 100, 
+        pointsPerVisit: 1,
+        enableReviewPoints: true,
+        enablePurchasePoints: false,
+        enableVisitPoints: false
+      } 
+    };
+  } catch (error) {
+    console.error("Error fetching point settings:", error);
+    return { success: false, error: error.message };
+  }
+}

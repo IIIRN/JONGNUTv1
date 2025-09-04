@@ -4,6 +4,7 @@ import { db } from '@/app/lib/firebaseAdmin';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { sendLineMessage, sendBookingNotification } from '@/app/actions/lineActions';
 import { sendTelegramMessageToAdmin } from '@/app/actions/telegramActions';
+import { awardPointsForPurchase, awardPointsForVisit } from '@/app/actions/pointActions';
 
 /**
  * Creates a new appointment, checking for slot availability.
@@ -193,14 +194,37 @@ export async function confirmAppointmentAndPaymentByAdmin(appointmentId, adminId
         if (!appointmentDoc.exists) throw new Error("ไม่พบข้อมูลการนัดหมาย");
         const appointmentData = appointmentDoc.data();
 
-        if (appointmentData.status !== 'awaiting_confirmation' && appointmentData.status !== 'confirmed') {
-            throw new Error("สถานะการนัดหมายไม่ถูกต้อง ไม่สามารถดำเนินการได้");
+        // Allow payment for all statuses except cancelled
+        if (appointmentData.status === 'cancelled') {
+            throw new Error("ไม่สามารถชำระเงินสำหรับการนัดหมายที่ยกเลิกแล้ว");
         }
         
         const wasAwaitingConfirmation = appointmentData.status === 'awaiting_confirmation';
+        const currentStatus = appointmentData.status;
+
+        // Award points for purchase and visit
+        const userId = appointmentData.userId;
+        const totalPrice = data.amount || appointmentData.paymentInfo?.totalPrice || 0;
+        
+        let totalPointsAwarded = 0;
+
+        // Award points for purchase amount
+        if (totalPrice > 0) {
+            const purchasePointsResult = await awardPointsForPurchase(userId, totalPrice);
+            if (purchasePointsResult.success) {
+                totalPointsAwarded += purchasePointsResult.pointsAwarded || 0;
+            }
+        }
+
+        // Award points for visit
+        const visitPointsResult = await awardPointsForVisit(userId);
+        if (visitPointsResult.success) {
+            totalPointsAwarded += visitPointsResult.pointsAwarded || 0;
+        }
 
         await appointmentRef.update({
-            status: 'confirmed',
+            // Keep current status unless it's awaiting_confirmation
+            status: wasAwaitingConfirmation ? 'confirmed' : currentStatus,
             'appointmentInfo.employeeId': adminId, 
             'appointmentInfo.timestamp': FieldValue.serverTimestamp(),
             'paymentInfo.paymentStatus': 'paid',
@@ -217,7 +241,13 @@ export async function confirmAppointmentAndPaymentByAdmin(appointmentId, adminId
             } else {
                  customerMessage = `✅ ได้รับการชำระเงินสำหรับบริการ "${appointmentData.serviceInfo.name}" ในวันที่ ${appointmentData.date} เรียบร้อยแล้วค่ะ\n\nขอบคุณที่ใช้บริการค่ะ ✨`;
             }
-            await sendLineMessage(appointmentData.userId, customerMessage, 'appointmentConfirmed');
+            
+            // Add points information if any points were awarded
+            if (totalPointsAwarded > 0) {
+                customerMessage += `\n\n🎉 คุณได้รับ ${totalPointsAwarded} พ้อยต์จากการใช้บริการ!`;
+            }
+            
+            await sendLineMessage(appointmentData.userId, customerMessage, 'paymentReceived');
         }
 
         try {
@@ -292,6 +322,30 @@ export async function updateAppointmentStatusByAdmin(appointmentId, newStatus) {
             updatedAt: FieldValue.serverTimestamp()
         });
 
+        // Award points when status changes to completed
+        if (newStatus === 'completed' && appointmentData.userId) {
+            const totalPrice = appointmentData.paymentInfo?.totalPrice || appointmentData.paymentInfo?.amountPaid || 0;
+            
+            let totalPointsAwarded = 0;
+
+            // Award points for purchase amount
+            if (totalPrice > 0) {
+                const purchasePointsResult = await awardPointsForPurchase(appointmentData.userId, totalPrice);
+                if (purchasePointsResult.success) {
+                    totalPointsAwarded += purchasePointsResult.pointsAwarded || 0;
+                }
+            }
+
+            // Award points for visit
+            const visitPointsResult = await awardPointsForVisit(appointmentData.userId);
+            if (visitPointsResult.success) {
+                totalPointsAwarded += visitPointsResult.pointsAwarded || 0;
+            }
+
+            // Store points info for later use in message
+            appointmentData._totalPointsAwarded = totalPointsAwarded;
+        }
+
         if (appointmentData.userId) {
             let customerMessage = '';
             let notificationType = '';
@@ -306,6 +360,10 @@ export async function updateAppointmentStatusByAdmin(appointmentId, newStatus) {
                     break;
                 case 'completed':
                     customerMessage = `✨ บริการ "${serviceName}" ของคุณเสร็จสมบูรณ์แล้ว ขอบคุณที่ใช้บริการค่ะ`;
+                    // Add points information if any points were awarded
+                    if (appointmentData._totalPointsAwarded && appointmentData._totalPointsAwarded > 0) {
+                        customerMessage += `\n\n🎉 คุณได้รับ ${appointmentData._totalPointsAwarded} พ้อยต์จากการใช้บริการ!`;
+                    }
                     notificationType = 'appointmentConfirmed'; 
                     await sendReviewRequestToCustomer(appointmentId);
                     break;

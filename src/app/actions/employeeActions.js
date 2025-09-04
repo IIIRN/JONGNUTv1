@@ -3,7 +3,8 @@
 import { db } from '@/app/lib/firebaseAdmin';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { revalidatePath } from 'next/cache';
-import { sendBookingNotification } from './lineActions'; 
+import { sendBookingNotification } from './lineActions';
+import { awardPointsForPurchase, awardPointsForVisit } from './pointActions'; 
 
 // --- Registration and Status Updates ---
 
@@ -41,6 +42,8 @@ export async function updateAppointmentStatus(appointmentId, newStatus, employee
         const appointmentDoc = await appointmentRef.get();
         if (!appointmentDoc.exists) throw new Error("ไม่พบข้อมูลนัดหมาย");
         
+        const appointmentData = appointmentDoc.data();
+        
         const updateData = {
             status: newStatus,
             updatedAt: FieldValue.serverTimestamp(),
@@ -54,6 +57,46 @@ export async function updateAppointmentStatus(appointmentId, newStatus, employee
         }
 
         await appointmentRef.update(updateData);
+
+        // Award points when status changes to completed
+        if (newStatus === 'completed' && appointmentData.userId) {
+            const totalPrice = appointmentData.paymentInfo?.totalPrice || appointmentData.paymentInfo?.amountPaid || 0;
+            
+            let totalPointsAwarded = 0;
+
+            // Award points for purchase amount
+            if (totalPrice > 0) {
+                const purchasePointsResult = await awardPointsForPurchase(appointmentData.userId, totalPrice);
+                if (purchasePointsResult.success) {
+                    totalPointsAwarded += purchasePointsResult.pointsAwarded || 0;
+                }
+            }
+
+            // Award points for visit
+            const visitPointsResult = await awardPointsForVisit(appointmentData.userId);
+            if (visitPointsResult.success) {
+                totalPointsAwarded += visitPointsResult.pointsAwarded || 0;
+            }
+
+            // Send completion message with points info to customer
+            if (appointmentData.userId) {
+                const serviceName = appointmentData.serviceInfo?.name || 'บริการ';
+                let customerMessage = `✨ บริการ "${serviceName}" ของคุณเสร็จสมบูรณ์แล้ว ขอบคุณที่ใช้บริการค่ะ`;
+                
+                if (totalPointsAwarded > 0) {
+                    customerMessage += `\n\n🎉 คุณได้รับ ${totalPointsAwarded} พ้อยต์จากการใช้บริการ!`;
+                }
+                
+                await sendBookingNotification({
+                    customerName: appointmentData.customerInfo?.fullName || 'ลูกค้า',
+                    serviceName: serviceName,
+                    appointmentDate: appointmentData.date,
+                    appointmentTime: appointmentData.time,
+                    message: customerMessage
+                }, 'appointmentCompleted');
+            }
+        }
+
         return { success: true };
     } catch (error) {
         console.error("Error updating appointment status:", error);
@@ -87,6 +130,26 @@ export async function updatePaymentStatusByEmployee(appointmentId, employeeId) {
             updatedAt: FieldValue.serverTimestamp()
         });
 
+        // Award points for purchase and visit
+        const userId = appointmentData.userId;
+        const totalPrice = appointmentData.paymentInfo?.totalPrice || 0;
+        
+        let totalPointsAwarded = 0;
+
+        // Award points for purchase amount
+        if (totalPrice > 0) {
+            const purchasePointsResult = await awardPointsForPurchase(userId, totalPrice);
+            if (purchasePointsResult.success) {
+                totalPointsAwarded += purchasePointsResult.pointsAwarded || 0;
+            }
+        }
+
+        // Award points for visit
+        const visitPointsResult = await awardPointsForVisit(userId);
+        if (visitPointsResult.success) {
+            totalPointsAwarded += visitPointsResult.pointsAwarded || 0;
+        }
+
         // Send notification to admins
         try {
             const notificationData = {
@@ -101,7 +164,10 @@ export async function updatePaymentStatusByEmployee(appointmentId, employeeId) {
             console.error('Error sending payment notification from employee action:', notificationError);
         }
 
-        return { success: true };
+        return { 
+            success: true, 
+            pointsAwarded: totalPointsAwarded 
+        };
 
     } catch (error) {
         console.error("Error updating payment status by employee:", error);

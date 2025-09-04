@@ -384,7 +384,7 @@ export default function AdminAppointmentDetail() {
             <InfoRow label="อัพเดตล่าสุด" value={safeDate(appointment.updatedAt) ? format(safeDate(appointment.updatedAt), 'dd MMM yyyy, HH:mm', { locale: th }) : '-'} />
             <button
                 onClick={handleSendInvoice}
-                disabled={isSendingInvoice || appointment.paymentInfo?.paymentStatus === 'paid'}
+                disabled={isSendingInvoice}
                 className="w-full bg-blue-600 text-white py-2 rounded-md mt-2 hover:bg-blue-700 disabled:bg-gray-400"
             >
                 {isSendingInvoice ? 'กำลังส่ง...' : 'ส่งลิงก์ชำระเงิน'}

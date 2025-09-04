@@ -34,7 +34,7 @@ export default function EditAppointmentPage() {
                 const [appointmentSnap, servicesSnapshot, beauticiansSnapshot] = await Promise.all([
                     getDoc(appointmentRef),
                     getDocs(servicesQuery),
-                    getDocs(beauticiansSnapshot)
+                    getDocs(beauticiansQuery)
                 ]);
 
                 if (!appointmentSnap.exists()) {
