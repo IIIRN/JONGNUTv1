@@ -74,14 +74,11 @@ const AppointmentCard = ({ job, onQrCodeClick, onCancelClick, onConfirmClick, is
                             </button>
                         )}
                          {job.status === 'confirmed' && (
-                            <button 
-                                className="bg-success text-white py-2 px-4 rounded-lg font-semibold text-sm cursor-not-allowed"
-                                disabled
-                            >
-                                ยืนยันแล้ว
-                            </button>
+                            <div className="text-center text-green-600 font-semibold text-sm py-2">
+                                กรุณามาก่อน 10 นาที
+                            </div>
                         )}
-                        {job.status !== 'in_progress' && (
+                        {job.status !== 'in_progress' && job.status !== 'confirmed' && (
                             <button 
                                 onClick={() => onCancelClick(job)}
                                 className="bg-error text-white py-2 px-4 rounded-lg font-semibold text-sm hover:bg-red-200 transition-colors"

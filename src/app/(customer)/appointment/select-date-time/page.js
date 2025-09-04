@@ -410,7 +410,7 @@ function SelectDateTimeContent() {
                 <button
                     onClick={handleConfirm}
                     disabled={!date || !time || (useBeautician && !selectedBeautician)}
-                    className="w-full bg-primary-dark text-white py-4 rounded-2xl font-bold shadow-lg "
+                    className="w-full bg-primary text-white py-4 rounded-2xl font-bold shadow-lg "
                 >
                     ถัดไป
                 </button>
