@@ -153,3 +153,61 @@ export async function generateQrCodeFromText(text) {
         throw new Error('Failed to generate QR code.');
     }
 }
+
+/**
+ * Updates the payment status of an appointment
+ * @param {string} appointmentId - The appointment ID
+ * @param {string} status - The payment status ('paid', 'unpaid', 'pending', etc.)
+ * @param {object} additionalData - Additional payment data
+ * @returns {Promise<object>} - Result object with success status
+ */
+export async function updatePaymentStatus(appointmentId, status, additionalData = {}) {
+    try {
+        if (!appointmentId) {
+            throw new Error('Appointment ID is required');
+        }
+
+        if (!status) {
+            throw new Error('Payment status is required');
+        }
+
+        console.log('Updating payment status for appointment:', appointmentId);
+        console.log('New status:', status);
+        console.log('Additional data:', additionalData);
+
+        // Import Firebase functions here to avoid issues with server actions
+        const { doc, updateDoc } = await import('firebase/firestore');
+        const { db } = await import('@/app/lib/firebase');
+
+        // Create the update object
+        const updateData = {
+            'paymentInfo.status': status,
+            'paymentInfo.updatedAt': new Date().toISOString(),
+            ...additionalData
+        };
+
+        // Update the appointment document
+        const appointmentRef = doc(db, 'appointments', appointmentId);
+        await updateDoc(appointmentRef, updateData);
+
+        console.log('Payment status updated successfully');
+
+        return {
+            success: true,
+            message: 'Payment status updated successfully',
+            data: {
+                appointmentId,
+                status,
+                updatedAt: updateData['paymentInfo.updatedAt']
+            }
+        };
+
+    } catch (error) {
+        console.error('Error updating payment status:', error);
+        return {
+            success: false,
+            error: error.message || 'Failed to update payment status',
+            data: null
+        };
+    }
+}
