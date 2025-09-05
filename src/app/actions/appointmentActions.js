@@ -360,62 +360,33 @@ export async function updateAppointmentStatusByAdmin(appointmentId, newStatus) {
         }
 
         // Award points when status changes to completed
-        if (newStatus === 'completed') {
-            console.log(`🎯 Appointment ${appointmentId} status changed to COMPLETED - Processing points...`);
-            const totalPrice = appointmentData.paymentInfo?.totalPrice || appointmentData.paymentInfo?.amountPaid || 0;
-            let totalPointsAwarded = 0;
+            if (newStatus === 'completed') {
+                // Award points based on settings
+                const pointSettingsSnap = await db.collection('settings').doc('points').get();
+                const pointSettings = pointSettingsSnap.exists ? pointSettingsSnap.data() : {};
+                let totalPointsAwarded = 0;
 
-            console.log(`💰 Total price for points calculation: ${totalPrice} baht`);
-            console.log(`👤 Customer info:`, { 
-                userId: appointmentData.userId, 
-                phone: appointmentData.customerInfo?.phone,
-                fullName: appointmentData.customerInfo?.fullName 
-            });
-
-            // Check if customer has userId (LINE ID) for points award
-            if (appointmentData.userId) {
-                console.log(`📱 Customer has LINE ID: ${appointmentData.userId} - Using LINE points system`);
-                
-                // Award points for purchase amount
-                if (totalPrice > 0) {
-                    console.log(`💸 Awarding purchase points for ${totalPrice} baht...`);
-                    const purchasePointsResult = await awardPointsForPurchase(appointmentData.userId, totalPrice);
-                    console.log(`💸 Purchase points result:`, purchasePointsResult);
-                    if (purchasePointsResult.success) {
-                        totalPointsAwarded += purchasePointsResult.pointsAwarded || 0;
+                // Award points for purchase if enabled
+                if (pointSettings.enablePurchasePoints && appointmentData.userId) {
+                    const totalPrice = appointmentData.paymentInfo?.totalPrice || appointmentData.paymentInfo?.amountPaid || 0;
+                    if (totalPrice > 0) {
+                        const purchasePointsResult = await awardPointsForPurchase(appointmentData.userId, totalPrice);
+                        if (purchasePointsResult.success) {
+                            totalPointsAwarded += purchasePointsResult.pointsAwarded || 0;
+                        }
                     }
                 }
 
-                // Award points for visit
-                console.log(`🏪 Awarding visit points...`);
-                const visitPointsResult = await awardPointsForVisit(appointmentData.userId);
-                console.log(`🏪 Visit points result:`, visitPointsResult);
-                if (visitPointsResult.success) {
-                    totalPointsAwarded += visitPointsResult.pointsAwarded || 0;
+                // Award points for visit if enabled
+                if (pointSettings.enableVisitPoints && appointmentData.userId) {
+                    const visitPointsResult = await awardPointsForVisit(appointmentData.userId);
+                    if (visitPointsResult.success) {
+                        totalPointsAwarded += visitPointsResult.pointsAwarded || 0;
+                    }
                 }
 
-                console.log(`✅ Points awarded for customer with LINE ID ${appointmentData.userId}: ${totalPointsAwarded} points`);
-            } else if (appointmentData.customerInfo?.phone) {
-                console.log(`📞 Customer has phone: ${appointmentData.customerInfo.phone} - Using phone points system`);
-                
-                // Customer doesn't have LINE ID but has phone number - use alternative point system
-                const phonePointsResult = await awardPointsByPhone(
-                    appointmentData.customerInfo.phone, 
-                    totalPrice, 
-                    appointmentId
-                );
-                console.log(`📞 Phone points result:`, phonePointsResult);
-                if (phonePointsResult.success) {
-                    totalPointsAwarded = phonePointsResult.pointsAwarded || 0;
-                    console.log(`✅ Points awarded for customer with phone ${appointmentData.customerInfo.phone}: ${totalPointsAwarded} points (No LINE ID)`);
-                }
-            } else {
-                // Customer has neither LINE ID nor phone number - log for admin awareness
-                console.log(`Customer for appointment ${appointmentId} has no LINE ID or phone number. Points cannot be awarded. Manual intervention required.`);
-            }
-
-            // Store points info for later use in message
-            appointmentData._totalPointsAwarded = totalPointsAwarded;
+                // Store points info for later use in message
+                appointmentData._totalPointsAwarded = totalPointsAwarded;
         }
 
         // Send LINE notification only if customer has userId (LINE ID)
