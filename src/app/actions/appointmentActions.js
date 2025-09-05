@@ -360,33 +360,35 @@ export async function updateAppointmentStatusByAdmin(appointmentId, newStatus) {
         }
 
         // Award points when status changes to completed
-            if (newStatus === 'completed') {
-                // Award points based on settings
-                const pointSettingsSnap = await db.collection('settings').doc('points').get();
-                const pointSettings = pointSettingsSnap.exists ? pointSettingsSnap.data() : {};
-                let totalPointsAwarded = 0;
+        if (newStatus === 'completed') {
+            // Award points based on settings
+            const pointSettingsSnap = await db.collection('settings').doc('points').get();
+            const pointSettings = pointSettingsSnap.exists ? pointSettingsSnap.data() : {};
+            let totalPointsAwarded = 0;
 
-                // Award points for purchase if enabled
-                if (pointSettings.enablePurchasePoints && appointmentData.userId) {
-                    const totalPrice = appointmentData.paymentInfo?.totalPrice || appointmentData.paymentInfo?.amountPaid || 0;
-                    if (totalPrice > 0) {
-                        const purchasePointsResult = await awardPointsForPurchase(appointmentData.userId, totalPrice);
-                        if (purchasePointsResult.success) {
-                            totalPointsAwarded += purchasePointsResult.pointsAwarded || 0;
-                        }
+            // Award points for purchase if enabled
+            if (pointSettings.enablePurchasePoints && appointmentData.userId) {
+                const totalPrice = appointmentData.paymentInfo?.totalPrice || appointmentData.paymentInfo?.amountPaid || 0;
+                if (totalPrice > 0) {
+                    const purchasePointsResult = await awardPointsForPurchase(appointmentData.userId, totalPrice);
+                    if (purchasePointsResult.success) {
+                        totalPointsAwarded += purchasePointsResult.pointsAwarded || 0;
                     }
                 }
+            }
 
-                // Award points for visit if enabled
-                if (pointSettings.enableVisitPoints && appointmentData.userId) {
-                    const visitPointsResult = await awardPointsForVisit(appointmentData.userId);
-                    if (visitPointsResult.success) {
-                        totalPointsAwarded += visitPointsResult.pointsAwarded || 0;
-                    }
+            // Award points for visit if enabled and not already awarded
+            if (pointSettings.enableVisitPoints && appointmentData.userId && !appointmentData.visitPointsAwarded) {
+                const visitPointsResult = await awardPointsForVisit(appointmentData.userId);
+                if (visitPointsResult.success) {
+                    totalPointsAwarded += visitPointsResult.pointsAwarded || 0;
+                    // Mark as awarded to prevent future duplicate
+                    await appointmentRef.update({ visitPointsAwarded: true });
                 }
+            }
 
-                // Store points info for later use in message
-                appointmentData._totalPointsAwarded = totalPointsAwarded;
+            // Store points info for later use in message
+            appointmentData._totalPointsAwarded = totalPointsAwarded;
         }
 
         // Send LINE notification only if customer has userId (LINE ID)
