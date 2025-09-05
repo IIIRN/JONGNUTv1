@@ -22,6 +22,8 @@ import { findOrCreateCustomer } from '@/app/actions/customerActions';
 export async function createAppointmentWithSlotCheck(appointmentData) {
     const { date, time, serviceId, beauticianId, userId } = appointmentData;
     if (!date || !time) return { success: false, error: 'กรุณาระบุวันและเวลา' };
+    // Ensure userId is present before creating an appointment, as it's crucial for sending notifications.
+    if (!userId) return { success: false, error: 'ไม่พบข้อมูลผู้ใช้ (userId) กรุณาเข้าสู่ระบบใหม่อีกครั้ง' };
     try {
         const settingsRef = db.collection('settings').doc('booking');
         const settingsSnap = await settingsRef.get();
@@ -110,12 +112,11 @@ export async function createAppointmentWithSlotCheck(appointmentData) {
                 console.error(`Error creating customer record for appointment ${newRef.id}:`, customerError);
             }
         }
-
+        
+        // Send new booking Flex Message to the customer.
         if (userId) {
             await sendNewBookingFlexMessage(userId, {
-                serviceName: appointmentData.serviceInfo.name,
-                date: date,
-                time: time,
+                ...appointmentData, // Pass full data to ensure template has all info
                 appointmentId: newRef.id
             });
         }
@@ -141,7 +142,7 @@ export async function createAppointmentWithSlotCheck(appointmentData) {
 }
 
 /**
- * NEW: Updates an existing appointment by an admin.
+ * Updates an existing appointment by an admin.
  */
 export async function updateAppointmentByAdmin(appointmentId, updateData) {
     if (!appointmentId || !updateData) {
@@ -236,8 +237,6 @@ export async function confirmAppointmentAndPaymentByAdmin(appointmentId, adminId
         const wasAwaitingConfirmation = appointmentData.status === 'awaiting_confirmation';
         const currentStatus = appointmentData.status;
 
-    // ไม่แจกแต้มในขั้นตอนนี้ ให้ไปแจกใน event สถานะ completed เท่านั้น
-
         await appointmentRef.update({
             // Keep current status unless it's awaiting_confirmation
             status: wasAwaitingConfirmation ? 'confirmed' : currentStatus,
@@ -271,25 +270,8 @@ export async function confirmAppointmentAndPaymentByAdmin(appointmentId, adminId
         }
 
         if (appointmentData.userId) {
-          if (wasAwaitingConfirmation) {
-              await sendPaymentConfirmationFlexMessage(appointmentData.userId, {
-                  serviceName: appointmentData.serviceInfo.name,
-                  date: appointmentData.date,
-                  time: appointmentData.time,
-                  totalPrice: data.amount,
-                  appointmentId: appointmentId,
-                  isConfirmed: true
-              });
-          } else {
-              await sendPaymentConfirmationFlexMessage(appointmentData.userId, {
-                  serviceName: appointmentData.serviceInfo.name,
-                  date: appointmentData.date,
-                  time: appointmentData.time,
-                  totalPrice: data.amount,
-                  appointmentId: appointmentId,
-                  isConfirmed: false
-              });
-          }
+            const flexData = { ...appointmentData, id: appointmentId, paymentInfo: { ...appointmentData.paymentInfo, amountPaid: data.amount } };
+            await sendPaymentConfirmationFlexMessage(appointmentData.userId, flexData);
         }
 
         try {
@@ -332,14 +314,7 @@ export async function cancelAppointmentByAdmin(appointmentId, reason) {
         });
 
         if (appointmentData.userId) {
-            await sendAppointmentCancelledFlexMessage(appointmentData.userId, {
-                appointmentId: appointmentId,
-                serviceName: appointmentData.serviceInfo?.name || 'บริการ',
-                date: appointmentData.date,
-                time: appointmentData.time,
-                reason: reason,
-                cancelledBy: 'admin'
-            });
+            await sendAppointmentCancelledFlexMessage(appointmentData.userId, { ...appointmentData, id: appointmentId }, reason);
         }
         return { success: true };
     } catch (error) {
@@ -392,77 +367,54 @@ export async function updateAppointmentStatusByAdmin(appointmentId, newStatus, n
 
         // Award points when status changes to completed
         if (newStatus === 'completed') {
-            // Award points based on settings
-            const pointSettingsSnap = await db.collection('settings').doc('points').get();
-            const pointSettings = pointSettingsSnap.exists ? pointSettingsSnap.data() : {};
+            const totalPrice = appointmentData.paymentInfo?.totalPrice || appointmentData.paymentInfo?.amountPaid || 0;
             let totalPointsAwarded = 0;
 
-            // Award points for purchase if enabled
-            if (pointSettings.enablePurchasePoints && appointmentData.userId) {
-                const totalPrice = appointmentData.paymentInfo?.totalPrice || appointmentData.paymentInfo?.amountPaid || 0;
+            if (appointmentData.userId) {
                 if (totalPrice > 0) {
                     const purchasePointsResult = await awardPointsForPurchase(appointmentData.userId, totalPrice);
                     if (purchasePointsResult.success) {
                         totalPointsAwarded += purchasePointsResult.pointsAwarded || 0;
                     }
                 }
-            }
-
-            // Award points for visit if enabled and not already awarded
-            if (pointSettings.enableVisitPoints && appointmentData.userId && !appointmentData.visitPointsAwarded) {
                 const visitPointsResult = await awardPointsForVisit(appointmentData.userId);
                 if (visitPointsResult.success) {
                     totalPointsAwarded += visitPointsResult.pointsAwarded || 0;
-                    // Mark as awarded to prevent future duplicate
-                    await appointmentRef.update({ visitPointsAwarded: true });
+                }
+            } else if (appointmentData.customerInfo?.phone) {
+                 const phonePointsResult = await awardPointsByPhone(
+                    appointmentData.customerInfo.phone, 
+                    totalPrice, 
+                    appointmentId
+                );
+                if (phonePointsResult.success) {
+                    totalPointsAwarded = phonePointsResult.pointsAwarded || 0;
                 }
             }
-
-            // Store points info for later use in message
-            appointmentData._totalPointsAwarded = totalPointsAwarded;
+            appointmentData._totalPointsAwarded = totalPointsAwarded; // Store for notification
         }
 
         // Send LINE notification only if customer has userId (LINE ID)
         if (appointmentData.userId) {
-            let customerMessage = '';
-            let notificationType = '';
-            const serviceName = appointmentData.serviceInfo?.name || 'บริการของคุณ';
-            const appointmentDate = appointmentData.date;
-            const appointmentTime = appointmentData.time;
-
+            const dataForFlex = { ...appointmentData, id: appointmentId };
+            
             switch (newStatus) {
                 case 'confirmed':
-                    await sendAppointmentConfirmedFlexMessage(appointmentData.userId, {
-                        serviceName: serviceName,
-                        date: appointmentDate,
-                        time: appointmentTime,
-                        appointmentId: appointmentId
-                    });
+                    await sendAppointmentConfirmedFlexMessage(appointmentData.userId, dataForFlex);
                     break;
                 case 'completed':
-                    await sendServiceCompletedFlexMessage(appointmentData.userId, {
-                        serviceName: serviceName,
-                        date: appointmentDate,
-                        time: appointmentTime,
-                        appointmentId: appointmentId,
-                        pointsAwarded: appointmentData._totalPointsAwarded || 0
+                    await sendServiceCompletedFlexMessage(appointmentData.userId, { 
+                        ...dataForFlex,
+                        totalPointsAwarded: appointmentData._totalPointsAwarded || 0 
                     });
                     console.log('🔄 Status completed - sending review request for appointment:', appointmentId);
                     await sendReviewRequestToCustomer(appointmentId);
                     break;
                 case 'cancelled':
-                    await sendAppointmentCancelledFlexMessage(appointmentData.userId, {
-                        appointmentId: appointmentId,
-                        serviceName: serviceName,
-                        date: appointmentDate,
-                        time: appointmentTime,
-                        reason: note || 'ไม่ได้ระบุเหตุผล',
-                        cancelledBy: 'admin'
-                    });
+                    await sendAppointmentCancelledFlexMessage(appointmentData.userId, dataForFlex, note || 'ไม่ได้ระบุเหตุผล');
                     break;
             }
         } else if (newStatus === 'completed') {
-            // Customer doesn't have LINE ID - log completion for manual follow-up
             console.log(`Appointment ${appointmentId} completed for customer without LINE ID. Manual notification may be required.`);
         }
 
@@ -473,8 +425,6 @@ export async function updateAppointmentStatusByAdmin(appointmentId, newStatus, n
         return { success: false, error: error.message };
     }
 }
-
-
 
 /**
  * Sends a review request link to the customer after a service is completed.
@@ -490,7 +440,6 @@ export async function sendReviewRequestToCustomer(appointmentId) {
         if (appointmentData.reviewInfo?.submitted) throw new Error("การนัดหมายนี้ได้รับการรีวิวแล้ว");
         if (!appointmentData.userId) throw new Error("ไม่พบ LINE User ID ของลูกค้า");
 
-        // ส่ง Review Flex Message แทนข้อความธรรมดา
         console.log('🔄 Sending Review Flex Message for appointment:', appointmentId, 'to user:', appointmentData.userId);
         const reviewResult = await sendReviewFlexMessage(appointmentData.userId, {
             id: appointmentId,
@@ -534,11 +483,9 @@ export async function updateAppointmentStatusByEmployee(appointmentId, employeeI
         if (appointmentData.userId) {
             if (newStatus === 'completed') {
                 await sendServiceCompletedFlexMessage(appointmentData.userId, {
-                    serviceName: appointmentData.serviceInfo?.name || 'บริการ',
-                    date: appointmentData.date,
-                    time: appointmentData.time,
-                    appointmentId: appointmentId,
-                    pointsAwarded: 0
+                    ...appointmentData,
+                    id: appointmentId,
+                    pointsAwarded: 0 // Points are awarded by admin/system
                 });
                 await sendReviewRequestToCustomer(appointmentId);
             }
@@ -559,7 +506,7 @@ export async function cancelAppointmentByUser(appointmentId, userId) {
     }
     const appointmentRef = db.collection('appointments').doc(appointmentId);
     try {
-        const { customerName, serviceName } = await db.runTransaction(async (transaction) => {
+        const { customerName, serviceName, fullAppointmentData } = await db.runTransaction(async (transaction) => {
             const appointmentDoc = await transaction.get(appointmentRef);
             if (!appointmentDoc.exists) throw new Error("ไม่พบข้อมูลการนัดหมาย");
             
@@ -572,17 +519,14 @@ export async function cancelAppointmentByUser(appointmentId, userId) {
                 cancellationInfo: { cancelledBy: 'customer', reason: 'Cancelled by customer.', timestamp: FieldValue.serverTimestamp() },
                 updatedAt: FieldValue.serverTimestamp()
             });
-            return { customerName: appointmentData.customerInfo.fullName, serviceName: appointmentData.serviceInfo.name };
+            return { 
+                customerName: appointmentData.customerInfo.fullName, 
+                serviceName: appointmentData.serviceInfo.name,
+                fullAppointmentData: appointmentData
+            };
         });
         
-        await sendAppointmentCancelledFlexMessage(userId, {
-            appointmentId: appointmentId,
-            serviceName: serviceName || 'บริการ',
-            date: '',
-            time: '',
-            reason: 'ยกเลิกโดยลูกค้า',
-            cancelledBy: 'customer'
-        });
+        await sendAppointmentCancelledFlexMessage(userId, { ...fullAppointmentData, id: appointmentId }, 'ยกเลิกโดยลูกค้า');
         
         const adminMessage = `🚫 การนัดหมายถูกยกเลิกโดยลูกค้า\n\n*ลูกค้า:* ${customerName}\n*บริการ:* ${serviceName}\n*Appointment ID:* ${appointmentId.substring(0, 6).toUpperCase()}`;
         await sendTelegramMessageToAdmin(adminMessage);
@@ -612,14 +556,11 @@ export async function sendInvoiceToCustomer(appointmentId) {
             paymentInfo: appointmentData.paymentInfo
         });
 
-        const liffUrl = `https://liff.line.me/${process.env.NEXT_PUBLIC_PAYMENT_LIFF_ID}/${appointmentId}`;
-
         await appointmentRef.update({
             'paymentInfo.paymentStatus': 'invoiced',
             updatedAt: FieldValue.serverTimestamp()
         });
 
-        // ส่ง Payment Flex Message แทนข้อความธรรมดา
         console.log('🔄 Sending Payment Flex Message for appointment:', appointmentId, 'to user:', appointmentData.userId);
         const paymentResult = await sendPaymentFlexMessage(appointmentData.userId, {
             id: appointmentId,
