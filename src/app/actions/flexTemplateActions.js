@@ -191,9 +191,10 @@ export async function createPaymentFlexTemplate(appointmentData) {
 }
 
 export async function createReviewFlexTemplate(appointmentData) {
-    const { id, serviceInfo, customerInfo, date, time } = appointmentData;
+    const { id, appointmentId, serviceInfo, customerInfo, date, time } = appointmentData;
     const customerName = customerInfo?.fullName || customerInfo?.firstName || 'คุณลูกค้า';
     const serviceName = serviceInfo?.name || 'บริการของคุณ';
+    const safeId = (id || appointmentId || '').toString();
     const appointmentDate = new Date(date).toLocaleDateString('th-TH', {
         day: '2-digit',
         month: 'short',
@@ -311,13 +312,19 @@ export async function createReviewFlexTemplate(appointmentData) {
                         cornerRadius: "8px"
                     },
                     {
-                        type: "text",
-                        text: "กดปุ่มด้านล่างเพื่อให้คะแนนและแสดงความคิดเห็น",
-                        size: "sm",
-                        color: "#A8999E",
-                        wrap: true,
+                        type: "box",
+                        layout: "vertical",
+                        contents: [
+                            {
+                                type: "text",
+                                text: "กดปุ่มด้านล่างเพื่อให้คะแนนและแสดงความคิดเห็น",
+                                size: "sm",
+                                color: "#A8999E",
+                                wrap: true,
+                                align: "center"
+                            }
+                        ],
                         margin: "lg",
-                        align: "center",
                         paddingAll: "12px",
                         backgroundColor: "#F5F2ED",
                         cornerRadius: "8px"
@@ -337,7 +344,7 @@ export async function createReviewFlexTemplate(appointmentData) {
                         action: {
                             type: "uri",
                             label: "ให้คะแนน",
-                            uri: `https://liff.line.me/${process.env.NEXT_PUBLIC_REVIEW_LIFF_ID}/${id}`
+                            uri: `https://liff.line.me/${process.env.NEXT_PUBLIC_REVIEW_LIFF_ID}/${safeId}`
                         },
                         color: "#A8999E"
                     }
