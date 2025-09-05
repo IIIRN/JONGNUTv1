@@ -565,26 +565,38 @@ export async function createReviewThankYouFlexTemplate(reviewData) {
                             margin: "lg"
                         },
                         {
-                            type: "text",
-                            text: `"${comment}"`,
-                            size: "md",
-                            color: "#333333",
+                            type: "box",
+                            layout: "vertical",
+                            contents: [
+                                {
+                                    type: "text",
+                                    text: `"${comment}"`,
+                                    size: "md",
+                                    color: "#333333",
+                                    wrap: true,
+                                    style: "italic"
+                                }
+                            ],
                             margin: "sm",
-                            wrap: true,
-                            style: "italic",
                             paddingAll: "12px",
                             backgroundColor: "#F8F8F8",
                             cornerRadius: "8px"
                         }
                     ] : []),
                     {
-                        type: "text",
-                        text: "ความคิดเห็นของคุณมีค่ามากสำหรับเรา เราจะนำไปปรับปรุงบริการให้ดียิ่งขึ้น",
-                        size: "sm",
-                        color: "#A8999E",
+                        type: "box",
+                        layout: "vertical",
+                        contents: [
+                            {
+                                type: "text",
+                                text: "ความคิดเห็นของคุณมีค่ามากสำหรับเรา เราจะนำไปปรับปรุงบริการให้ดียิ่งขึ้น",
+                                size: "sm",
+                                color: "#A8999E",
+                                wrap: true,
+                                align: "center"
+                            }
+                        ],
                         margin: "lg",
-                        wrap: true,
-                        align: "center",
                         paddingAll: "12px",
                         backgroundColor: "#F5F2ED",
                         cornerRadius: "8px"
@@ -840,19 +852,44 @@ export async function createServiceCompletedFlexTemplate(appointmentData) {
                         }
                     ] : []),
                     {
-                        type: "text",
-                        text: "ขอบคุณที่ใช้บริการ หากมีข้อเสนอแนะยินดีรับฟังเสมอ",
-                        size: "sm",
-                        color: "#A8999E",
-                        wrap: true,
+                        type: "box",
+                        layout: "vertical",
+                        contents: [
+                            {
+                                type: "text",
+                                text: "ขอบคุณที่ใช้บริการ หากมีข้อเสนอแนะยินดีรับฟังเสมอ",
+                                size: "sm",
+                                color: "#A8999E",
+                                wrap: true,
+                                align: "center"
+                            }
+                        ],
                         margin: "lg",
-                        align: "center",
                         paddingAll: "12px",
                         backgroundColor: "#F5F2ED",
                         cornerRadius: "8px"
                     }
                 ],
                 spacing: "md",
+                paddingAll: "20px"
+            },
+            footer: {
+                type: "box",
+                layout: "vertical",
+                contents: [
+                    {
+                        type: "button",
+                        style: "primary",
+                        height: "sm",
+                        action: {
+                            type: "uri",
+                            label: "ให้คะแนนรีวิว",
+                            uri: `https://liff.line.me/${process.env.NEXT_PUBLIC_REVIEW_LIFF_ID}/${id}`
+                        },
+                        color: "#A8999E"
+                    }
+                ],
+                spacing: "sm",
                 paddingAll: "20px"
             }
         }
@@ -1175,13 +1212,19 @@ export async function createNewBookingFlexTemplate(appointmentData) {
                         cornerRadius: "8px"
                     },
                     {
-                        type: "text",
-                        text: "โปรดรอการยืนยันจากร้าน ขอบคุณค่ะ",
-                        size: "sm",
-                        color: "#FBC02D",
-                        wrap: true,
+                        type: "box",
+                        layout: "vertical",
+                        contents: [
+                            {
+                                type: "text",
+                                text: "โปรดรอการยืนยันจากร้าน ขอบคุณค่ะ",
+                                size: "sm",
+                                color: "#FBC02D",
+                                wrap: true,
+                                align: "center"
+                            }
+                        ],
                         margin: "lg",
-                        align: "center",
                         paddingAll: "12px",
                         backgroundColor: "#FFFDE7",
                         cornerRadius: "8px"

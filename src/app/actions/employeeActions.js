@@ -4,6 +4,7 @@ import { db } from '@/app/lib/firebaseAdmin';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { revalidatePath } from 'next/cache';
 import { sendBookingNotification } from './lineActions';
+import { sendServiceCompletedFlexMessage } from './lineFlexActions';
 import { awardPointsForPurchase, awardPointsForVisit, awardPointsByPhone } from './pointActions'; 
 import { findOrCreateCustomer } from './customerActions'; 
 
@@ -100,25 +101,16 @@ export async function updateAppointmentStatus(appointmentId, newStatus, employee
                     totalPointsAwarded += visitPointsResult.pointsAwarded || 0;
                 }
 
-                // Send completion message with points info to customer
-                const serviceName = appointmentData.serviceInfo?.name || 'บริการ';
-                let customerMessage = `✨ บริการ "${serviceName}" ของคุณเสร็จสมบูรณ์แล้ว ขอบคุณที่ใช้บริการค่ะ`;
-                
-                if (totalPointsAwarded > 0) {
-                    customerMessage += `\n\n🎉 คุณได้รับ ${totalPointsAwarded} พ้อยต์จากการใช้บริการ!`;
-                }
-                
+                // Send service completed Flex message to customer
                 try {
-                    await sendBookingNotification({
-                        customerName: appointmentData.customerInfo?.fullName || 'ลูกค้า',
+                    await sendServiceCompletedFlexMessage(appointmentData.userId, {
                         serviceName: serviceName,
-                        appointmentDate: appointmentData.date,
-                        appointmentTime: appointmentData.time,
-                        message: customerMessage
-                    }, 'appointmentCompleted');
-                    console.log(`Points awarded and notification sent for customer with LINE ID ${appointmentData.userId}: ${totalPointsAwarded} points`);
+                        appointmentId: appointmentId,
+                        totalPointsAwarded: totalPointsAwarded
+                    });
+                    console.log(`Service completed Flex message and points awarded for customer with LINE ID ${appointmentData.userId}: ${totalPointsAwarded} points`);
                 } catch (notificationError) {
-                    console.error(`Failed to send notification to customer ${appointmentData.userId}:`, notificationError);
+                    console.error(`Failed to send service completed Flex message to customer ${appointmentData.userId}:`, notificationError);
                 }
             } else if (appointmentData.customerInfo?.phone) {
                 // Customer doesn't have LINE ID but has phone number - use alternative point system

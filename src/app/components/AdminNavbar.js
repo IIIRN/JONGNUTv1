@@ -64,6 +64,8 @@ const navLinks = [
       { name: "จัดการผู้ดูแลระบบ", href: "/admins" },
       { name: "จัดการพนักงาน", href: "/employees" },
       { name: "ตั้งค่าทั่วไป", href: "/settings" },
+      { name: "LINE Users", href: "/line-users" },
+      { name: "ทดสอบ Flex Messages", href: "/test-flex" },
     ]
   },
 ];
