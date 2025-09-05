@@ -16,9 +16,7 @@ import { generateQrCodePayload } from '@/app/actions/paymentActions';
 const PaymentQrModal = ({ show, onClose, appointment }) => {
     const [qrCodeUrl, setQrCodeUrl] = useState('');
     const [loading, setLoading] = useState(false);
-    // [!code focus start]
-    const PROMPTPAY_ID = '0623733306'; // Ensure this is your correct PromptPay ID
-    // [!code focus end]
+    const PROMPTPAY_ID = process.env.NEXT_PUBLIC_PROMPTPAY_ID; // Use environment variable
 
     useEffect(() => {
         if (show && appointment) {
@@ -26,9 +24,7 @@ const PaymentQrModal = ({ show, onClose, appointment }) => {
                 setLoading(true);
                 try {
                     const amount = appointment.paymentInfo.totalPrice;
-                    // [!code focus start]
                     const url = await generateQrCodePayload(PROMPTPAY_ID, amount);
-                    // [!code focus end]
                     setQrCodeUrl(url);
                 } catch (error) {
                     console.error("Error generating payment QR code:", error);
@@ -38,7 +34,7 @@ const PaymentQrModal = ({ show, onClose, appointment }) => {
             };
             generateQR();
         }
-    }, [show, appointment]);
+    }, [show, appointment, PROMPTPAY_ID]);
 
     if (!show) return null;
 

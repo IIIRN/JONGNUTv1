@@ -1,3 +1,4 @@
+// src/app/payment/[appointmentId]/page.js
 "use client";
 
 import React, { useState, useEffect, Suspense } from 'react';
@@ -36,7 +37,7 @@ function PaymentContent() {
                 const appointmentData = { id: appointmentSnap.id, ...appointmentSnap.data() };
                 setAppointment(appointmentData);
 
-                const PROMPTPAY_ID = '0623733306'; 
+                const PROMPTPAY_ID = process.env.NEXT_PUBLIC_PROMPTPAY_ID; 
                 if (!PROMPTPAY_ID) {
                     throw new Error('ไม่พบข้อมูลพร้อมเพย์ กรุณาติดต่อผู้ดูแลระบบ');
                 }
@@ -61,7 +62,7 @@ function PaymentContent() {
 
     if (loading) {
         return (
-            <div className="text-center p-4">
+            <div className="text-center p-10">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-800 mx-auto mb-4"></div>
                 <p>กำลังสร้าง QR Code...</p>
             </div>
