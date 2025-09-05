@@ -4,7 +4,7 @@ import { db } from '@/app/lib/firebaseAdmin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { revalidatePath } from 'next/cache';
 import { mergePointsFromPhone, checkPhonePointsForMerge } from './pointMergeActions';
-import { awardPointsForVisit } from './pointActions';
+// Removed unused import: import { awardPointsForVisit } from './pointActions';
 
 /**
  * Find or create customer with automatic points merging when LINE ID is connected
@@ -49,9 +49,6 @@ export async function findOrCreateCustomer(customerData, userId) {
             // --- Customer Found ---
             const customerDoc = customerQuery[0];
             customerId = customerDoc.id;
-
-            // Award points for the visit
-            const visitPointsResult = await awardPointsForVisit(customerId);
 
             // Prepare data for update (only update if new data is provided)
             const updateData = {
@@ -122,11 +119,8 @@ export async function findOrCreateCustomer(customerData, userId) {
 
             await newCustomerRef.set(newCustomerData);
             customerId = newCustomerRef.id;
-
-            // Award points for the first visit (additional to merged points)
-            await awardPointsForVisit(customerId);
             
-            console.log(`Created new customer ${customerId} with ${mergedPoints} merged points and awarded visit points.`);
+            console.log(`Created new customer ${customerId} with ${mergedPoints} merged points.`);
         }
 
         return {
