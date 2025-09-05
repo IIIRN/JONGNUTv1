@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { useLiffContext } from '@/context/LiffProvider';
 import { submitReview } from '@/app/actions/reviewActions';
+import { createReviewThankYouFlexTemplate } from '@/app/actions/flexTemplateActions';
 import { db } from '@/app/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 
@@ -133,13 +134,14 @@ function ReviewContent() {
                 // ส่งข้อความกลับ LINE OA
                 if (liff.isInClient()) {
                     try {
-                        const stars = '⭐'.repeat(rating);
-                        await liff.sendMessages([
-                            {
-                                type: 'text',
-                                text: `🎉 ขอบคุณสำหรับรีวิว!\n\n${stars} (${rating}/5 ดาว)\n💬 "${comment || 'ไม่มีความเห็นเพิ่มเติม'}"\n\nเราจะนำความคิดเห็นของคุณไปปรับปรุงบริการให้ดียิ่งขึ้น!`
-                            }
-                        ]);
+                        // สร้าง Flex Message สำหรับขอบคุณหลังรีวิว
+                        const reviewThankYouFlex = createReviewThankYouFlexTemplate({
+                            rating,
+                            comment: comment.trim(),
+                            appointmentId: appointment.id
+                        });
+                        
+                        await liff.sendMessages([reviewThankYouFlex]);
                     } catch (msgError) {
                         console.warn('ไม่สามารถส่งข้อความได้:', msgError);
                     }

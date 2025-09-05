@@ -4,7 +4,7 @@
 
 import { db } from '@/app/lib/firebaseAdmin';
 import { FieldValue } from 'firebase-admin/firestore';
-import { sendLineMessage } from './lineActions'; 
+import { sendReviewThankYouFlexMessage } from './lineFlexActions'; 
 
 /**
  * Submits a review for a completed appointment.
@@ -108,13 +108,7 @@ export async function submitReview(reviewData) {
     });
 
     // Send thank you message with points info
-    let thankYouMessage = 'ขอบคุณสำหรับรีวิวค่ะ! ความคิดเห็นของคุณมีความสำคัญอย่างยิ่งในการพัฒนาบริการของเราให้ดียิ่งขึ้นไปค่ะ';
-    
-    if (pointsToAward > 0) {
-      thankYouMessage += `\n\n🎉 คุณได้รับ ${pointsToAward} พ้อยต์จากการรีวิว!`;
-    }
-    
-    await sendLineMessage(userId, thankYouMessage);
+    await sendReviewThankYouFlexMessage(userId, pointsToAward);
 
     return { success: true };
   } catch (error) {

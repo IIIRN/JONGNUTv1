@@ -8,6 +8,7 @@ import { db } from '@/app/lib/firebase';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { generateQrCodePayload } from '@/app/actions/paymentActions';
 import { updatePaymentStatus } from '@/app/actions/paymentActions';
+import { createPaymentConfirmationFlexTemplate } from '@/app/actions/flexTemplateActions';
 import Image from 'next/image';
 
 function PaymentContent() {
@@ -49,11 +50,14 @@ function PaymentContent() {
                 }
 
                 const PROMPTPAY_ID = process.env.NEXT_PUBLIC_PROMPTPAY_ID; 
+                console.log('PromptPay ID configured:', PROMPTPAY_ID ? 'Yes' : 'No');
+                
                 if (!PROMPTPAY_ID) {
-                    throw new Error('ไม่พบข้อมูลพร้อมเพย์ กรุณาติดต่อผู้ดูแลระบบ');
+                    throw new Error('ไม่พบข้อมูลพร้อมเพย์ กรุณาติดต่อผู้ดูแลระบบ (NEXT_PUBLIC_PROMPTPAY_ID)');
                 }
 
                 const amount = appointmentData.paymentInfo.totalPrice;
+                console.log('Generating QR for amount:', amount);
                 const dataUrl = await generateQrCodePayload(PROMPTPAY_ID, amount);
                 setQrCodeDataUrl(dataUrl);
 
@@ -69,32 +73,34 @@ function PaymentContent() {
     }, [appointmentId]);
 
     const handlePaymentConfirmation = async () => {
-        if (!liff || !profile || !appointment) {
-            setError('ไม่สามารถดำเนินการได้ กรุณาเปิดใน LINE');
+        // Allow confirmation even without full LIFF functionality
+        if (!appointment) {
+            setError('ไม่พบข้อมูลการนัดหมาย');
             return;
         }
 
         setIsProcessing(true);
         try {
+            // Use mock user ID if LIFF is not available
+            const userId = profile?.userId || 'MANUAL_PAYMENT_USER';
+            
             // อัปเดตสถานะการชำระเงิน
             const result = await updatePaymentStatus(appointmentId, 'paid', {
-                paidAt: new Date(),
-                paidBy: profile.userId,
-                paymentMethod: 'promptpay'
+                'paymentInfo.paidAt': new Date().toISOString(),
+                'paymentInfo.paidBy': userId,
+                'paymentInfo.paymentMethod': 'promptpay'
             });
 
             if (result.success) {
                 setPaymentStatus('paid');
                 
-                // ส่งข้อความกลับ LINE OA
-                if (liff.isInClient()) {
+                // ส่งข้อความกลับ LINE OA (only if LIFF is available)
+                if (liff && liff.isInClient) {
                     try {
-                        await liff.sendMessages([
-                            {
-                                type: 'text',
-                                text: `✅ ชำระเงินเรียบร้อยแล้ว\n💰 ยอดเงิน: ${appointment.paymentInfo.totalPrice.toLocaleString()} บาท\n📝 การนัดหมาย: ${appointmentId.substring(0, 6).toUpperCase()}\n\nขอบคุณที่ใช้บริการ!`
-                            }
-                        ]);
+                        // สร้าง Flex Message สำหรับยืนยันการชำระเงิน
+                        const paymentConfirmationFlex = createPaymentConfirmationFlexTemplate(appointment);
+                        
+                        await liff.sendMessages([paymentConfirmationFlex]);
                     } catch (msgError) {
                         console.warn('ไม่สามารถส่งข้อความได้:', msgError);
                     }
@@ -120,6 +126,9 @@ function PaymentContent() {
     const handleCancel = () => {
         if (liff && liff.closeWindow) {
             liff.closeWindow();
+        } else {
+            // Fallback for when LIFF is not available
+            window.history.back();
         }
     };
 

@@ -24,9 +24,10 @@ function PaymentHeader() {
     if (error) {
         return (
             <div className="p-4">
-                <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
-                    <p className="text-red-600 text-sm">เกิดข้อผิดพลาดในการเชื่อมต่อ LINE</p>
-                    <p className="text-red-500 text-xs mt-1">{error}</p>
+                <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4">
+                    <p className="text-yellow-800 text-sm">⚠️ การเชื่อมต่อ LINE ไม่สมบูรณ์</p>
+                    <p className="text-yellow-700 text-xs mt-1">สามารถใช้งานได้ แต่ไม่สามารถส่งข้อความกลับ LINE ได้</p>
+                    <p className="text-yellow-600 text-xs mt-1">Error: {error}</p>
                 </div>
             </div>
         );
@@ -73,7 +74,6 @@ export default function PaymentLayout({ children }) {
     return (
         <LiffProvider liffId={paymentLiffId}>
             <div className="max-w-md mx-auto bg-gray-100 min-h-screen">
-                <PaymentHeader />
                 <main className="p-4">
                     {children}
                 </main>

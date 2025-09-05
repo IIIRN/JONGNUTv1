@@ -20,9 +20,17 @@ const useLiff = (liffId) => {
         const initializeLiff = async () => {
             if (process.env.NODE_ENV === 'development') {
                 console.warn("LIFF mock mode is active.");
-                // Mock LIFF object with scanCodeV2 function for development
+                // Mock LIFF object with all necessary functions for development
                 const mockLiff = {
                     isInClient: () => true,
+                    closeWindow: () => {
+                        console.log('Mock: LIFF window closed');
+                        window.history.back();
+                    },
+                    sendMessages: async (messages) => {
+                        console.log('Mock: Messages sent:', messages);
+                        return Promise.resolve();
+                    },
                     scanCodeV2: async () => {
                         // Simulate scan result
                         return new Promise((resolve) => {
@@ -56,7 +64,10 @@ const useLiff = (liffId) => {
                 }
 
                 if (!liff.isLoggedIn()) {
-                    liff.login({ redirectUri: window.location.href, scope: 'profile openid chat_message.write scan_qr' });
+                    liff.login({ 
+                        redirectUri: window.location.href,
+                        scope: 'profile openid chat_message.write'
+                    });
                     return;
                 }
 
@@ -66,7 +77,27 @@ const useLiff = (liffId) => {
 
             } catch (err) {
                 console.error("LIFF initialization failed", err);
-                setError(err.toString());
+                
+                // Set a more user-friendly error message
+                let userError = 'การเชื่อมต่อ LINE ไม่สมบูรณ์';
+                if (err.message && err.message.includes('permission')) {
+                    userError = 'สิทธิ์การเข้าถึง LINE ไม่เพียงพอ กรุณาอนุญาตสิทธิ์ในการส่งข้อความ';
+                } else if (err.message && err.message.includes('scope')) {
+                    userError = 'การตั้งค่า LIFF ไม่ถูกต้อง กรุณาติดต่อผู้ดูแลระบบ';
+                }
+                
+                setError(userError);
+                
+                // In development, still provide mock data to allow testing
+                if (process.env.NODE_ENV === 'development') {
+                    console.warn('Setting up fallback mock data for development');
+                    setLiffObject({
+                        isInClient: () => false,
+                        closeWindow: () => window.history.back(),
+                        sendMessages: async () => console.log('Mock: Messages sent (fallback)')
+                    });
+                    setProfile(MOCK_PROFILE);
+                }
             } finally {
                 setLoading(false);
             }

@@ -2,6 +2,7 @@
 
 import { Client } from '@line/bot-sdk';
 import { db } from '@/app/lib/firebaseAdmin';
+import { sendAppointmentReminderFlexMessage } from './lineFlexActions';
 
 const client = new Client({
   channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
@@ -155,5 +156,5 @@ export async function sendBookingNotification(bookingData, notificationType) {
  * Send reminder notification to customer
  */
 export async function sendReminderNotification(customerLineId, bookingData) {
-    return await sendLineMessage(customerLineId, `🔔 แจ้งเตือนการนัดหมาย\n\nสวัสดีค่ะ! อีก 1 ชั่วโมงจะถึงเวลานัดหมายของคุณแล้ว\n\n💅 บริการ: ${bookingData.serviceName}\n📅 วันที่: ${bookingData.appointmentDate}\n⏰ เวลา: ${bookingData.appointmentTime}\n🏪 ${bookingData.shopName || 'ร้านเสริมสวย'}\n\nกรุณามาตรงเวลานะคะ ขอบคุณค่ะ ✨`, 'appointmentReminder');
+    return await sendAppointmentReminderFlexMessage(customerLineId, bookingData);
 }
