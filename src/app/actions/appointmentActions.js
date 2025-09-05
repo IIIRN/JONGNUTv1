@@ -224,24 +224,8 @@ export async function confirmAppointmentAndPaymentByAdmin(appointmentId, adminId
         const currentStatus = appointmentData.status;
 
         // Award points for purchase and visit
-        const userId = appointmentData.userId;
-        const totalPrice = data.amount || appointmentData.paymentInfo?.totalPrice || 0;
-        
-        let totalPointsAwarded = 0;
-
-        // Award points for purchase amount
-        if (totalPrice > 0) {
-            const purchasePointsResult = await awardPointsForPurchase(userId, totalPrice);
-            if (purchasePointsResult.success) {
-                totalPointsAwarded += purchasePointsResult.pointsAwarded || 0;
-            }
-        }
-
-        // Award points for visit
-        const visitPointsResult = await awardPointsForVisit(userId);
-        if (visitPointsResult.success) {
-            totalPointsAwarded += visitPointsResult.pointsAwarded || 0;
-        }
+    // ...existing code...
+    // ไม่แจกแต้มซ้ำในขั้นตอนนี้ ให้ไปแจกใน event สถานะ completed เท่านั้น
 
         await appointmentRef.update({
             // Keep current status unless it's awaiting_confirmation
