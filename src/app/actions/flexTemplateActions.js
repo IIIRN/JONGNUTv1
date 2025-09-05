@@ -203,7 +203,7 @@ export async function createReviewFlexTemplate(appointmentData) {
     altText: `⭐ ให้คะแนนรีวิว ${serviceName}`,
         contents: {
             type: "bubble",
-            size: "kilo",
+            size: "mega",
             body: {
                 type: "box",
                 layout: "vertical",
@@ -1040,18 +1040,20 @@ export async function createAppointmentCancelledFlexTemplate(appointmentData, re
  * สร้าง Flex Message สำหรับการจองใหม่ (แจ้งลูกค้า)
  */
 export async function createNewBookingFlexTemplate(appointmentData) {
-    const { id, serviceInfo, customerInfo, date, time } = appointmentData;
+    const { id, appointmentId, serviceInfo, serviceName: svcName, customerInfo, date, time } = appointmentData || {};
     const customerName = customerInfo?.fullName || customerInfo?.firstName || 'คุณลูกค้า';
-    const serviceName = serviceInfo?.name || 'บริการของคุณ';
-    const appointmentDate = new Date(date).toLocaleDateString('th-TH', {
+    const serviceName = svcName || serviceInfo?.name || 'บริการของคุณ';
+    const safeId = (id || appointmentId || '').toString();
+    const shortId = safeId ? safeId.substring(0, 8).toUpperCase() : '—';
+    const appointmentDate = date ? new Date(date).toLocaleDateString('th-TH', {
         day: '2-digit',
         month: 'short',
         year: 'numeric'
-    });
+    }) : '';
     
     return {
-    type: "flex",
-    altText: `📝 รับคำขอจองเรียบร้อย`,
+        type: "flex",
+        altText: `📝 รับคำขอจองเรียบร้อย`,
         contents: {
             type: "bubble",
             size: "mega",
@@ -1157,7 +1159,7 @@ export async function createNewBookingFlexTemplate(appointmentData) {
                                     },
                                     {
                                         type: "text",
-                                        text: id.substring(0, 8).toUpperCase(),
+                                        text: shortId,
                                         size: "sm",
                                         color: "#333333",
                                         flex: 3,

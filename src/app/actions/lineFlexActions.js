@@ -50,9 +50,8 @@ export async function sendPaymentFlexMessage(userId, appointmentData) {
             throw new Error(`LINE API Error: ${response.status} - ${errorText}`);
         }
 
-        const responseData = await response.json();
-        console.log('✅ Payment Flex message sent successfully:', responseData);
-        return { success: true, message: 'Payment flex message sent successfully' };
+    console.log('✅ Payment Flex message sent successfully. Status:', response.status);
+    return { success: true, message: 'Payment flex message sent successfully' };
 
     } catch (error) {
         console.error('Error sending payment flex message:', error);
@@ -100,9 +99,8 @@ export async function sendReviewFlexMessage(userId, appointmentData) {
             throw new Error(`LINE API Error: ${response.status} - ${errorText}`);
         }
 
-        const responseData = await response.json();
-        console.log('✅ Review Flex message sent successfully:', responseData);
-        return { success: true, message: 'Review flex message sent successfully' };
+    console.log('✅ Review Flex message sent successfully. Status:', response.status);
+    return { success: true, message: 'Review flex message sent successfully' };
 
     } catch (error) {
         console.error('Error sending review flex message:', error);
@@ -189,9 +187,8 @@ export async function sendAppointmentConfirmedFlexMessage(userId, appointmentDat
             throw new Error(`LINE API Error: ${response.status} - ${errorText}`);
         }
 
-        const responseData = await response.json();
-        console.log('✅ Appointment confirmed Flex message sent successfully:', responseData);
-        return { success: true, message: 'Appointment confirmed flex message sent successfully' };
+    console.log('✅ Appointment confirmed Flex message sent successfully. Status:', response.status);
+    return { success: true, message: 'Appointment confirmed flex message sent successfully' };
 
     } catch (error) {
         console.error('Error sending appointment confirmed flex message:', error);
@@ -234,9 +231,8 @@ export async function sendServiceCompletedFlexMessage(userId, appointmentData) {
             throw new Error(`LINE API Error: ${response.status} - ${errorText}`);
         }
 
-        const responseData = await response.json();
-        console.log('✅ Service completed Flex message sent successfully:', responseData);
-        return { success: true, message: 'Service completed flex message sent successfully' };
+    console.log('✅ Service completed Flex message sent successfully. Status:', response.status);
+    return { success: true, message: 'Service completed flex message sent successfully' };
 
     } catch (error) {
         console.error('Error sending service completed flex message:', error);
@@ -279,9 +275,8 @@ export async function sendAppointmentCancelledFlexMessage(userId, appointmentDat
             throw new Error(`LINE API Error: ${response.status} - ${errorText}`);
         }
 
-        const responseData = await response.json();
-        console.log('✅ Appointment cancelled Flex message sent successfully:', responseData);
-        return { success: true, message: 'Appointment cancelled flex message sent successfully' };
+    console.log('✅ Appointment cancelled Flex message sent successfully. Status:', response.status);
+    return { success: true, message: 'Appointment cancelled flex message sent successfully' };
 
     } catch (error) {
         console.error('Error sending appointment cancelled flex message:', error);
@@ -324,9 +319,8 @@ export async function sendNewBookingFlexMessage(userId, appointmentData) {
             throw new Error(`LINE API Error: ${response.status} - ${errorText}`);
         }
 
-        const responseData = await response.json();
-        console.log('✅ New booking Flex message sent successfully:', responseData);
-        return { success: true, message: 'New booking flex message sent successfully' };
+    console.log('✅ New booking Flex message sent successfully. Status:', response.status);
+    return { success: true, message: 'New booking flex message sent successfully' };
 
     } catch (error) {
         console.error('Error sending new booking flex message:', error);
@@ -369,9 +363,8 @@ export async function sendPaymentConfirmationFlexMessage(userId, appointmentData
             throw new Error(`LINE API Error: ${response.status} - ${errorText}`);
         }
 
-        const responseData = await response.json();
-        console.log('✅ Payment confirmation Flex message sent successfully:', responseData);
-        return { success: true, message: 'Payment confirmation flex message sent successfully' };
+    console.log('✅ Payment confirmation Flex message sent successfully. Status:', response.status);
+    return { success: true, message: 'Payment confirmation flex message sent successfully' };
 
     } catch (error) {
         console.error('Error sending payment confirmation flex message:', error);
