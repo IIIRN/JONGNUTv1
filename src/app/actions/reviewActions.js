@@ -49,11 +49,17 @@ export async function submitReview(reviewData) {
         throw new Error('ไม่พบข้อมูลการนัดหมายนี้');
       }
       const appointmentData = appointmentDoc.data();
+      if (!appointmentData.userId) {
+        throw new Error('ข้อมูลการนัดหมายนี้ไม่มี LINE User ID กรุณาติดต่อแอดมิน');
+      }
       if (appointmentData.userId !== userId) {
-        throw new Error('คุณไม่มีสิทธิ์รีวิวการนัดหมายนี้');
+        throw new Error('คุณไม่มีสิทธิ์รีวิวการนัดหมายนี้ กรุณา login ด้วย LINE ที่ใช้จอง');
       }
       if (appointmentData.reviewInfo?.submitted) {
         throw new Error('คุณได้รีวิวการนัดหมายนี้ไปแล้ว');
+      }
+      if (!appointmentData.customerInfo) {
+        throw new Error('ข้อมูลลูกค้าในนัดหมายไม่สมบูรณ์ กรุณาติดต่อแอดมิน');
       }
 
       let customerDoc = null;
