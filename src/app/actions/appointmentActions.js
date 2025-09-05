@@ -103,8 +103,12 @@ export async function createAppointmentWithSlotCheck(appointmentData) {
         }
 
         if (userId) {
-            const customerMessage = `การนัดหมายบริการ ${appointmentData.serviceInfo.name} ของคุณในวันที่ ${date} เวลา ${time} ได้รับการบันทึกแล้วค่ะ ขณะนี้กำลังรอการยืนยันจากทางร้านนะคะ`;
-            await sendLineMessage(userId, customerMessage, 'appointmentConfirmed');
+            const flexData = {
+                serviceName: appointmentData.serviceInfo?.name || 'บริการ',
+                date: date,
+                time: time
+            };
+            await sendLineMessage(userId, null, 'appointmentConfirmed', flexData);
         }
 
         try {
@@ -258,13 +262,29 @@ export async function confirmAppointmentAndPaymentByAdmin(appointmentId, adminId
         }
 
         if (appointmentData.userId) {
-          let customerMessage = '';
+          let flexData = {};
+          let notificationType = '';
+          
           if (wasAwaitingConfirmation) {
-              customerMessage = `✅ ได้รับการชำระเงินเรียบร้อยแล้วค่ะ\n\nการนัดหมายบริการ "${appointmentData.serviceInfo.name}" ของคุณในวันที่ ${appointmentData.date} เวลา ${appointmentData.time} ได้รับการยืนยันแล้วค่ะ\n\nขอบคุณที่ใช้บริการค่ะ ✨`;
+              flexData = {
+                  serviceName: appointmentData.serviceInfo?.name || 'บริการ',
+                  date: appointmentData.date,
+                  time: appointmentData.time,
+                  amount: data.amount,
+                  message: `✅ ได้รับการชำระเงินเรียบร้อยแล้วค่ะ\n\nการนัดหมายบริการ "${appointmentData.serviceInfo?.name}" ของคุณในวันที่ ${appointmentData.date} เวลา ${appointmentData.time} ได้รับการยืนยันแล้วค่ะ\n\nขอบคุณที่ใช้บริการค่ะ ✨`
+              };
+              notificationType = 'paymentReceived';
           } else {
-              customerMessage = `✅ ได้รับการชำระเงินสำหรับบริการ "${appointmentData.serviceInfo.name}" ในวันที่ ${appointmentData.date} เรียบร้อยแล้วค่ะ\n\nขอบคุณที่ใช้บริการค่ะ ✨`;
+              flexData = {
+                  serviceName: appointmentData.serviceInfo?.name || 'บริการ',
+                  date: appointmentData.date,
+                  time: appointmentData.time,
+                  amount: data.amount
+              };
+              notificationType = 'paymentReceived';
           }
-          await sendLineMessage(appointmentData.userId, customerMessage, 'paymentReceived');
+          
+          await sendLineMessage(appointmentData.userId, null, notificationType, flexData);
         }
 
         try {
@@ -307,8 +327,10 @@ export async function cancelAppointmentByAdmin(appointmentId, reason) {
         });
 
         if (appointmentData.userId) {
-            const customerMessage = `ขออภัยค่ะ การนัดหมายของคุณ (ID: ${appointmentId.substring(0, 6).toUpperCase()}) ถูกยกเลิกเนื่องจาก: "${reason}"\n\nกรุณาติดต่อแอดมินสำหรับข้อมูลเพิ่มเติม`;
-            await sendLineMessage(appointmentData.userId, customerMessage, 'appointmentCancelled');
+            const flexData = {
+                message: `ขออภัยค่ะ การนัดหมายของคุณ (ID: ${appointmentId.substring(0, 6).toUpperCase()}) ถูกยกเลิกเนื่องจาก: "${reason}"\n\nกรุณาติดต่อแอดมินสำหรับข้อมูลเพิ่มเติม`
+            };
+            await sendLineMessage(appointmentData.userId, null, 'appointmentCancelled', flexData);
         }
         return { success: true };
     } catch (error) {
@@ -393,7 +415,7 @@ export async function updateAppointmentStatusByAdmin(appointmentId, newStatus) {
 
         // Send LINE notification only if customer has userId (LINE ID)
         if (appointmentData.userId) {
-            let customerMessage = '';
+            let flexData = {};
             let notificationType = '';
             const serviceName = appointmentData.serviceInfo?.name || 'บริการของคุณ';
             const appointmentDate = appointmentData.date;
@@ -401,27 +423,34 @@ export async function updateAppointmentStatusByAdmin(appointmentId, newStatus) {
 
             switch (newStatus) {
                 case 'confirmed':
-                    customerMessage = `✅ การนัดหมายบริการ "${serviceName}" ในวันที่ ${appointmentDate} เวลา ${appointmentTime} ของคุณได้รับการยืนยันแล้วค่ะ`;
+                    flexData = {
+                        serviceName: serviceName,
+                        date: appointmentDate,
+                        time: appointmentTime
+                    };
                     notificationType = 'appointmentConfirmed';
                     break;
                 case 'completed':
-                    customerMessage = `✨ บริการ "${serviceName}" ของคุณเสร็จสมบูรณ์แล้ว ขอบคุณที่ใช้บริการค่ะ`;
-                    // Add points information if any points were awarded
-                    if (appointmentData._totalPointsAwarded && appointmentData._totalPointsAwarded > 0) {
-                        customerMessage += `\n\n🎉 คุณได้รับ ${appointmentData._totalPointsAwarded} พ้อยต์จากการใช้บริการ!`;
-                    }
-                    notificationType = 'appointmentConfirmed'; 
+                    flexData = {
+                        serviceName: serviceName,
+                        date: appointmentDate,
+                        time: appointmentTime,
+                        pointsAwarded: appointmentData._totalPointsAwarded || 0
+                    };
+                    notificationType = 'appointmentConfirmed';
                     await sendReviewRequestToCustomer(appointmentId);
                     break;
                 case 'cancelled':
-                    customerMessage = `❌ ขออภัยค่ะ การนัดหมายบริการ "${serviceName}" ของคุณถูกยกเลิกโดยผู้ดูแลระบบ กรุณาติดต่อสอบถามข้อมูลเพิ่มเติม`;
+                    flexData = {
+                        message: `❌ ขออภัยค่ะ การนัดหมายบริการ "${serviceName}" ของคุณถูกยกเลิกโดยผู้ดูแลระบบ กรุณาติดต่อสอบถามข้อมูลเพิ่มเติม`
+                    };
                     notificationType = 'appointmentCancelled';
                     break;
             }
 
-            if (customerMessage && notificationType) {
+            if (notificationType) {
                 try {
-                    await sendLineMessage(appointmentData.userId, customerMessage, notificationType);
+                    await sendLineMessage(appointmentData.userId, null, notificationType, flexData);
                     console.log(`LINE notification sent successfully to ${appointmentData.userId}`);
                 } catch (error) {
                     console.error(`Failed to send LINE notification to ${appointmentData.userId}:`, error);
@@ -457,8 +486,10 @@ export async function sendReviewRequestToCustomer(appointmentId) {
         if (!appointmentData.userId) throw new Error("ไม่พบ LINE User ID ของลูกค้า");
 
         const reviewLiffUrl = `https://liff.line.me/${process.env.NEXT_PUBLIC_REVIEW_LIFF_ID}/${appointmentId}`;
-        const reviewMessage = `รบกวนสละเวลารีวิวบริการของคุณ เพื่อนำไปพัฒนาบริการให้ดียิ่งขึ้น\n${reviewLiffUrl}`;
-        await sendLineMessage(appointmentData.userId, reviewMessage, 'reviewRequest');
+        const flexData = {
+            reviewUrl: reviewLiffUrl
+        };
+        await sendLineMessage(appointmentData.userId, null, 'reviewRequest', flexData);
 
         return { success: true };
     } catch (error) {
@@ -496,12 +527,13 @@ export async function updateAppointmentStatusByEmployee(appointmentId, employeeI
         if (appointmentData.userId) {
             let customerMessage = '';
             if (newStatus === 'completed') {
-                const thankYouMessage = `บริการของคุณเสร็จสิ้นแล้ว ขอบคุณที่ใช้บริการค่ะ`;
-                await sendLineMessage(appointmentData.userId, thankYouMessage, 'appointmentConfirmed');
+                const flexData = {
+                    serviceName: appointmentData.serviceInfo?.name || 'บริการ',
+                    date: appointmentData.date,
+                    time: appointmentData.time
+                };
+                await sendLineMessage(appointmentData.userId, null, 'appointmentConfirmed', flexData);
                 await sendReviewRequestToCustomer(appointmentId);
-            }
-            if (customerMessage) {
-                await sendLineMessage(appointmentData.userId, customerMessage);
             }
         }
         return { success: true };
@@ -536,8 +568,10 @@ export async function cancelAppointmentByUser(appointmentId, userId) {
             return { customerName: appointmentData.customerInfo.fullName, serviceName: appointmentData.serviceInfo.name };
         });
         
-        const customerMessage = `การนัดหมายของคุณ (ID: ${appointmentId.substring(0, 6).toUpperCase()}) ได้ถูกยกเลิกเรียบร้อยแล้วค่ะ`;
-        await sendLineMessage(userId, customerMessage, 'appointmentCancelled');
+        const flexData = {
+            message: `การนัดหมายของคุณ (ID: ${appointmentId.substring(0, 6).toUpperCase()}) ได้ถูกยกเลิกเรียบร้อยแล้วค่ะ`
+        };
+        await sendLineMessage(userId, null, 'appointmentCancelled', flexData);
         
         const adminMessage = `🚫 การนัดหมายถูกยกเลิกโดยลูกค้า\n\n*ลูกค้า:* ${customerName}\n*บริการ:* ${serviceName}\n*Appointment ID:* ${appointmentId.substring(0, 6).toUpperCase()}`;
         await sendTelegramMessageToAdmin(adminMessage);
@@ -566,8 +600,13 @@ export async function sendInvoiceToCustomer(appointmentId) {
             updatedAt: FieldValue.serverTimestamp()
         });
 
-        const customerMessage = `เรียนคุณ ${appointmentData.customerInfo.fullName},\n\nนี่คือใบแจ้งค่าบริการสำหรับบริการของคุณ\nยอดชำระ: ${appointmentData.paymentInfo.totalPrice.toLocaleString()} บาท\n\nกรุณาคลิกที่ลิงก์เพื่อชำระเงิน:\n${liffUrl}`;
-        await sendLineMessage(appointmentData.userId, customerMessage, 'paymentInvoice');
+        const flexData = {
+            serviceName: appointmentData.serviceInfo?.name || 'บริการ',
+            customerName: appointmentData.customerInfo?.fullName || 'คุณลูกค้า',
+            totalPrice: appointmentData.paymentInfo?.totalPrice || 0,
+            paymentUrl: liffUrl
+        };
+        await sendLineMessage(appointmentData.userId, null, 'paymentInvoice', flexData);
 
         return { success: true };
     } catch (error) {

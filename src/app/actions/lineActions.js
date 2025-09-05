@@ -8,6 +8,956 @@ const client = new Client({
   channelSecret: process.env.LINE_CHANNEL_SECRET,
 });
 
+// ฟังก์ชันสร้าง Flex Message แบบสวยงามตามรูปแบบแอป
+function createFlexMessage(type, data) {
+  const primaryColor = "#A8999E";
+  const primaryDark = "#7F7679";
+  const successColor = "#4CAF50";
+  const errorColor = "#F28A8A";
+  
+  switch (type) {
+    case 'appointmentConfirmed':
+      return {
+        type: "flex",
+        altText: "การนัดหมายได้รับการยืนยัน",
+        contents: {
+          type: "bubble",
+          header: {
+            type: "box",
+            layout: "vertical",
+            contents: [
+              {
+                type: "text",
+                text: data.pointsAwarded ? "✨ บริการเสร็จสิ้น" : "✅ ยืนยันการนัดหมาย",
+                weight: "bold",
+                color: "#FFFFFF",
+                size: "lg"
+              }
+            ],
+            backgroundColor: successColor,
+            paddingAll: "20px"
+          },
+          body: {
+            type: "box",
+            layout: "vertical",
+            contents: [
+              {
+                type: "text",
+                text: data.serviceName || "บริการ",
+                weight: "bold",
+                size: "xl",
+                color: primaryDark,
+                margin: "md"
+              },
+              {
+                type: "separator",
+                margin: "lg"
+              },
+              {
+                type: "box",
+                layout: "vertical",
+                margin: "lg",
+                spacing: "sm",
+                contents: [
+                  {
+                    type: "box",
+                    layout: "baseline",
+                    spacing: "sm",
+                    contents: [
+                      {
+                        type: "text",
+                        text: "📅 วันที่:",
+                        color: primaryColor,
+                        size: "sm",
+                        flex: 2
+                      },
+                      {
+                        type: "text",
+                        text: data.date || "-",
+                        wrap: true,
+                        color: "#333333",
+                        size: "sm",
+                        flex: 5
+                      }
+                    ]
+                  },
+                  {
+                    type: "box",
+                    layout: "baseline",
+                    spacing: "sm",
+                    contents: [
+                      {
+                        type: "text",
+                        text: "⏰ เวลา:",
+                        color: primaryColor,
+                        size: "sm",
+                        flex: 2
+                      },
+                      {
+                        type: "text",
+                        text: data.time || "-",
+                        wrap: true,
+                        color: "#333333",
+                        size: "sm",
+                        flex: 5
+                      }
+                    ]
+                  }
+                ].concat(data.pointsAwarded && data.pointsAwarded > 0 ? [
+                  {
+                    type: "separator",
+                    margin: "lg"
+                  },
+                  {
+                    type: "box",
+                    layout: "baseline",
+                    spacing: "sm",
+                    contents: [
+                      {
+                        type: "text",
+                        text: "🎉 แต้มที่ได้รับ:",
+                        color: successColor,
+                        size: "sm",
+                        flex: 2,
+                        weight: "bold"
+                      },
+                      {
+                        type: "text",
+                        text: `${data.pointsAwarded} แต้ม`,
+                        wrap: true,
+                        color: successColor,
+                        size: "lg",
+                        weight: "bold",
+                        flex: 5
+                      }
+                    ]
+                  }
+                ] : [])
+              }
+            ]
+          },
+          footer: {
+            type: "box",
+            layout: "vertical",
+            spacing: "sm",
+            contents: [
+              {
+                type: "text",
+                text: data.pointsAwarded ? "ขอบคุณที่ใช้บริการค่ะ ✨" : "ขอบคุณที่ใช้บริการค่ะ ✨",
+                color: primaryColor,
+                size: "sm",
+                align: "center"
+              }
+            ]
+          }
+        }
+      };
+
+    case 'appointmentCancelled':
+      return {
+        type: "flex",
+        altText: "การนัดหมายถูกยกเลิก",
+        contents: {
+          type: "bubble",
+          header: {
+            type: "box",
+            layout: "vertical",
+            contents: [
+              {
+                type: "text",
+                text: "❌ ยกเลิกการนัดหมาย",
+                weight: "bold",
+                color: "#FFFFFF",
+                size: "lg"
+              }
+            ],
+            backgroundColor: errorColor,
+            paddingAll: "20px"
+          },
+          body: {
+            type: "box",
+            layout: "vertical",
+            contents: [
+              {
+                type: "text",
+                text: "ขออภัยค่ะ",
+                weight: "bold",
+                size: "lg",
+                color: primaryDark
+              },
+              {
+                type: "text",
+                text: data.message || "การนัดหมายของคุณถูกยกเลิก",
+                wrap: true,
+                color: "#333333",
+                margin: "md"
+              }
+            ]
+          },
+          footer: {
+            type: "box",
+            layout: "vertical",
+            contents: [
+              {
+                type: "text",
+                text: "หากต้องการข้อมูลเพิ่มเติม กรุณาติดต่อแอดมิน",
+                color: primaryColor,
+                size: "sm",
+                wrap: true,
+                align: "center"
+              }
+            ]
+          }
+        }
+      };
+
+    case 'paymentReceived':
+    case 'paymentInvoice':
+      return {
+        type: "flex",
+        altText: type === 'paymentReceived' ? "ได้รับการชำระเงิน" : "ใบแจ้งค่าบริการ",
+        contents: {
+          type: "bubble",
+          header: {
+            type: "box",
+            layout: "vertical",
+            contents: [
+              {
+                type: "text",
+                text: type === 'paymentReceived' ? "💳 ชำระเงินสำเร็จ" : "💰 ใบแจ้งค่าบริการ",
+                weight: "bold",
+                color: "#FFFFFF",
+                size: "lg"
+              }
+            ],
+            backgroundColor: type === 'paymentReceived' ? successColor : primaryColor,
+            paddingAll: "20px"
+          },
+          body: {
+            type: "box",
+            layout: "vertical",
+            contents: [
+              {
+                type: "text",
+                text: data.serviceName || "บริการ",
+                weight: "bold",
+                size: "xl",
+                color: primaryDark
+              },
+              {
+                type: "separator",
+                margin: "lg"
+              },
+              {
+                type: "box",
+                layout: "vertical",
+                margin: "lg",
+                spacing: "sm",
+                contents: [
+                  {
+                    type: "box",
+                    layout: "baseline",
+                    spacing: "sm",
+                    contents: [
+                      {
+                        type: "text",
+                        text: "📅 วันที่:",
+                        color: primaryColor,
+                        size: "sm",
+                        flex: 2
+                      },
+                      {
+                        type: "text",
+                        text: data.date || "-",
+                        wrap: true,
+                        color: "#333333",
+                        size: "sm",
+                        flex: 5
+                      }
+                    ]
+                  },
+                  {
+                    type: "box",
+                    layout: "baseline",
+                    spacing: "sm",
+                    contents: [
+                      {
+                        type: "text",
+                        text: "💰 ยอดเงิน:",
+                        color: primaryColor,
+                        size: "sm",
+                        flex: 2
+                      },
+                      {
+                        type: "text",
+                        text: `${(data.amount || data.totalPrice || 0).toLocaleString()} บาท`,
+                        wrap: true,
+                        color: "#333333",
+                        size: "lg",
+                        weight: "bold",
+                        flex: 5
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          footer: {
+            type: "box",
+            layout: "vertical",
+            contents: type === 'paymentInvoice' && data.paymentUrl ? [
+              {
+                type: "button",
+                action: {
+                  type: "uri",
+                  label: "ชำระเงิน",
+                  uri: data.paymentUrl
+                },
+                style: "primary",
+                color: primaryColor
+              }
+            ] : [
+              {
+                type: "text",
+                text: type === 'paymentReceived' ? "ขอบคุณที่ใช้บริการค่ะ ✨" : data.paymentUrl ? "กรุณาคลิกปุ่มเพื่อชำระเงิน" : "ขอบคุณค่ะ",
+                color: primaryColor,
+                size: "sm",
+                wrap: true,
+                align: "center"
+              }
+            ]
+          }
+        }
+      };
+
+    case 'reviewRequest':
+      return {
+        type: "flex",
+        altText: "ขอรีวิวบริการ",
+        contents: {
+          type: "bubble",
+          header: {
+            type: "box",
+            layout: "vertical",
+            contents: [
+              {
+                type: "text",
+                text: "⭐ รีวิวบริการ",
+                weight: "bold",
+                color: "#FFFFFF",
+                size: "lg"
+              }
+            ],
+            backgroundColor: primaryColor,
+            paddingAll: "20px"
+          },
+          body: {
+            type: "box",
+            layout: "vertical",
+            contents: [
+              {
+                type: "text",
+                text: "รบกวนสละเวลารีวิวบริการ",
+                weight: "bold",
+                size: "lg",
+                color: primaryDark
+              },
+              {
+                type: "text",
+                text: "เพื่อนำไปพัฒนาบริการให้ดียิ่งขึ้น",
+                wrap: true,
+                color: "#333333",
+                margin: "md"
+              }
+            ]
+          },
+          footer: {
+            type: "box",
+            layout: "vertical",
+            contents: data.reviewUrl ? [
+              {
+                type: "button",
+                action: {
+                  type: "uri",
+                  label: "รีวิวเลย",
+                  uri: data.reviewUrl
+                },
+                style: "primary",
+                color: primaryColor
+              }
+            ] : [
+              {
+                type: "text",
+                text: "ขอบคุณค่ะ",
+                color: primaryColor,
+                size: "sm",
+                align: "center"
+              }
+            ]
+          }
+        }
+      };
+
+    case 'appointmentReminder':
+      return {
+        type: "flex",
+        altText: "แจ้งเตือนการนัดหมาย",
+        contents: {
+          type: "bubble",
+          header: {
+            type: "box",
+            layout: "vertical",
+            contents: [
+              {
+                type: "text",
+                text: "🔔 แจ้งเตือนการนัดหมาย",
+                weight: "bold",
+                color: "#FFFFFF",
+                size: "lg"
+              }
+            ],
+            backgroundColor: primaryColor,
+            paddingAll: "20px"
+          },
+          body: {
+            type: "box",
+            layout: "vertical",
+            contents: [
+              {
+                type: "text",
+                text: "อีก 1 ชั่วโมงจะถึงเวลานัดหมาย",
+                weight: "bold",
+                size: "lg",
+                color: primaryDark
+              },
+              {
+                type: "separator",
+                margin: "lg"
+              },
+              {
+                type: "box",
+                layout: "vertical",
+                margin: "lg",
+                spacing: "sm",
+                contents: [
+                  {
+                    type: "box",
+                    layout: "baseline",
+                    spacing: "sm",
+                    contents: [
+                      {
+                        type: "text",
+                        text: "💅 บริการ:",
+                        color: primaryColor,
+                        size: "sm",
+                        flex: 2
+                      },
+                      {
+                        type: "text",
+                        text: data.serviceName || "-",
+                        wrap: true,
+                        color: "#333333",
+                        size: "sm",
+                        flex: 5
+                      }
+                    ]
+                  },
+                  {
+                    type: "box",
+                    layout: "baseline",
+                    spacing: "sm",
+                    contents: [
+                      {
+                        type: "text",
+                        text: "📅 วันที่:",
+                        color: primaryColor,
+                        size: "sm",
+                        flex: 2
+                      },
+                      {
+                        type: "text",
+                        text: data.appointmentDate || "-",
+                        wrap: true,
+                        color: "#333333",
+                        size: "sm",
+                        flex: 5
+                      }
+                    ]
+                  },
+                  {
+                    type: "box",
+                    layout: "baseline",
+                    spacing: "sm",
+                    contents: [
+                      {
+                        type: "text",
+                        text: "⏰ เวลา:",
+                        color: primaryColor,
+                        size: "sm",
+                        flex: 2
+                      },
+                      {
+                        type: "text",
+                        text: data.appointmentTime || "-",
+                        wrap: true,
+                        color: "#333333",
+                        size: "sm",
+                        flex: 5
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          footer: {
+            type: "box",
+            layout: "vertical",
+            contents: [
+              {
+                type: "text",
+                text: "กรุณามาตรงเวลานะคะ ✨",
+                color: primaryColor,
+                size: "sm",
+                align: "center"
+              }
+            ]
+          }
+        }
+      };
+
+    default:
+      // Fallback เป็นข้อความธรรมดา
+      return {
+        type: "text",
+        text: data.message || "ข้อความจากระบบ"
+      };
+  }
+}
+
+// ฟังก์ชันสร้าง Admin Flex Message 
+function createAdminFlexMessage(type, data) {
+  const primaryColor = "#A8999E";
+  const primaryDark = "#7F7679"; 
+  const successColor = "#4CAF50";
+  const warningColor = "#FBC02D";
+  const errorColor = "#F28A8A";
+  
+  switch (type) {
+    case 'newBooking':
+      return {
+        type: "flex",
+        altText: "การจองใหม่",
+        contents: {
+          type: "bubble",
+          header: {
+            type: "box",
+            layout: "vertical",
+            contents: [
+              {
+                type: "text",
+                text: "🆕 การจองใหม่",
+                weight: "bold", 
+                color: "#FFFFFF",
+                size: "lg"
+              }
+            ],
+            backgroundColor: successColor,
+            paddingAll: "20px"
+          },
+          body: {
+            type: "box",
+            layout: "vertical",
+            contents: [
+              {
+                type: "box",
+                layout: "vertical",
+                spacing: "sm",
+                contents: [
+                  {
+                    type: "box",
+                    layout: "baseline",
+                    spacing: "sm",
+                    contents: [
+                      {
+                        type: "text",
+                        text: "👤 ลูกค้า:",
+                        color: primaryColor,
+                        size: "sm",
+                        flex: 2
+                      },
+                      {
+                        type: "text",
+                        text: data.customerName || "-",
+                        wrap: true,
+                        color: "#333333",
+                        size: "sm",
+                        weight: "bold",
+                        flex: 5
+                      }
+                    ]
+                  },
+                  {
+                    type: "box",
+                    layout: "baseline",
+                    spacing: "sm", 
+                    contents: [
+                      {
+                        type: "text",
+                        text: "💅 บริการ:",
+                        color: primaryColor,
+                        size: "sm",
+                        flex: 2
+                      },
+                      {
+                        type: "text",
+                        text: data.serviceName || "-",
+                        wrap: true,
+                        color: "#333333",
+                        size: "sm",
+                        flex: 5
+                      }
+                    ]
+                  },
+                  {
+                    type: "box",
+                    layout: "baseline",
+                    spacing: "sm",
+                    contents: [
+                      {
+                        type: "text",
+                        text: "📅 วันที่:",
+                        color: primaryColor,
+                        size: "sm",
+                        flex: 2
+                      },
+                      {
+                        type: "text",
+                        text: data.appointmentDate || "-",
+                        wrap: true,
+                        color: "#333333",
+                        size: "sm",
+                        flex: 5
+                      }
+                    ]
+                  },
+                  {
+                    type: "box",
+                    layout: "baseline",
+                    spacing: "sm",
+                    contents: [
+                      {
+                        type: "text",
+                        text: "⏰ เวลา:",
+                        color: primaryColor,
+                        size: "sm",
+                        flex: 2
+                      },
+                      {
+                        type: "text",
+                        text: data.appointmentTime || "-",
+                        wrap: true,
+                        color: "#333333",
+                        size: "sm",
+                        flex: 5
+                      }
+                    ]
+                  },
+                  {
+                    type: "box",
+                    layout: "baseline",
+                    spacing: "sm",
+                    contents: [
+                      {
+                        type: "text",
+                        text: "💰 ราคา:",
+                        color: primaryColor,
+                        size: "sm",
+                        flex: 2
+                      },
+                      {
+                        type: "text",
+                        text: `${(data.totalPrice || 0).toLocaleString()} บาท`,
+                        wrap: true,
+                        color: successColor,
+                        size: "lg",
+                        weight: "bold",
+                        flex: 5
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      };
+
+    case 'paymentReceived':
+      return {
+        type: "flex",
+        altText: "ได้รับการชำระเงิน",
+        contents: {
+          type: "bubble",
+          header: {
+            type: "box",
+            layout: "vertical",
+            contents: [
+              {
+                type: "text",
+                text: "💳 ได้รับการชำระเงิน",
+                weight: "bold",
+                color: "#FFFFFF", 
+                size: "lg"
+              }
+            ],
+            backgroundColor: successColor,
+            paddingAll: "20px"
+          },
+          body: {
+            type: "box",
+            layout: "vertical",
+            contents: [
+              {
+                type: "box",
+                layout: "vertical",
+                spacing: "sm",
+                contents: [
+                  {
+                    type: "box",
+                    layout: "baseline",
+                    spacing: "sm",
+                    contents: [
+                      {
+                        type: "text",
+                        text: "👤 ลูกค้า:",
+                        color: primaryColor,
+                        size: "sm",
+                        flex: 2
+                      },
+                      {
+                        type: "text",
+                        text: data.customerName || "-",
+                        wrap: true,
+                        color: "#333333",
+                        size: "sm",
+                        weight: "bold",
+                        flex: 5
+                      }
+                    ]
+                  },
+                  {
+                    type: "box",
+                    layout: "baseline",
+                    spacing: "sm",
+                    contents: [
+                      {
+                        type: "text",
+                        text: "💅 บริการ:",
+                        color: primaryColor,
+                        size: "sm",
+                        flex: 2
+                      },
+                      {
+                        type: "text",
+                        text: data.serviceName || "-",
+                        wrap: true,
+                        color: "#333333",
+                        size: "sm",
+                        flex: 5
+                      }
+                    ]
+                  },
+                  {
+                    type: "box",
+                    layout: "baseline",
+                    spacing: "sm",
+                    contents: [
+                      {
+                        type: "text",
+                        text: "💰 จำนวน:",
+                        color: primaryColor,
+                        size: "sm",
+                        flex: 2
+                      },
+                      {
+                        type: "text",
+                        text: `${(data.totalPrice || 0).toLocaleString()} บาท`,
+                        wrap: true,
+                        color: successColor,
+                        size: "lg",
+                        weight: "bold",
+                        flex: 5
+                      }
+                    ]
+                  },
+                  {
+                    type: "box",
+                    layout: "baseline",
+                    spacing: "sm",
+                    contents: [
+                      {
+                        type: "text",
+                        text: "📅 วันที่จอง:",
+                        color: primaryColor,
+                        size: "sm",
+                        flex: 2
+                      },
+                      {
+                        type: "text",
+                        text: `${data.appointmentDate} ${data.appointmentTime}` || "-",
+                        wrap: true,
+                        color: "#333333",
+                        size: "sm",
+                        flex: 5
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      };
+
+    case 'bookingCancelled':
+    case 'customerConfirmed':
+      const isConfirmed = type === 'customerConfirmed';
+      return {
+        type: "flex",
+        altText: isConfirmed ? "ลูกค้ายืนยันนัดหมาย" : "ยกเลิกการจอง",
+        contents: {
+          type: "bubble",
+          header: {
+            type: "box",
+            layout: "vertical",
+            contents: [
+              {
+                type: "text",
+                text: isConfirmed ? "✅ ลูกค้ายืนยันนัดหมาย" : "❌ ยกเลิกการจอง",
+                weight: "bold",
+                color: "#FFFFFF",
+                size: "lg"
+              }
+            ],
+            backgroundColor: isConfirmed ? successColor : errorColor,
+            paddingAll: "20px"
+          },
+          body: {
+            type: "box",
+            layout: "vertical",
+            contents: [
+              {
+                type: "box",
+                layout: "vertical",
+                spacing: "sm",
+                contents: [
+                  {
+                    type: "box",
+                    layout: "baseline",
+                    spacing: "sm",
+                    contents: [
+                      {
+                        type: "text",
+                        text: "👤 ลูกค้า:",
+                        color: primaryColor,
+                        size: "sm",
+                        flex: 2
+                      },
+                      {
+                        type: "text",
+                        text: data.customerName || "-",
+                        wrap: true,
+                        color: "#333333",
+                        size: "sm",
+                        weight: "bold",
+                        flex: 5
+                      }
+                    ]
+                  },
+                  {
+                    type: "box",
+                    layout: "baseline",
+                    spacing: "sm",
+                    contents: [
+                      {
+                        type: "text",
+                        text: "💅 บริการ:",
+                        color: primaryColor,
+                        size: "sm",
+                        flex: 2
+                      },
+                      {
+                        type: "text",
+                        text: data.serviceName || "-",
+                        wrap: true,
+                        color: "#333333",
+                        size: "sm",
+                        flex: 5
+                      }
+                    ]
+                  },
+                  {
+                    type: "box",
+                    layout: "baseline",
+                    spacing: "sm",
+                    contents: [
+                      {
+                        type: "text",
+                        text: "📅 วันที่:",
+                        color: primaryColor,
+                        size: "sm",
+                        flex: 2
+                      },
+                      {
+                        type: "text",
+                        text: data.appointmentDate || "-",
+                        wrap: true,
+                        color: "#333333",
+                        size: "sm",
+                        flex: 5
+                      }
+                    ]
+                  },
+                  {
+                    type: "box",
+                    layout: "baseline",
+                    spacing: "sm",
+                    contents: [
+                      {
+                        type: "text",
+                        text: "⏰ เวลา:",
+                        color: primaryColor,
+                        size: "sm",
+                        flex: 2
+                      },
+                      {
+                        type: "text",
+                        text: data.appointmentTime || "-",
+                        wrap: true,
+                        color: "#333333",
+                        size: "sm",
+                        flex: 5
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      };
+
+    default:
+      // Fallback เป็นข้อความธรรมดา
+      return {
+        type: "text",
+        text: data.message || "การแจ้งเตือนจากระบบ"
+      };
+  }
+}
+
 /**
  * Fetches and returns the notification settings object.
  */
@@ -39,10 +989,11 @@ async function getNotificationSettings() {
 
 /**
  * Sends a push message to a single LINE user, checking customer notification settings first.
+ * Supports both text and flex messages.
  */
-export async function sendLineMessage(to, messageText, notificationType) {
-  if (!to || !messageText) {
-    console.error("Missing 'to' or 'messageText'");
+export async function sendLineMessage(to, messageText, notificationType, flexData = null) {
+  if (!to || (!messageText && !flexData)) {
+    console.error("Missing 'to' or message content");
     return { success: false, error: "Missing recipient or message." };
   }
   
@@ -53,7 +1004,16 @@ export async function sendLineMessage(to, messageText, notificationType) {
   }
 
   try {
-    const messageObject = { type: 'text', text: messageText };
+    let messageObject;
+    
+    // ถ้ามี flexData ให้สร้าง Flex Message
+    if (flexData && notificationType) {
+      messageObject = createFlexMessage(notificationType, flexData);
+    } else {
+      // ใช้ข้อความธรรมดา
+      messageObject = { type: 'text', text: messageText };
+    }
+    
     await client.pushMessage(to, messageObject);
     return { success: true };
   } catch (error) {
@@ -64,8 +1024,9 @@ export async function sendLineMessage(to, messageText, notificationType) {
 
 /**
  * Sends a multicast message to all registered admins, checking admin notification settings first.
+ * Supports both text and flex messages.
  */
-export async function sendLineMessageToAllAdmins(messageText) {
+export async function sendLineMessageToAllAdmins(messageText, notificationType = null, flexData = null) {
   const settings = await getNotificationSettings();
   if (!settings.allNotifications?.enabled || !settings.adminNotifications?.enabled) {
       console.log("Admin LINE notifications are disabled. Skipping message.");
@@ -84,7 +1045,15 @@ export async function sendLineMessageToAllAdmins(messageText) {
     const adminLineIds = adminSnapshot.docs.map(doc => doc.data().lineUserId);
 
     if (adminLineIds.length > 0) {
-      const messageObject = { type: 'text', text: messageText };
+      let messageObject;
+      
+      // ถ้ามี flexData ให้สร้าง Admin Flex Message
+      if (flexData && notificationType) {
+        messageObject = createAdminFlexMessage(notificationType, flexData);
+      } else {
+        messageObject = { type: 'text', text: messageText };
+      }
+      
       await client.multicast(adminLineIds, [messageObject]);
       console.log(`Successfully sent multicast notification to ${adminLineIds.length} admins.`);
     }
@@ -107,53 +1076,30 @@ export async function sendBookingNotification(bookingData, notificationType) {
     return { success: true, message: "Notification type disabled for admins." };
   }
 
-  let message = '';
   const { customerName, serviceName, appointmentDate, appointmentTime, totalPrice } = bookingData;
   
-  switch (notificationType) {
-    case 'newBooking':
-      message = `🆕 การจองใหม่\n` +
-               `👤 ลูกค้า: ${customerName}\n` +
-               `💅 บริการ: ${serviceName}\n` +
-               `📅 วันที่: ${appointmentDate}\n` +
-               `⏰ เวลา: ${appointmentTime}\n` +
-               `💰 ราคา: ${totalPrice} บาท`;
-      break;
-      
-    case 'customerConfirmed':
-      message = `✅ ลูกค้ายืนยันนัดหมาย\n` +
-               `👤 ลูกค้า: ${customerName}\n` +
-               `💅 บริการ: ${serviceName}\n` +
-               `📅 วันที่: ${appointmentDate}\n` +
-               `⏰ เวลา: ${appointmentTime}`;
-      break;
-      
-    case 'bookingCancelled':
-      message = `❌ ยกเลิกการจอง\n` +
-               `👤 ลูกค้า: ${customerName}\n` +
-               `💅 บริการ: ${serviceName}\n` +
-               `📅 วันที่: ${appointmentDate}\n` +
-               `⏰ เวลา: ${appointmentTime}`;
-      break;
-      
-    case 'paymentReceived':
-      message = `💳 ได้รับการชำระเงิน\n` +
-               `👤 ลูกค้า: ${customerName}\n` +
-               `💅 บริการ: ${serviceName}\n` +
-               `💰 จำนวน: ${totalPrice} บาท\n` +
-               `📅 วันที่จอง: ${appointmentDate} ${appointmentTime}`;
-      break;
-      
-    default:
-      message = 'การแจ้งเตือนจากระบบจองคิว';
-  }
+  // ใช้ Flex Message สำหรับ Admin
+  const flexData = {
+    customerName,
+    serviceName,
+    appointmentDate,
+    appointmentTime,
+    totalPrice
+  };
 
-  return await sendLineMessageToAllAdmins(message);
+  return await sendLineMessageToAllAdmins(null, notificationType, flexData);
 }
 
 /**
  * Send reminder notification to customer
  */
 export async function sendReminderNotification(customerLineId, bookingData) {
-    return await sendLineMessage(customerLineId, `🔔 แจ้งเตือนการนัดหมาย\n\nสวัสดีค่ะ! อีก 1 ชั่วโมงจะถึงเวลานัดหมายของคุณแล้ว\n\n💅 บริการ: ${bookingData.serviceName}\n📅 วันที่: ${bookingData.appointmentDate}\n⏰ เวลา: ${bookingData.appointmentTime}\n🏪 ${bookingData.shopName || 'ร้านเสริมสวย'}\n\nกรุณามาตรงเวลานะคะ ขอบคุณค่ะ ✨`, 'appointmentReminder');
+    const flexData = {
+        serviceName: bookingData.serviceName,
+        appointmentDate: bookingData.appointmentDate,
+        appointmentTime: bookingData.appointmentTime,
+        shopName: bookingData.shopName || 'ร้านเสริมสวย'
+    };
+    
+    return await sendLineMessage(customerLineId, null, 'appointmentReminder', flexData);
 }
