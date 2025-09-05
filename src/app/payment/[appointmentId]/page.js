@@ -36,24 +36,16 @@ function PaymentContent() {
                 const appointmentData = { id: appointmentSnap.id, ...appointmentSnap.data() };
                 setAppointment(appointmentData);
 
-                console.log('Appointment Data:', appointmentData);
-                console.log('Customer Info:', appointmentData.customerInfo);
-
-                // Get PromptPay ID from server-side action
-                const response = await fetch('/api/get-promptpay-id');
-                const { promptPayId } = await response.json();
-                
-                if (!promptPayId) {
+                const PROMPTPAY_ID = '0623733306'; 
+                if (!PROMPTPAY_ID) {
                     throw new Error('ไม่พบข้อมูลพร้อมเพย์ กรุณาติดต่อผู้ดูแลระบบ');
                 }
 
                 const amount = appointmentData.paymentInfo.totalPrice;
-                const dataUrl = await generateQrCodePayload(promptPayId, amount);
-                
+                const dataUrl = await generateQrCodePayload(PROMPTPAY_ID, amount);
                 setQrCodeDataUrl(dataUrl);
 
-                // Test payload for debugging
-                const testResult = await testPromptPayPayload(promptPayId, amount);
+                const testResult = await testPromptPayPayload(PROMPTPAY_ID, amount);
                 setDebugInfo(testResult);
 
             } catch (err) {
@@ -81,12 +73,6 @@ function PaymentContent() {
             <div className="text-center p-10 text-red-500">
                 <p className="text-lg font-semibold">เกิดข้อผิดพลาด</p>
                 <p>{error}</p>
-                <button 
-                    onClick={() => window.location.reload()} 
-                    className="mt-4 px-4 py-2 bg-slate-800 text-white rounded-lg"
-                >
-                    ลองใหม่
-                </button>
             </div>
         );
     }
@@ -98,7 +84,6 @@ function PaymentContent() {
                 <p className="text-sm text-gray-500 mb-4">
                     Appointment ID: {appointment?.id.substring(0, 6).toUpperCase()}
                 </p>
-                
                 <div className="my-6">
                     <p className="text-gray-600">ยอดชำระทั้งหมด</p>
                     <p className="text-5xl font-bold text-slate-800">
@@ -106,7 +91,6 @@ function PaymentContent() {
                         <span className="text-2xl font-medium ml-1">บาท</span>
                     </p>
                 </div>
-                
                 {qrCodeDataUrl && (
                     <div className="flex justify-center my-6">
                          <Image 
@@ -118,36 +102,9 @@ function PaymentContent() {
                          />
                     </div>
                 )}
-                
                 <p className="text-gray-600 mb-4">
                     สแกน QR Code นี้เพื่อชำระเงินผ่านแอปพลิเคชันของธนาคาร
                 </p>
-
-                {appointment && (
-                    <div className="mt-6 text-left bg-gray-50 p-4 rounded-lg text-sm">
-                        <h3 className="font-semibold mb-2">สรุปรายการ</h3>
-                        <p><strong>ลูกค้า:</strong> {appointment.customerInfo?.fullName || appointment.customerInfo?.name || 'ไม่ระบุ'}</p>
-                        <p><strong>บริการ:</strong> {appointment.serviceInfo?.name || 'ไม่ระบุ'}</p>
-                        <p><strong>วันที่:</strong> {appointment.appointmentInfo?.dateTime?.toDate()?.toLocaleDateString('th-TH') || 'ไม่ระบุ'}</p>
-                        <p><strong>เวลา:</strong> {appointment.appointmentInfo?.dateTime?.toDate()?.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) || 'ไม่ระบุ'}</p>
-                    </div>
-                )}
-
-                {/* Debug Information */}
-                {debugInfo && (
-                    <div className="mt-4 text-left bg-yellow-50 p-3 rounded-lg text-xs">
-                        <h4 className="font-semibold mb-1">Debug Info:</h4>
-                        <p><strong>Payload:</strong> {debugInfo.payload.substring(0, 50)}...</p>
-                        <div className="mt-1">
-                            <strong>Validations:</strong>
-                            {Object.entries(debugInfo.validations).map(([key, value]) => (
-                                <div key={key} className={`text-xs ${value ? 'text-green-600' : 'text-red-600'}`}>
-                                    {key}: {value ? '✓' : '✗'}
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
             </div>
         </div>
     );

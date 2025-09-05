@@ -68,13 +68,8 @@ function calculateCRC16(input) {
   return crc;
 }
 
-export async function generateQrCodePayload(amount) {
+export async function generateQrCodePayload(promptPayId, amount) {
   try {
-    const promptPayId = process.env.PROMPTPAY_ID;
-    if (!promptPayId) {
-      throw new Error('PromptPay ID is not configured on the server.');
-    }
-
     console.log('=== PromptPay QR Code Generation ===');
     console.log('PromptPay ID:', promptPayId);
     console.log('Amount:', amount);
@@ -112,12 +107,8 @@ export async function generateQrCodePayload(amount) {
 }
 
 // Test function to validate PromptPay payload (for debugging)
-export async function testPromptPayPayload(amount) {
+export async function testPromptPayPayload(promptPayId, amount) {
   try {
-    const promptPayId = process.env.PROMPTPAY_ID;
-    if (!promptPayId) {
-      throw new Error('PromptPay ID is not configured on the server.');
-    }
     const payload = generatePromptPayPayload(promptPayId, amount);
     console.log('Test Payload:', payload);
     
