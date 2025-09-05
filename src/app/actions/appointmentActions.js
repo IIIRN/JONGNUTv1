@@ -223,9 +223,7 @@ export async function confirmAppointmentAndPaymentByAdmin(appointmentId, adminId
         const wasAwaitingConfirmation = appointmentData.status === 'awaiting_confirmation';
         const currentStatus = appointmentData.status;
 
-        // Award points for purchase and visit
-    // ...existing code...
-    // ไม่แจกแต้มซ้ำในขั้นตอนนี้ ให้ไปแจกใน event สถานะ completed เท่านั้น
+    // ไม่แจกแต้มในขั้นตอนนี้ ให้ไปแจกใน event สถานะ completed เท่านั้น
 
         await appointmentRef.update({
             // Keep current status unless it's awaiting_confirmation
@@ -260,19 +258,13 @@ export async function confirmAppointmentAndPaymentByAdmin(appointmentId, adminId
         }
 
         if (appointmentData.userId) {
-            let customerMessage = '';
-            if (wasAwaitingConfirmation) {
-                 customerMessage = `✅ ได้รับการชำระเงินเรียบร้อยแล้วค่ะ\n\nการนัดหมายบริการ "${appointmentData.serviceInfo.name}" ของคุณในวันที่ ${appointmentData.date} เวลา ${appointmentData.time} ได้รับการยืนยันแล้วค่ะ\n\nขอบคุณที่ใช้บริการค่ะ ✨`;
-            } else {
-                 customerMessage = `✅ ได้รับการชำระเงินสำหรับบริการ "${appointmentData.serviceInfo.name}" ในวันที่ ${appointmentData.date} เรียบร้อยแล้วค่ะ\n\nขอบคุณที่ใช้บริการค่ะ ✨`;
-            }
-            
-            // Add points information if any points were awarded
-            if (totalPointsAwarded > 0) {
-                customerMessage += `\n\n🎉 คุณได้รับ ${totalPointsAwarded} พ้อยต์จากการใช้บริการ!`;
-            }
-            
-            await sendLineMessage(appointmentData.userId, customerMessage, 'paymentReceived');
+          let customerMessage = '';
+          if (wasAwaitingConfirmation) {
+              customerMessage = `✅ ได้รับการชำระเงินเรียบร้อยแล้วค่ะ\n\nการนัดหมายบริการ "${appointmentData.serviceInfo.name}" ของคุณในวันที่ ${appointmentData.date} เวลา ${appointmentData.time} ได้รับการยืนยันแล้วค่ะ\n\nขอบคุณที่ใช้บริการค่ะ ✨`;
+          } else {
+              customerMessage = `✅ ได้รับการชำระเงินสำหรับบริการ "${appointmentData.serviceInfo.name}" ในวันที่ ${appointmentData.date} เรียบร้อยแล้วค่ะ\n\nขอบคุณที่ใช้บริการค่ะ ✨`;
+          }
+          await sendLineMessage(appointmentData.userId, customerMessage, 'paymentReceived');
         }
 
         try {
