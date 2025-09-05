@@ -61,7 +61,7 @@ function PaymentContent() {
 
     if (loading) {
         return (
-            <div className="text-center p-10">
+            <div className="text-center p-4">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-800 mx-auto mb-4"></div>
                 <p>กำลังสร้าง QR Code...</p>
             </div>
