@@ -43,20 +43,30 @@ export async function submitReview(reviewData) {
     }
 
     await db.runTransaction(async (transaction) => {
+      // Read all docs first
       const appointmentDoc = await transaction.get(appointmentRef);
       if (!appointmentDoc.exists) {
         throw new Error('ไม่พบข้อมูลการนัดหมายนี้');
       }
-      
       const appointmentData = appointmentDoc.data();
       if (appointmentData.userId !== userId) {
-          throw new Error('คุณไม่มีสิทธิ์รีวิวการนัดหมายนี้');
+        throw new Error('คุณไม่มีสิทธิ์รีวิวการนัดหมายนี้');
       }
       if (appointmentData.reviewInfo?.submitted) {
-          throw new Error('คุณได้รีวิวการนัดหมายนี้ไปแล้ว');
+        throw new Error('คุณได้รีวิวการนัดหมายนี้ไปแล้ว');
       }
 
-      // Save the new review
+      let customerDoc = null;
+      let currentPoints = 0;
+      const customerRef = db.collection('customers').doc(userId);
+      if (pointsToAward > 0) {
+        customerDoc = await transaction.get(customerRef);
+        if (customerDoc.exists) {
+          currentPoints = customerDoc.data().points || 0;
+        }
+      }
+
+      // All reads done, now do writes
       transaction.set(reviewRef, {
         appointmentId,
         userId,
@@ -68,7 +78,6 @@ export async function submitReview(reviewData) {
         createdAt: FieldValue.serverTimestamp(),
       });
 
-      // Mark the appointment as reviewed
       transaction.update(appointmentRef, {
         'reviewInfo.submitted': true,
         'reviewInfo.rating': Number(rating),
@@ -76,19 +85,13 @@ export async function submitReview(reviewData) {
         updatedAt: FieldValue.serverTimestamp(),
       });
 
-      // Award points to customer if enabled
       if (pointsToAward > 0) {
-        const customerRef = db.collection('customers').doc(userId);
-        const customerDoc = await transaction.get(customerRef);
-        
-        if (customerDoc.exists) {
-          const currentPoints = customerDoc.data().points || 0;
+        if (customerDoc && customerDoc.exists) {
           transaction.update(customerRef, {
             points: currentPoints + pointsToAward,
             updatedAt: FieldValue.serverTimestamp(),
           });
         } else {
-          // Create customer record if doesn't exist
           transaction.set(customerRef, {
             points: pointsToAward,
             createdAt: FieldValue.serverTimestamp(),
