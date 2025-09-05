@@ -273,19 +273,29 @@ export async function confirmAppointmentAndPaymentByAdmin(appointmentId, adminId
         if (appointmentData.userId) {
           if (wasAwaitingConfirmation) {
               await sendPaymentConfirmationFlexMessage(appointmentData.userId, {
-                  serviceName: appointmentData.serviceInfo.name,
+                  id: appointmentId,
+                  serviceInfo: appointmentData.serviceInfo,
+                  customerInfo: appointmentData.customerInfo,
+                  paymentInfo: {
+                      amountPaid: data.amount,
+                      paymentMethod: data.method
+                  },
                   date: appointmentData.date,
                   time: appointmentData.time,
-                  totalPrice: data.amount,
                   appointmentId: appointmentId,
                   isConfirmed: true
               });
           } else {
               await sendPaymentConfirmationFlexMessage(appointmentData.userId, {
-                  serviceName: appointmentData.serviceInfo.name,
+                  id: appointmentId,
+                  serviceInfo: appointmentData.serviceInfo,
+                  customerInfo: appointmentData.customerInfo,
+                  paymentInfo: {
+                      amountPaid: data.amount,
+                      paymentMethod: data.method
+                  },
                   date: appointmentData.date,
                   time: appointmentData.time,
-                  totalPrice: data.amount,
                   appointmentId: appointmentId,
                   isConfirmed: false
               });

@@ -1,11 +1,13 @@
 "use server";
 
 export async function createPaymentFlexTemplate(appointmentData) {
-    const { id, serviceInfo, paymentInfo, customerInfo, date, time } = appointmentData;
+    const { id, appointmentId, serviceInfo, paymentInfo, customerInfo, date, time } = appointmentData;
     const customerName = customerInfo?.fullName || customerInfo?.firstName || 'คุณลูกค้า';
     const totalAmount = paymentInfo?.totalAmount || paymentInfo?.totalPrice || serviceInfo?.price || 0;
     const formattedAmount = new Intl.NumberFormat('th-TH').format(totalAmount);
     const serviceName = serviceInfo?.name || 'บริการของคุณ';
+    const safeId = (id || appointmentId || '').toString();
+    const shortId = safeId ? safeId.substring(0, 8).toUpperCase() : '—';
     const appointmentDate = new Date(date).toLocaleDateString('th-TH', {
         day: '2-digit',
         month: 'short',
@@ -120,7 +122,7 @@ export async function createPaymentFlexTemplate(appointmentData) {
                                     },
                                     {
                                         type: "text",
-                                        text: id.substring(0, 8).toUpperCase(),
+                                        text: shortId,
                                         size: "sm",
                                         color: "#333333",
                                         flex: 3,
@@ -348,11 +350,13 @@ export async function createReviewFlexTemplate(appointmentData) {
 }
 
 export async function createPaymentConfirmationFlexTemplate(appointmentData) {
-    const { id, paymentInfo, serviceInfo, customerInfo } = appointmentData;
+    const { id, appointmentId, paymentInfo, serviceInfo, customerInfo } = appointmentData;
     const customerName = customerInfo?.fullName || customerInfo?.firstName || 'คุณลูกค้า';
     const totalAmount = paymentInfo?.totalAmount || paymentInfo?.amountPaid || serviceInfo?.price || 0;
     const formattedAmount = new Intl.NumberFormat('th-TH').format(totalAmount);
     const serviceName = serviceInfo?.name || 'บริการของคุณ';
+    const safeId = (id || appointmentId || '').toString();
+    const shortId = safeId ? safeId.substring(0, 8).toUpperCase() : '—';
     
     return {
         type: "flex",
@@ -451,7 +455,7 @@ export async function createPaymentConfirmationFlexTemplate(appointmentData) {
                                     },
                                     {
                                         type: "text",
-                                        text: id.substring(0, 8).toUpperCase(),
+                                        text: shortId,
                                         size: "sm",
                                         color: "#333333",
                                         flex: 3,
@@ -467,13 +471,19 @@ export async function createPaymentConfirmationFlexTemplate(appointmentData) {
                         cornerRadius: "8px"
                     },
                     {
-                        type: "text",
-                        text: "????????????????????????????? ????????????????????????????????????",
-                        size: "sm",
-                        color: "#4CAF50",
-                        wrap: true,
+                        type: "box",
+                        layout: "vertical",
+                        contents: [
+                            {
+                                type: "text",
+                                text: "ขอบคุณที่ชำระเงิน ใช้บริการของเราต่อไปนะคะ",
+                                size: "sm",
+                                color: "#4CAF50",
+                                wrap: true,
+                                align: "center"
+                            }
+                        ],
                         margin: "lg",
-                        align: "center",
                         paddingAll: "12px",
                         backgroundColor: "#E8F5E8",
                         cornerRadius: "8px"
@@ -1017,7 +1027,7 @@ export async function createAppointmentCancelledFlexTemplate(appointmentData, re
                                     },
                                     {
                                         type: "text",
-                                        text: id.substring(0, 8).toUpperCase(),
+                                        text: shortId,
                                         size: "sm",
                                         color: "#333333",
                                         flex: 3,
