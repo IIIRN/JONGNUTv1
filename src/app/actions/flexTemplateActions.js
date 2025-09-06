@@ -1101,7 +1101,7 @@ export async function createNewBookingFlexTemplate(appointmentData) {
                         text: "📝 คำขอจอง",
                         weight: "bold",
                         size: "lg",
-                        color: "#FBC02D",
+                        color: "#7F7679",
                         align: "center",
                         margin: "none"
                     },
@@ -1215,9 +1215,9 @@ export async function createNewBookingFlexTemplate(appointmentData) {
                         contents: [
                             {
                                 type: "text",
-                                text: "โปรดรอการยืนยันจากร้าน ขอบคุณค่ะ",
+                                text: "โปรด ยืนยัน การจองของคุณ",
                                 size: "sm",
-                                color: "#FBC02D",
+                                color: "#7F7679",
                                 wrap: true,
                                 align: "center"
                             }

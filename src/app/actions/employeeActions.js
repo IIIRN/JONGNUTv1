@@ -4,7 +4,7 @@ import { db } from '@/app/lib/firebaseAdmin';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { revalidatePath } from 'next/cache';
 import { sendBookingNotification } from './lineActions';
-import { sendServiceCompletedFlexMessage } from './lineFlexActions';
+import { sendServiceCompletedFlexMessage, sendReviewFlexMessage } from './lineFlexActions';
 import { awardPointsForPurchase, awardPointsForVisit, awardPointsByPhone } from './pointActions'; 
 import { findOrCreateCustomer } from './customerActions'; 
 
@@ -103,6 +103,7 @@ export async function updateAppointmentStatus(appointmentId, newStatus, employee
 
                 // Send service completed Flex message to customer
                 try {
+                    const serviceName = appointmentData.serviceInfo?.name || 'บริการเสริมสวย';
                     await sendServiceCompletedFlexMessage(appointmentData.userId, {
                         serviceName: serviceName,
                         appointmentId: appointmentId,
@@ -111,6 +112,28 @@ export async function updateAppointmentStatus(appointmentId, newStatus, employee
                     console.log(`Service completed Flex message and points awarded for customer with LINE ID ${appointmentData.userId}: ${totalPointsAwarded} points`);
                 } catch (notificationError) {
                     console.error(`Failed to send service completed Flex message to customer ${appointmentData.userId}:`, notificationError);
+                }
+
+                // Send review request Flex message if enabled in settings
+                try {
+                    // Check if review requests are enabled in settings
+                    const settingsRef = db.collection('settings').doc('general');
+                    const settingsDoc = await settingsRef.get();
+                    const settings = settingsDoc.exists ? settingsDoc.data() : {};
+                    const reviewEnabled = settings.enableReviewRequests !== false; // Default to true if not set
+
+                    if (reviewEnabled) {
+                        await sendReviewFlexMessage(appointmentData.userId, {
+                            id: appointmentId,
+                            appointmentId: appointmentId,
+                            ...appointmentData
+                        });
+                        console.log(`Review Flex message sent to customer with LINE ID ${appointmentData.userId}`);
+                    } else {
+                        console.log(`Review requests disabled in settings - skipping review message for ${appointmentData.userId}`);
+                    }
+                } catch (reviewError) {
+                    console.error(`Failed to send review Flex message to customer ${appointmentData.userId}:`, reviewError);
                 }
             } else if (appointmentData.customerInfo?.phone) {
                 // Customer doesn't have LINE ID but has phone number - use alternative point system

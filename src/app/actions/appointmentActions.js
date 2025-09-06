@@ -455,7 +455,7 @@ export async function updateAppointmentStatusByAdmin(appointmentId, newStatus, n
                         date: appointmentDate,
                         time: appointmentTime,
                         appointmentId: appointmentId,
-                        pointsAwarded: appointmentData._totalPointsAwarded || 0
+                        totalPointsAwarded: appointmentData._totalPointsAwarded || 0
                     });
                     console.log('🔄 Status completed - sending review request for appointment:', appointmentId);
                     await sendReviewRequestToCustomer(appointmentId);

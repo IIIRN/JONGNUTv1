@@ -65,6 +65,50 @@ const AppointmentCard = ({ appointment, onConfirm, onUpdatePayment, onShowPaymen
     const now = new Date();
     const isFuture = appointmentDate > now;
 
+    // สถานะที่สามารถเลือกได้
+    const statusOptions = [
+        { value: 'pending', label: 'รอใช้บริการ', color: 'bg-yellow-100 text-yellow-800' },
+        { value: 'in_progress', label: 'เริ่มใช้บริการ', color: 'bg-blue-100 text-blue-800' },
+        { value: 'completed', label: 'เสร็จสิ้น', color: 'bg-green-100 text-green-800' },
+        { value: 'cancelled', label: 'ยกเลิก', color: 'bg-red-100 text-red-800' }
+    ];
+
+    const [selectedStatus, setSelectedStatus] = useState(appointment.status);
+    const [statusUpdating, setStatusUpdating] = useState(false);
+
+    const handleStatusUpdate = async () => {
+        if (selectedStatus === appointment.status) {
+            alert('กรุณาเลือกสถานะใหม่ที่แตกต่างจากสถานะปัจจุบัน');
+            return;
+        }
+
+        if (!confirm(`ยืนยันการเปลี่ยนสถานะเป็น "${statusOptions.find(opt => opt.value === selectedStatus)?.label}"?`)) {
+            return;
+        }
+
+        setStatusUpdating(true);
+        try {
+            const employeeId = appointment.employeeId || 'employee';
+            const result = await updateAppointmentStatus(appointment.id, selectedStatus, employeeId, `อัพเดทสถานะเป็น ${selectedStatus}`);
+            if (result.success) {
+                alert('อัพเดทสถานะสำเร็จ!');
+                // อัพเดท appointment ใน state
+                appointment.status = selectedStatus;
+            } else {
+                alert('เกิดข้อผิดพลาด: ' + result.error);
+                setSelectedStatus(appointment.status); // รีเซ็ตกลับเป็นสถานะเดิม
+            }
+        } catch (err) {
+            alert('เกิดข้อผิดพลาด: ' + err.message);
+            setSelectedStatus(appointment.status); // รีเซ็ตกลับเป็นสถานะเดิม
+        }
+        setStatusUpdating(false);
+    };
+
+    const getCurrentStatusInfo = () => {
+        return statusOptions.find(opt => opt.value === appointment.status) || statusOptions[0];
+    };
+
     return (
         <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200 space-y-3">
             <div className="flex justify-between items-start">
@@ -72,9 +116,14 @@ const AppointmentCard = ({ appointment, onConfirm, onUpdatePayment, onShowPaymen
                     <p className="font-bold text-lg">{appointment.customerInfo.fullName}</p>
                     <p className="text-sm text-gray-600">{appointment.serviceInfo.name}</p>
                 </div>
-                <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${isPaid ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                    {isPaid ? 'ชำระแล้ว' : 'ยังไม่ชำระ'}
-                </span>
+                <div className="flex flex-col items-end space-y-1">
+                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${isPaid ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                        {isPaid ? 'ชำระแล้ว' : 'ยังไม่ชำระ'}
+                    </span>
+                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${getCurrentStatusInfo().color}`}>
+                        {getCurrentStatusInfo().label}
+                    </span>
+                </div>
             </div>
             <div className="text-sm text-gray-700 border-t pt-3">
                 <p><strong>วันที่:</strong> {format(appointmentDate, 'dd MMMM yyyy', { locale: th })}</p>
@@ -96,11 +145,37 @@ const AppointmentCard = ({ appointment, onConfirm, onUpdatePayment, onShowPaymen
                         }
                         onUpdatePayment(appointment.id);
                     }}
-                    className="font-semibold py-2 rounded-lg transition-colors bg-green-500 text-white hover:bg-green-600"
+                    className={`font-semibold py-2 rounded-lg transition-colors bg-green-500 text-white hover:bg-green-600 ${isFuture && !isPaid ? 'border-2 border-yellow-400' : ''}`}
                     disabled={isPaid}
                 >
-                    {isPaid ? 'ชำระเงินแล้ว' : 'อัปเดตชำระเงิน'}
+                    {isPaid ? 'ชำระเงินแล้ว' : isFuture ? 'อัปเดตชำระเงิน (ยังไม่ถึงวันนัด)' : 'อัปเดตชำระเงิน'}
                 </button>
+            </div>
+            <div className="border-t pt-3">
+                <label className="block text-sm font-medium mb-2 text-gray-700">อัพเดทสถานะการนัดหมาย</label>
+                <div className="flex items-center space-x-2">
+                    <select
+                        value={selectedStatus}
+                        onChange={(e) => setSelectedStatus(e.target.value)}
+                        disabled={statusUpdating}
+                        className="flex-1 p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                        {statusOptions.map(opt => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
+                    </select>
+                    <button
+                        onClick={handleStatusUpdate}
+                        disabled={statusUpdating || selectedStatus === appointment.status}
+                        className={`px-4 py-2 rounded-md font-semibold transition-colors ${
+                            statusUpdating || selectedStatus === appointment.status
+                                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                : 'bg-orange-500 text-white hover:bg-orange-600'
+                        }`}
+                    >
+                        {statusUpdating ? 'กำลังอัพเดท...' : 'ยืนยัน'}
+                    </button>
+                </div>
             </div>
             <button
                 onClick={() => onConfirm(appointment.id)}
