@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense, useCallback } from 'react';
+import { useState, useEffect, Suspense, useCallback } from 'react'; // Import useCallback
 import { useRouter, useSearchParams } from 'next/navigation';
 import { db } from '@/app/lib/firebase';
 import { collection, getDocs, query, where, orderBy, doc, getDoc } from 'firebase/firestore';
@@ -10,56 +10,29 @@ import Image from 'next/image';
 import CustomerHeader from '@/app/components/CustomerHeader';
 import { useToast } from '@/app/components/common/Toast';
 
-// --- Beautician Card Component ---
+// --- Beautician Card Component (ได้รับการแก้ไข) ---
 const BeauticianCard = ({ beautician, isSelected, onSelect, isAvailable }) => (
     <div
         onClick={() => isAvailable && onSelect(beautician)}
-        className={`p-4 rounded-xl border-2 cursor-pointer transition-all duration-300
-            ${isSelected ? 'border-primary bg-purple-50 shadow-lg' : 'border-gray-200 bg-white hover:border-purple-200'}
-            ${!isAvailable ? 'opacity-50 cursor-not-allowed bg-gray-50' : ''}
-        `}
+        className={`rounded-lg p-4 flex items-center space-x-4 border-2 transition-all w-full ${!isAvailable ? 'bg-gray-200 opacity-60 cursor-not-allowed' : isSelected ? 'border-primary bg-primary-light cursor-pointer' : 'border-gray-200 bg-white cursor-pointer'}`}
     >
+        <div className="relative w-16 h-16 rounded-full overflow-hidden flex-shrink-0">
+            <Image
+                src={beautician.imageUrl || 'https://via.placeholder.com/150'}
+                alt={beautician.firstName}
+                fill
+                style={{ objectFit: 'cover' }}
+            />
+        </div>
+        <div className="flex-1">
+            <p className="font-bold text-lg text-gray-800">{beautician.firstName}</p>
+        </div>
         <div className="flex items-center space-x-3">
-            <div className="relative w-12 h-12 rounded-full overflow-hidden bg-gray-200 flex-shrink-0">
-                {beautician.profileImage ? (
-                    <Image
-                        src={beautician.profileImage}
-                        alt={beautician.name}
-                        width={48}
-                        height={48}
-                        className="object-cover"
-                    />
-                ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-purple-200 to-pink-200 flex items-center justify-center">
-                        <span className="text-purple-600 font-semibold text-lg">
-                            {beautician.name.charAt(0)}
-                        </span>
-                    </div>
-                )}
-                {!isAvailable && (
-                    <div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center">
-                        <span className="text-white text-xs font-bold">ไม่ว่าง</span>
-                    </div>
-                )}
-            </div>
-            <div className="flex-1 min-w-0">
-                <h3 className={`font-semibold text-sm ${isSelected ? 'text-primary' : 'text-gray-800'} truncate`}>
-                    {beautician.name}
-                </h3>
-                <p className="text-xs text-gray-500 mt-1 truncate">
-                    {beautician.specialties?.join(', ') || 'ช่างทั่วไป'}
-                </p>
-                {beautician.rating && (
-                    <div className="flex items-center mt-1">
-                        <span className="text-yellow-400 text-xs">★</span>
-                        <span className="text-xs text-gray-600 ml-1">
-                            {beautician.rating.toFixed(1)}
-                        </span>
-                    </div>
-                )}
-            </div>
-            {isSelected && (
-                <div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center flex-shrink-0">
+            <p className={`text-sm px-3 py-1 rounded-full ${isAvailable ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                {isAvailable ? 'ว่าง' : 'ไม่ว่าง'}
+            </p>
+            {isSelected && isAvailable && (
+                <div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center">
                     <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
@@ -69,35 +42,38 @@ const BeauticianCard = ({ beautician, isSelected, onSelect, isAvailable }) => (
     </div>
 );
 
+// --- Time Slot Component (คงเดิม) ---
+const TimeSlot = ({ time, isSelected, onSelect }) => (
+    <button
+        onClick={() => onSelect(time)}
+        className={`rounded-lg px-4 py-2 transition-colors text-sm font-semibold ${isSelected ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+    >
+        {time}
+    </button>
+);
+
+
 function SelectDateTimeContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const { showToast } = useToast();
-    
     const serviceId = searchParams.get('serviceId');
     const addOns = searchParams.get('addOns');
-    const customerId = searchParams.get('customerId');
+    const { showToast, ToastComponent } = useToast();
 
-    const [date, setDate] = useState(null);
+    const [date, setDate] = useState(new Date());
+    const [activeMonth, setActiveMonth] = useState(new Date());
+
     const [time, setTime] = useState('');
-    const [selectedBeautician, setSelectedBeautician] = useState(null);
     const [beauticians, setBeauticians] = useState([]);
-    const [slotCounts, setSlotCounts] = useState({});
-    const [existingAppointments, setExistingAppointments] = useState([]);
-    const [unavailableBeauticianIds, setUnavailableBeauticianIds] = useState(new Set());
     const [loading, setLoading] = useState(true);
-    
-    // Booking settings
+    const [selectedBeautician, setSelectedBeautician] = useState(null);
     const [timeQueues, setTimeQueues] = useState([]);
     const [totalBeauticians, setTotalBeauticians] = useState(1);
+    const [slotCounts, setSlotCounts] = useState({});
     const [useBeautician, setUseBeautician] = useState(false);
     const [weeklySchedule, setWeeklySchedule] = useState({});
     const [holidayDates, setHolidayDates] = useState([]);
-    const [bufferMinutes, setBufferMinutes] = useState(20);
-    
-    // Service and add-ons data
-    const [service, setService] = useState(null);
-    const [addOnsData, setAddOnsData] = useState([]);
+    const [unavailableBeauticianIds, setUnavailableBeauticianIds] = useState(new Set());
 
     // Fetch booking settings
     useEffect(() => {
@@ -107,25 +83,11 @@ function SelectDateTimeContent() {
                 const docSnap = await getDoc(docRef);
                 if (docSnap.exists()) {
                     const data = docSnap.data();
-                    console.log('Booking settings loaded:', data);
                     setTimeQueues(Array.isArray(data.timeQueues) ? data.timeQueues : []);
                     setTotalBeauticians(Number(data.totalBeauticians) || 1);
                     setUseBeautician(!!data.useBeautician);
                     setWeeklySchedule(data.weeklySchedule || {});
                     setHolidayDates(Array.isArray(data.holidayDates) ? data.holidayDates : []);
-                    setBufferMinutes(Number(data.bufferMinutes) || 20);
-                } else {
-                    console.log('No booking settings found, using defaults');
-                    // Set default time queues if no settings exist
-                    setTimeQueues([
-                        { time: '09:00', count: 1 },
-                        { time: '10:00', count: 1 },
-                        { time: '11:00', count: 1 },
-                        { time: '13:00', count: 1 },
-                        { time: '14:00', count: 1 },
-                        { time: '15:00', count: 1 },
-                        { time: '16:00', count: 1 }
-                    ]);
                 }
             } catch (e) {
                 console.error("Error fetching booking settings:", e);
@@ -134,43 +96,15 @@ function SelectDateTimeContent() {
         fetchBookingSettings();
     }, []);
 
-    // Fetch service and addOns data
-    useEffect(() => {
-        const fetchServiceData = async () => {
-            if (!serviceId) return;
-            try {
-                const serviceRef = doc(db, 'services', serviceId);
-                const serviceSnap = await getDoc(serviceRef);
-                if (serviceSnap.exists()) {
-                    setService({ id: serviceSnap.id, ...serviceSnap.data() });
-                }
-                
-                if (addOns) {
-                    const addOnsIds = addOns.split(',');
-                    const addOnsPromises = addOnsIds.map(async (id) => {
-                        const addOnRef = doc(db, 'addOns', id);
-                        const addOnSnap = await getDoc(addOnRef);
-                        return addOnSnap.exists() ? { id: addOnSnap.id, ...addOnSnap.data() } : null;
-                    });
-                    const addOnsResults = await Promise.all(addOnsPromises);
-                    setAddOnsData(addOnsResults.filter(Boolean));
-                }
-            } catch (e) {
-                console.error("Error fetching service data:", e);
-            }
-        };
-        fetchServiceData();
-    }, [serviceId, addOns]);
-
-    // Fetch all beauticians
+    // Fetch beauticians
     useEffect(() => {
         const fetchBeauticians = async () => {
             setLoading(true);
             try {
                 const q = query(
                     collection(db, 'beauticians'),
-                    where('status', '==', 'active'),
-                    orderBy('name')
+                    where('status', '==', 'available'),
+                    orderBy('firstName')
                 );
                 const querySnapshot = await getDocs(q);
                 setBeauticians(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -181,60 +115,6 @@ function SelectDateTimeContent() {
         };
         fetchBeauticians();
     }, []);
-
-    // Helper function to check if a time slot is available considering buffer and overlaps
-    const isTimeSlotAvailable = (timeSlot, dateStr, appointmentsForDay = null) => {
-        const appointments = appointmentsForDay || existingAppointments.filter(appointment => {
-            const appointmentDate = new Date(appointment.date.seconds * 1000).toDateString();
-            const selectedDate = new Date(dateStr).toDateString();
-            return appointmentDate === selectedDate;
-        });
-
-        if (!appointments.length) return true;
-
-        // Calculate total duration of selected service + add-ons
-        const serviceDuration = service?.duration || 60; // Default 60 minutes
-        const addOnsDuration = addOnsData.reduce((total, addOn) => total + (addOn.duration || 0), 0);
-        const totalDuration = serviceDuration + addOnsDuration;
-
-        // Convert timeSlot to minutes for calculation
-        const [hours, minutes] = timeSlot.split(':').map(Number);
-        const slotStartMinutes = hours * 60 + minutes;
-        const slotEndMinutes = slotStartMinutes + totalDuration;
-
-        // Check existing appointments for conflicts
-        for (let appointment of appointments) {
-            const [appHours, appMinutes] = appointment.time.split(':').map(Number);
-            const appStartMinutes = appHours * 60 + appMinutes;
-            
-            // Calculate appointment end time including its service and add-ons duration
-            let appTotalDuration = 60; // Default duration
-            
-            // Add add-ons duration (estimate if actual data not available)
-            if (appointment.addOns && appointment.addOns.length > 0) {
-                appTotalDuration += appointment.addOns.length * 30; // Estimate 30 min per add-on
-            }
-            
-            const appEndMinutes = appStartMinutes + appTotalDuration;
-
-            // Check for overlap considering buffer time
-            const hasOverlap = (
-                // New appointment starts before existing ends (with buffer)
-                (slotStartMinutes < appEndMinutes + bufferMinutes) &&
-                // New appointment ends after existing starts (with buffer)
-                (slotEndMinutes + bufferMinutes > appStartMinutes)
-            );
-
-            if (hasOverlap) {
-                if (!useBeautician) {
-                    return false; // No beautician mode - any overlap blocks the slot
-                }
-                // In beautician mode, we'll handle this in the beautician availability logic
-            }
-        }
-
-        return true;
-    };
 
     // Fetch appointment counts for the selected date and update beautician availability
     useEffect(() => {
@@ -250,50 +130,11 @@ function SelectDateTimeContent() {
             const querySnapshot = await getDocs(q);
             const appointmentsForDay = querySnapshot.docs.map(doc => doc.data());
             
-            // Calculate slot availability considering duration and buffer
+            // Calculate total bookings for each time slot
             const counts = {};
-            timeQueues.forEach(queue => {
-                const timeSlot = queue.time;
-                if (timeSlot && isTimeInBusinessHours(timeSlot)) {
-                    const isAvailable = isTimeSlotAvailable(timeSlot, dateStr, appointmentsForDay);
-                    
-                    if (useBeautician) {
-                        // Count how many beauticians are available for this slot
-                        const unavailableForSlot = appointmentsForDay
-                            .filter(appt => {
-                                if (!appt.time || !appt.beauticianId) return false;
-                                
-                                const [appHours, appMinutes] = appt.time.split(':').map(Number);
-                                const appStartMinutes = appHours * 60 + appMinutes;
-                                
-                                // Estimate appointment duration
-                                let appDuration = 60; // Default
-                                if (appt.addOns && appt.addOns.length > 0) {
-                                    appDuration += appt.addOns.length * 30;
-                                }
-                                const appEndMinutes = appStartMinutes + appDuration;
-                                
-                                const [slotHours, slotMinutes] = timeSlot.split(':').map(Number);
-                                const slotStartMinutes = slotHours * 60 + slotMinutes;
-                                
-                                // Calculate total duration for new appointment
-                                const serviceDuration = service?.duration || 60;
-                                const addOnsDuration = addOnsData.reduce((total, addOn) => total + (addOn.duration || 0), 0);
-                                const totalDuration = serviceDuration + addOnsDuration;
-                                const slotEndMinutes = slotStartMinutes + totalDuration;
-                                
-                                // Check for overlap with buffer
-                                return (slotStartMinutes < appEndMinutes + bufferMinutes) &&
-                                       (slotEndMinutes + bufferMinutes > appStartMinutes);
-                            })
-                            .map(appt => appt.beauticianId);
-                        
-                        const availableBeauticians = beauticians.length - new Set(unavailableForSlot).size;
-                        counts[timeSlot] = Math.max(0, beauticians.length - availableBeauticians);
-                    } else {
-                        // For non-beautician mode, mark as full if not available
-                        counts[timeSlot] = isAvailable ? 0 : 1;
-                    }
+            appointmentsForDay.forEach(appt => {
+                if (appt.time) {
+                    counts[appt.time] = (counts[appt.time] || 0) + 1;
                 }
             });
             setSlotCounts(counts);
@@ -302,208 +143,128 @@ function SelectDateTimeContent() {
             if (time) {
                 const unavailableIds = new Set(
                     appointmentsForDay
-                        .filter(appt => {
-                            if (!appt.time || !appt.beauticianId) return false;
-                            
-                            const [appHours, appMinutes] = appt.time.split(':').map(Number);
-                            const appStartMinutes = appHours * 60 + appMinutes;
-                            
-                            // Estimate appointment duration
-                            let appDuration = 60; // Default
-                            if (appt.addOns && appt.addOns.length > 0) {
-                                appDuration += appt.addOns.length * 30;
-                            }
-                            const appEndMinutes = appStartMinutes + appDuration;
-                            
-                            const [timeHours, timeMinutes] = time.split(':').map(Number);
-                            const timeStartMinutes = timeHours * 60 + timeMinutes;
-                            
-                            // Calculate total duration for new appointment
-                            const serviceDuration = service?.duration || 60;
-                            const addOnsDuration = addOnsData.reduce((total, addOn) => total + (addOn.duration || 0), 0);
-                            const totalDuration = serviceDuration + addOnsDuration;
-                            const timeEndMinutes = timeStartMinutes + totalDuration;
-                            
-                            // Check for overlap with buffer
-                            return (timeStartMinutes < appEndMinutes + bufferMinutes) &&
-                                   (timeEndMinutes + bufferMinutes > appStartMinutes);
-                        })
+                        .filter(appt => appt.time === time && appt.beauticianId)
                         .map(appt => appt.beauticianId)
                 );
                 setUnavailableBeauticianIds(unavailableIds);
+
+                // If currently selected beautician becomes unavailable, deselect them
+                if (selectedBeautician && unavailableIds.has(selectedBeautician.id)) {
+                    setSelectedBeautician(null);
+                    showToast('ช่างที่เลือกไม่ว่างในเวลานี้แล้ว', 'warning', 'โปรดเลือกช่างใหม่');
+                }
+            } else {
+                setUnavailableBeauticianIds(new Set());
             }
         };
 
         fetchAppointmentsForDate();
-    }, [date, time, beauticians, bufferMinutes, service, addOnsData, timeQueues]);
-
+    }, [date, time, selectedBeautician, showToast]);
+    
     // Reset time and beautician when date changes
     useEffect(() => {
         setTime('');
         setSelectedBeautician(null);
     }, [date]);
-
-    // Reset beautician when time changes
-    useEffect(() => {
-        if (selectedBeautician && unavailableBeauticianIds.has(selectedBeautician.id)) {
-            setSelectedBeautician(null);
-            if (time) {
-                showToast('ช่างที่เลือกไม่ว่างในเวลานี้แล้ว', 'warning', 'โปรดเลือกช่างใหม่');
-            }
-        }
-    }, [time, selectedBeautician, unavailableBeauticianIds, showToast]);
-
-    // Business hours and date checking functions
-    const isTimeInBusinessHours = (time) => {
-        // If no date selected or no weekly schedule, assume all times are valid
-        if (!date || !weeklySchedule || Object.keys(weeklySchedule).length === 0) {
-            console.log(`isTimeInBusinessHours(${time}): no date or schedule, returning true`);
-            return true;
-        }
-        
-        const dayOfWeek = date.getDay();
-        const dayName = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][dayOfWeek];
-        const daySchedule = weeklySchedule[dayName];
-        
-        console.log(`isTimeInBusinessHours(${time}): dayName=${dayName}, daySchedule=`, daySchedule);
-        
-        // If no schedule for this day, assume all times are valid
-        if (!daySchedule) {
-            console.log(`isTimeInBusinessHours(${time}): no day schedule, returning true`);
-            return true;
-        }
-        
-        // If day is not open, no times are valid
-        if (!daySchedule.isOpen) {
-            console.log(`isTimeInBusinessHours(${time}): day not open, returning false`);
-            return false;
-        }
-        
-        // If no open/close times specified, assume all times are valid
-        if (!daySchedule.openTime || !daySchedule.closeTime) {
-            console.log(`isTimeInBusinessHours(${time}): no open/close times, returning true`);
-            return true;
-        }
-        
-        const timeMinutes = time.split(':').reduce((acc, time) => (60 * acc) + parseInt(time));
-        const openMinutes = daySchedule.openTime.split(':').reduce((acc, time) => (60 * acc) + parseInt(time));
-        const closeMinutes = daySchedule.closeTime.split(':').reduce((acc, time) => (60 * acc) + parseInt(time));
-        
-        const result = timeMinutes >= openMinutes && timeMinutes <= closeMinutes;
-        console.log(`isTimeInBusinessHours(${time}): ${timeMinutes} >= ${openMinutes} && ${timeMinutes} <= ${closeMinutes} = ${result}`);
-        
-        return result;
-    };
-
-    const isDateOpen = (checkDate) => {
-        // If no weekly schedule data loaded yet, assume all days are open
-        if (!weeklySchedule || Object.keys(weeklySchedule).length === 0) return true;
-        
-        const dayOfWeek = checkDate.getDay();
-        const dayName = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][dayOfWeek];
-        const daySchedule = weeklySchedule[dayName];
-        
-        // If day schedule doesn't exist, assume it's open
-        if (!daySchedule) return true;
-        
-        // Check if the day is set to be open
-        if (!daySchedule.isOpen) return false;
-        
-        // Check if it's a holiday
-        const dateStr = format(checkDate, 'yyyy-MM-dd');
-        const isHoliday = holidayDates.some(holiday => holiday.date === dateStr);
-        
-        return !isHoliday;
-    };
+    
 
     const handleConfirm = () => {
         if (!date || !time) {
-            showToast('กรุณาเลือกวันที่และเวลา', 'error');
+            showToast('กรุณาเลือกวันและเวลาที่ต้องการจอง', "warning", "ข้อมูลไม่ครบถ้วน");
             return;
         }
         
         if (useBeautician && !selectedBeautician) {
-            showToast('กรุณาเลือกช่างเสริมสวย', 'error');
+            showToast('กรุณาเลือกช่างเสริมสวยที่ต้องการ', "warning", "ข้อมูลไม่ครบถ้วน");
             return;
         }
-
-        const params = new URLSearchParams({
-            serviceId: serviceId || '',
-            addOns: addOns || '',
-            customerId: customerId || '',
-            date: format(date, 'yyyy-MM-dd'),
-            time: time,
-            ...(selectedBeautician ? { beauticianId: selectedBeautician.id } : {})
-        });
-
+        
+        const params = new URLSearchParams();
+        if (serviceId) params.set('serviceId', serviceId);
+        if (addOns) params.set('addOns', addOns);
+        params.set('date', format(date, 'yyyy-MM-dd'));
+        params.set('time', time);
+        
+        if (useBeautician && selectedBeautician) {
+            params.set('beauticianId', selectedBeautician.id);
+        } else {
+            params.set('beauticianId', 'auto-assign');
+        }
+        
         router.push(`/appointment/general-info?${params.toString()}`);
     };
 
-    const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
-    const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
+    const isDateOpen = (checkDate) => {
+        const dayOfWeek = checkDate.getDay();
+        const daySchedule = weeklySchedule[dayOfWeek];
+        const isRegularlyOpen = daySchedule ? daySchedule.isOpen : true;
+        if (!isRegularlyOpen) return false;
+        
+        const dateStr = format(checkDate, 'yyyy-MM-dd');
+        const isHoliday = holidayDates.some(holiday => holiday.date === dateStr);
+        if (isHoliday) return false;
+        
+        return true;
+    };
 
-    const monthNames = [
-        "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
-        "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"
-    ];
+    const isTimeInBusinessHours = (timeSlot) => {
+        if (!date) return true;
+        const dayOfWeek = date.getDay();
+        const daySchedule = weeklySchedule[dayOfWeek];
+        if (!daySchedule || !daySchedule.isOpen) return false;
+        
+        const slotTime = timeSlot.replace(':', '');
+        const openTime = daySchedule.openTime.replace(':', '');
+        const closeTime = daySchedule.closeTime.replace(':', '');
+        
+        return slotTime >= openTime && slotTime <= closeTime;
+    };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50">
-            <CustomerHeader />
-            
-            <div className="container mx-auto px-4 py-6">
-                {/* Calendar */}
-                <div className="w-full max-w-md mx-auto bg-white rounded-2xl shadow-lg p-6 mb-6">
-                    <div className="flex items-center justify-between mb-4">
-                        <button
-                            onClick={() => {
-                                if (currentMonth === 0) {
-                                    setCurrentMonth(11);
-                                    setCurrentYear(currentYear - 1);
-                                } else {
-                                    setCurrentMonth(currentMonth - 1);
-                                }
-                            }}
-                            className="p-2 rounded-full hover:bg-purple-50 text-primary"
-                        >
-                            &#8249;
-                        </button>
-                        <h2 className="text-lg font-bold text-primary">
-                            {monthNames[currentMonth]} {currentYear + 543}
-                        </h2>
-                        <button
-                            onClick={() => {
-                                if (currentMonth === 11) {
-                                    setCurrentMonth(0);
-                                    setCurrentYear(currentYear + 1);
-                                } else {
-                                    setCurrentMonth(currentMonth + 1);
-                                }
-                            }}
-                            className="p-2 rounded-full hover:bg-purple-50 text-primary"
-                        >
-                            &#8250;
-                        </button>
-                    </div>
-
-                    {/* Day headers */}
+        <div>
+            <ToastComponent />
+            <CustomerHeader showBackButton={true} showActionButtons={false} />
+            <div className="min-h-screen flex flex-col items-center  px-4">
+            {/* Calendar */}
+            <div className="w-full bg-white/30 border border-[#A8999E] p-4 rounded-2xl max-w-md mx-auto flex flex-col items-center">
+                <div className="flex items-center justify-between w-full mb-4">
+                    <button
+                        onClick={() => setActiveMonth(prev => {
+                            const d = new Date(prev);
+                            d.setMonth(d.getMonth() - 1);
+                            return d;
+                        })}
+                        className="px-3 py-2 text-xl text-primary hover:text-primary"
+                    >&#60;</button>
+                    <span className="font-bold text-lg text-primary">
+                        {activeMonth.toLocaleString('th-TH', { month: 'long', year: 'numeric' })}
+                    </span>
+                    <button
+                        onClick={() => setActiveMonth(prev => {
+                            const d = new Date(prev);
+                            d.setMonth(d.getMonth() + 1);
+                            return d;
+                        })}
+                        className="px-3 py-2 text-xl text-primary hover:text-primary"
+                    >&#62;</button>
+                </div>
+                <div className="w-full">
+                    {/* Header วันในสัปดาห์ */}
                     <div className="grid grid-cols-7 gap-1 mb-2">
-                        {['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'].map(day => (
-                            <div key={day} className="h-8 flex items-center justify-center">
-                                <span className="text-xs font-semibold text-gray-600">{day}</span>
-                            </div>
+                        {['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'].map((d, i) => (
+                            <div key={i} className="text-sm text-primary text-center font-semibold py-2">{d}</div>
                         ))}
                     </div>
-
-                    {/* Calendar days */}
-                    <div className="grid grid-cols-7 gap-1">
+                    
+                    {/* วันที่ในเดือน */}
+                    <div className="grid grid-cols-7 gap-2">
                         {(() => {
-                            const year = currentYear;
-                            const month = currentMonth;
+                            const year = activeMonth.getFullYear();
+                            const month = activeMonth.getMonth();
                             const firstDay = new Date(year, month, 1);
                             const lastDay = new Date(year, month + 1, 0);
                             const startDate = new Date(firstDay);
-                            startDate.setDate(startDate.getDate() - firstDay.getDay());
+                            startDate.setDate(startDate.getDate() - firstDay.getDay()); // เริ่มจากวันอาทิตย์
                             
                             const days = [];
                             const currentDate = new Date(startDate);
@@ -564,112 +325,96 @@ function SelectDateTimeContent() {
                         })()}
                     </div>
                 </div>
+            </div>
 
-                {/* Available Time */}
+            {/* Available Time */}
+            <div className="w-full max-w-md mx-auto mt-6">
+                <h2 className="text-base font-bold mb-2 text-primary">เลือกช่วงเวลา</h2>
+                
+                {date && !isDateOpen(date) ? (
+                    <div className="text-center p-4 bg-red-50 border border-red-200 rounded-lg">
+                        {(() => {
+                            const dateStr = format(date, 'yyyy-MM-dd');
+                            const holidayInfo = holidayDates.find(holiday => holiday.date === dateStr);
+                            
+                            if (holidayInfo) {
+                                return (
+                                    <div>
+                                        <p className="text-red-600 font-medium">วันหยุดพิเศษ</p>
+                                        {holidayInfo.note && (
+                                            <p className="text-red-500 text-sm mt-1">{holidayInfo.note}</p>
+                                        )}
+                                        <p className="text-red-400 text-xs mt-2">กรุณาเลือกวันที่อื่น</p>
+                                    </div>
+                                );
+                            } else {
+                                return <p className="text-gray-600">วันที่เลือกปิดทำการ</p>;
+                            }
+                        })()}
+                        <p className="text-sm text-gray-500">กรุณาเลือกวันอื่น</p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-3 gap-3">
+                        {timeQueues
+                            .filter(q => q.time && isTimeInBusinessHours(q.time))
+                            .sort((a, b) => String(a.time).localeCompare(String(b.time)))
+                            .map(queue => {
+                                const slot = queue.time;
+                                const max = useBeautician ? beauticians.length : (queue.count || totalBeauticians);
+                                const booked = slotCounts[slot] || 0;
+                                const isFull = booked >= max;
+                                return (
+                                    <button
+                                        key={slot}
+                                        onClick={() => !isFull && setTime(slot)}
+                                        className={`rounded-full px-4 py-2 text-sm font-semibold shadow-sm transition-colors
+                                            ${time === slot ? 'bg-primary text-white shadow-lg' : 'bg-white text-primary border border-purple-100 hover:bg-purple-50'}
+                                            ${isFull ? 'opacity-40 cursor-not-allowed line-through' : ''}`}
+                                        disabled={isFull}
+                                        title={isFull ? 'คิวเต็ม' : ''}
+                                    >
+                                        {slot} {isFull && <span className="text-xs">(เต็ม)</span>}
+                                    </button>
+                                );
+                            })}
+                    </div>
+                )}
+            </div>
+
+            {/* Beautician Selection */}
+            {useBeautician && time && (
                 <div className="w-full max-w-md mx-auto mt-6">
-                    <h2 className="text-base font-bold mb-2 text-primary">เลือกช่วงเวลา</h2>
-                    
-                    {date && !isDateOpen(date) ? (
-                        <div className="text-center p-4 bg-red-50 border border-red-200 rounded-lg">
-                            {(() => {
-                                const dateStr = format(date, 'yyyy-MM-dd');
-                                const holidayInfo = holidayDates.find(holiday => holiday.date === dateStr);
-                                
-                                if (holidayInfo) {
-                                    return (
-                                        <div>
-                                            <p className="text-red-600 font-medium">วันหยุดพิเศษ</p>
-                                            {holidayInfo.note && (
-                                                <p className="text-red-500 text-sm mt-1">{holidayInfo.note}</p>
-                                            )}
-                                            <p className="text-red-400 text-xs mt-2">กรุณาเลือกวันที่อื่น</p>
-                                        </div>
-                                    );
-                                } else {
-                                    return <p className="text-gray-600">วันที่เลือกปิดทำการ</p>;
-                                }
-                            })()}
-                            <p className="text-sm text-gray-500">กรุณาเลือกวันอื่น</p>
-                        </div>
+                    <h2 className="text-base font-bold mb-2 text-primary">เลือกช่างเสริมสวย</h2>
+                    {loading ? (
+                        <div className="text-center">กำลังโหลดรายชื่อช่าง...</div>
+                    ) : beauticians.length === 0 ? (
+                        <div className="text-center text-gray-500 bg-gray-100 p-4 rounded-lg">ขออภัย ไม่มีช่างที่พร้อมให้บริการในขณะนี้</div>
                     ) : (
-                        <div className="grid grid-cols-3 gap-3">
-                            {(() => {
-                                console.log('TimeQueues:', timeQueues);
-                                console.log('Selected date:', date);
-                                console.log('WeeklySchedule:', weeklySchedule);
-                                
-                                const filteredQueues = timeQueues.filter(q => q.time && isTimeInBusinessHours(q.time));
-                                console.log('Filtered time queues:', filteredQueues);
-                                
-                                if (filteredQueues.length === 0) {
-                                    return (
-                                        <div className="col-span-3 text-center p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                                            <p className="text-yellow-700">ไม่มีช่วงเวลาให้บริการในวันนี้</p>
-                                            <p className="text-yellow-600 text-sm mt-1">timeQueues: {timeQueues.length} items</p>
-                                        </div>
-                                    );
-                                }
-                                
-                                return filteredQueues
-                                    .sort((a, b) => String(a.time).localeCompare(String(b.time)))
-                                    .map(queue => {
-                                        const slot = queue.time;
-                                        const max = useBeautician ? beauticians.length : (queue.count || totalBeauticians);
-                                        const booked = slotCounts[slot] || 0;
-                                        const isFull = booked >= max;
-                                        return (
-                                            <button
-                                                key={slot}
-                                                onClick={() => !isFull && setTime(slot)}
-                                                className={`rounded-full px-4 py-2 text-sm font-semibold shadow-sm transition-colors
-                                                    ${time === slot ? 'bg-primary text-white shadow-lg' : 'bg-white text-primary border border-purple-100 hover:bg-purple-50'}
-                                                    ${isFull ? 'opacity-40 cursor-not-allowed line-through' : ''}`}
-                                                disabled={isFull}
-                                                title={isFull ? 'คิวเต็ม' : ''}
-                                            >
-                                                {slot} {isFull && <span className="text-xs">(เต็ม)</span>}
-                                            </button>
-                                        );
-                                    });
-                            })()}
+                        <div className="space-y-3">
+                            {beauticians.map(beautician => (
+                                <BeauticianCard
+                                    key={beautician.id}
+                                    beautician={beautician}
+                                    isSelected={selectedBeautician?.id === beautician.id}
+                                    onSelect={setSelectedBeautician}
+                                    isAvailable={!unavailableBeauticianIds.has(beautician.id)}
+                                />
+                            ))}
                         </div>
                     )}
                 </div>
+            )}
 
-                {/* Beautician Selection */}
-                {useBeautician && time && (
-                    <div className="w-full max-w-md mx-auto mt-6">
-                        <h2 className="text-base font-bold mb-2 text-primary">เลือกช่างเสริมสวย</h2>
-                        {loading ? (
-                            <div className="text-center">กำลังโหลดรายชื่อช่าง...</div>
-                        ) : beauticians.length === 0 ? (
-                            <div className="text-center text-gray-500 bg-gray-100 p-4 rounded-lg">ขออภัย ไม่มีช่างที่พร้อมให้บริการในขณะนี้</div>
-                        ) : (
-                            <div className="space-y-3">
-                                {beauticians.map(beautician => (
-                                    <BeauticianCard
-                                        key={beautician.id}
-                                        beautician={beautician}
-                                        isSelected={selectedBeautician?.id === beautician.id}
-                                        onSelect={setSelectedBeautician}
-                                        isAvailable={!unavailableBeauticianIds.has(beautician.id)}
-                                    />
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {/* Confirm Button */}
-                <div className="w-full max-w-md mx-auto mt-8 mb-8">
-                    <button
-                        onClick={handleConfirm}
-                        disabled={!date || !time || (useBeautician && !selectedBeautician)}
-                        className="w-full bg-primary text-white py-4 rounded-2xl font-bold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        ถัดไป
-                    </button>
-                </div>
+            {/* Confirm Button */}
+            <div className="w-full max-w-md mx-auto mt-8 mb-8">
+                <button
+                    onClick={handleConfirm}
+                    disabled={!date || !time || (useBeautician && !selectedBeautician)}
+                    className="w-full bg-primary text-white py-4 rounded-2xl font-bold shadow-lg "
+                >
+                    ถัดไป
+                </button>
+            </div>
             </div>
         </div>
     );
