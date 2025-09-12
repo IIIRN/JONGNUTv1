@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
@@ -16,6 +16,7 @@
     "date-fns": "^4.1.0",
     "firebase": "^12.0.0",
     "firebase-admin": "^13.4.0",
+    "googleapis": "^159.0.0",
     "leaflet": "^1.9.4",
     "next": "15.4.5",
     "promptpay-qr": "^0.5.0",
