@@ -21,19 +21,19 @@ async function getNotificationSettings() {
       return settingsDoc.data();
     }
     
-    // Default settings if document doesn't exist
+    // Default settings if document doesn't exist (fail-safe: disabled)
     return {
-      allNotifications: { enabled: true },
-      adminNotifications: { enabled: true, newBooking: true, bookingCancelled: true, paymentReceived: true, customerConfirmed: true },
-      customerNotifications: { enabled: true, appointmentConfirmed: true, appointmentCancelled: true, appointmentReminder: true, reviewRequest: true, paymentInvoice: true },
+      allNotifications: { enabled: false },
+      adminNotifications: { enabled: false, newBooking: false, bookingCancelled: false, paymentReceived: false, customerConfirmed: false },
+      customerNotifications: { enabled: false, appointmentConfirmed: false, appointmentCancelled: false, appointmentReminder: false, reviewRequest: false, paymentInvoice: false },
     };
   } catch (error) {
     console.error('Error fetching notification settings:', error);
-    // Return default enabled settings on error to avoid blocking critical notifications
+    // Return default disabled settings on error (fail-safe)
     return {
-      allNotifications: { enabled: true },
-      adminNotifications: { enabled: true },
-      customerNotifications: { enabled: true },
+      allNotifications: { enabled: false },
+      adminNotifications: { enabled: false, newBooking: false, bookingCancelled: false, paymentReceived: false, customerConfirmed: false },
+      customerNotifications: { enabled: false, appointmentConfirmed: false, appointmentCancelled: false, appointmentReminder: false, reviewRequest: false, paymentInvoice: false },
     };
   }
 }
