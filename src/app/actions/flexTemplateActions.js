@@ -367,17 +367,17 @@ export async function createPaymentConfirmationFlexTemplate(appointmentData) {
     
     return {
         type: "flex",
-    altText: `✅ ชำระเงินสำเร็จ ${formattedAmount} บาท`,
+    altText: `ชำระเงินสำเร็จ ${formattedAmount} บาท`,
         contents: {
             type: "bubble",
-            size: "kilo",
+            size: "mega",
             body: {
                 type: "box",
                 layout: "vertical",
                 contents: [
                     {
                         type: "text",
-                        text: "✅ ชำระเงินสำเร็จ",
+                        text: "ชำระเงินสำเร็จ",
                         weight: "bold",
                         size: "lg",
                         color: "#4CAF50",
@@ -1664,3 +1664,4 @@ export async function createDailyAppointmentNotificationFlexTemplate(appointment
 
     return flexMessage;
 }
+
