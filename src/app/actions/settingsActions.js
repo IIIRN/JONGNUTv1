@@ -1,0 +1,111 @@
+'use server';
+
+import { db } from '@/app/lib/firebaseAdmin';
+import { FieldValue } from 'firebase-admin/firestore';
+
+// ฟังก์ชันบันทึกการตั้งค่าการแจ้งเตือน
+export async function saveNotificationSettings(settingsData) {
+    if (!db) return { success: false, error: "Firebase Admin is not initialized." };
+    try {
+        const settingsRef = db.collection('settings').doc('notifications');
+        await settingsRef.set({
+            ...settingsData,
+            updatedAt: FieldValue.serverTimestamp(),
+        }, { merge: true });
+        return { success: true };
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+}
+
+// ฟังก์ชันบันทึกการตั้งค่าการจอง
+export async function saveBookingSettings(settingsData) {
+    if (!db) return { success: false, error: "Firebase Admin is not initialized." };
+    try {
+        const settingsRef = db.collection('settings').doc('booking');
+        await settingsRef.set({
+            ...settingsData,
+            updatedAt: FieldValue.serverTimestamp(),
+        }, { merge: true });
+        return { success: true };
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+}
+
+// ฟังก์ชันบันทึกการตั้งค่าคะแนน
+export async function savePointSettings(settingsData) {
+    if (!db) return { success: false, error: "Firebase Admin is not initialized." };
+    try {
+        const settingsRef = db.collection('settings').doc('points');
+        await settingsRef.set({
+            ...settingsData,
+            updatedAt: FieldValue.serverTimestamp(),
+        }, { merge: true });
+        return { success: true };
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+}
+
+// ฟังก์ชันบันทึกการตั้งค่า Payment
+export async function savePaymentSettings(settingsData) {
+    if (!db) return { success: false, error: "Firebase Admin is not initialized." };
+    try {
+        const settingsRef = db.collection('settings').doc('payment');
+        await settingsRef.set({
+            ...settingsData,
+            updatedAt: FieldValue.serverTimestamp(),
+        }, { merge: true });
+        return { success: true };
+    } catch (error) {
+        console.error("Error saving payment settings:", error);
+        return { success: false, error: error.message };
+    }
+}
+
+// ฟังก์ชันสำหรับบันทึกการตั้งค่า Calendar
+export async function saveCalendarSettings(settingsData) {
+    if (!db) return { success: false, error: "Firebase Admin is not initialized." };
+    try {
+        const settingsRef = db.collection('settings').doc('calendar');
+        await settingsRef.set({
+            ...settingsData,
+            updatedAt: FieldValue.serverTimestamp(),
+        }, { merge: true });
+        return { success: true };
+    } catch (error) {
+        console.error("Error saving calendar settings:", error);
+        return { success: false, error: error.message };
+    }
+}
+
+
+// ฟังก์ชันดึงข้อมูลการตั้งค่า Payment
+export async function getPaymentSettings() {
+    if (!db) {
+        console.error("Firebase Admin SDK has not been initialized.");
+        return { success: false, error: "บริการ Firebase ไม่พร้อมใช้งาน" };
+    }
+
+    try {
+        const docRef = db.collection('settings').doc('payment');
+        const docSnap = await docRef.get();
+
+        if (docSnap.exists) {
+            const settingsData = docSnap.data();
+            const serializableSettings = JSON.parse(JSON.stringify(settingsData, (key, value) => {
+                if (value && value.hasOwnProperty('_seconds') && value.hasOwnProperty('_nanoseconds')) {
+                    return new Date(value._seconds * 1000 + value._nanoseconds / 1000000).toISOString();
+                }
+                return value;
+            }));
+            return { success: true, settings: serializableSettings };
+        } else {
+            return { success: false, error: "ยังไม่ได้ตั้งค่าการชำระเงิน" };
+        }
+    } catch (error) {
+        console.error("Error getting payment settings:", error);
+        return { success: false, error: error.message };
+    }
+}
