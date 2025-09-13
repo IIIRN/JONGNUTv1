@@ -60,10 +60,18 @@ export async function saveNotificationSettings(settingsData) {
     if (!db) return { success: false, error: "Firebase Admin is not initialized." };
     try {
         const settingsRef = db.collection('settings').doc('notifications');
-        await settingsRef.set({
+        // Ensure newBooking toggle exists in customerNotifications
+        const updatedSettings = {
             ...settingsData,
+            customerNotifications: {
+                newBooking: typeof settingsData?.customerNotifications?.newBooking === 'boolean'
+                    ? settingsData.customerNotifications.newBooking
+                    : true, // default to true if not set
+                ...settingsData.customerNotifications
+            },
             updatedAt: FieldValue.serverTimestamp(),
-        }, { merge: true });
+        };
+        await settingsRef.set(updatedSettings, { merge: true });
         notificationSettingsCache = null; // Invalidate cache
         return { success: true };
     } catch (error) {

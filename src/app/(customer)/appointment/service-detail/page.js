@@ -98,73 +98,78 @@ function ServiceDetailContent() {
 
     return (
         <div>
-            <CustomerHeader showBackButton={true} showActionButtons={false} />
-            
-            <div className="px-4 pb-24">
-            {/* รูปภาพบริการ */}
-            <div className="relative w-full h-48 rounded-2xl overflow-hidden mb-4">
-                <Image
-                    src={service.imageUrl || 'https://via.placeholder.com/400x200'}
-                    alt={service.serviceName}
-                    fill
-                    style={{ objectFit: 'cover' }}
-                    className="rounded-2xl"
-                    priority
-                />
-            </div>
-
-            {/* ชื่อและราคาบริการ */}
-            <div className="mb-2">
-                <h1 className="text-xl font-bold text-gray-800 mb-2">{service.serviceName}</h1>
-                <div className="flex items-center justify-between">
-                    <span className="text-gray-600">ระยะเวลา</span>
-                    <span className="font-semibold text-gray-800">{service.duration} นาที</span>
-                </div>
-                <div className="flex items-center justify-between">
-                    <span className="text-gray-600">ราคา</span>
-                    <span className="font-bold text-lg text-gray-800">{profile.currency}{service.price?.toLocaleString()}</span>
-                </div>
-            </div>
-
-            {/* รายละเอียดบริการ */}
-            <div className="py-2">
-                <p className="text-gray-600 text-sm mt-2" style={{ whiteSpace: 'pre-line' }}>{service.details}</p>
-            </div>
-
-            {/* Add-on Services */}
-            {(service.addOnServices && service.addOnServices.length > 0) && (
-                <div className="py-2">
-                    <h2 className="text-sm font-bold mb-1">รายการเสริม</h2>
-                    <div className="space-y-2">
-                        {service.addOnServices.map((addOn, idx) => (
-                            <AddOnCard
-                                key={idx}
-                                addOn={addOn}
-                                isSelected={selectedAddOns.some(item => item.name === addOn.name)}
-                                onToggle={toggleAddOn}
-                            />
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {/* Footer ปกติ ไม่ fixed */}
-            <div className="py-4">
-                <div className="flex justify-between items-center mb-2">
-                    <span className="text-gray-600 text-sm">ราคารวม</span>
-                    <span className="text-xl font-bold text-gray-800">{profile.currency}{totalPrice.toLocaleString()}</span>
-                </div>
-                <button
-                    onClick={handleConfirm}
-                    className="w-full bg-primary hover:bg-primary text-white py-4 rounded-2xl font-bold text-base transition-colors"
-                >
-                    ยืนยัน
-                </button>
-            </div>
-            </div>
-        </div>
-    );
-}
+                   <CustomerHeader showBackButton={true} showActionButtons={false} />
+       
+                   <div className="px-4 pb-24">
+                       {/* รูปภาพบริการ */}
+                       <div className="relative w-full h-48 rounded-2xl overflow-hidden mb-4">
+                           <Image
+                               src={service.imageUrl || 'https://via.placeholder.com/400x200'}
+                               alt={service.serviceName}
+                               fill
+                               style={{ objectFit: 'cover' }}
+                               className="rounded-2xl"
+                               priority
+                           />
+                       </div>
+       
+                       {/* ชื่อและราคาบริการ */}
+                       <div className="mb-2">
+                           <h1 className="text-xl font-bold text-gray-800 mb-2">{service.serviceName}</h1>
+                           <div className="flex items-center justify-between">
+                               <div>
+                                   <div className="flex justify-between items-center">
+                                       <span className="text-gray-600 pr-4">ระยะเวลา</span>
+                                       <span className="font-bold text-md text-gray-800">{service.duration} นาที</span>
+                                   </div>
+       
+                                   <div className="flex justify-between items-center">
+                                       <span className="text-gray-600 pr-4">ราคา</span>
+                           <span className="font-bold text-md text-gray-800">{profile.currency}{service.price?.toLocaleString()}</span>
+                                   </div>
+                                   <div className="flex justify-between items-center mb-2">
+                                       <span className="text-gray-600 pr-4">ราคารวม</span>
+                           <span className="text-md font-bold text-gray-800">{profile.currency}{totalPrice.toLocaleString()}</span>
+                                   </div>
+                               </div>
+                               <button onClick={handleConfirm} className="w-1/3 bg-primary hover:bg-primary text-white py-4 rounded-2xl font-bold text-base transition-colors"
+                               >
+                                   ยืนยัน
+                               </button>
+                           </div></div>
+       
+                       {/* Add-on Services */}
+                       {(service.addOnServices && service.addOnServices.length > 0) && (
+                           <div className="py2">
+                               <h2 className="text-sm font-bold mb-1">รายการเสริม</h2>
+                               <div className="space-y-2">
+                                   {service.addOnServices.map((addOn, idx) => (
+                                       <AddOnCard
+                                           key={idx}
+                                           addOn={addOn}
+                                           isSelected={selectedAddOns.some(item => item.name === addOn.name)}
+                                           onToggle={toggleAddOn}
+                                       />
+                                   ))}
+                               </div>
+                           </div>
+                       )}
+       
+                       {/* รายละเอียดบริการ */}
+                       <div className="py-2">
+                           <p className="text-gray-600 text-sm mt-2" style={{ whiteSpace: 'pre-line' }}>
+                               {service.details}
+                           </p>
+                       </div>
+       
+       
+       
+       
+                   </div>
+               </div>
+           );
+       }
+       
 
 export default function ServiceDetailPage() {
     return (

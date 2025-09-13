@@ -46,6 +46,7 @@ export default function AdminSettingsPage() {
         adminNotifications: { enabled: true, newBooking: true, bookingCancelled: true, paymentReceived: true, customerConfirmed: true },
         customerNotifications: { 
             enabled: true, 
+            newBooking: true, // เพิ่ม default
             appointmentConfirmed: true, 
             serviceCompleted: true, 
             appointmentCancelled: true, 
@@ -110,7 +111,18 @@ export default function AdminSettingsPage() {
                 const promises = docsToFetch.map(id => getDoc(doc(db, 'settings', id)));
                 const [notificationsSnap, bookingSnap, pointsSnap, paymentSnap, calendarSnap, profileSnap] = await Promise.all(promises);
 
-                if (notificationsSnap.exists()) setSettings(prev => ({ ...prev, ...notificationsSnap.data() }));
+                if (notificationsSnap.exists()) {
+                    const data = notificationsSnap.data();
+                    setSettings(prev => ({
+                        ...prev,
+                        ...data,
+                        customerNotifications: {
+                            ...prev.customerNotifications,
+                            ...data.customerNotifications,
+                            newBooking: typeof data.customerNotifications?.newBooking === 'boolean' ? data.customerNotifications.newBooking : true
+                        }
+                    }));
+                }
                 if (bookingSnap.exists()) setBookingSettings(prev => ({ ...prev, ...bookingSnap.data() }));
                 if (pointsSnap.exists()) setPointSettings(prev => ({ ...prev, ...pointsSnap.data() }));
                 if (paymentSnap.exists()) setPaymentSettings(prev => ({ ...prev, ...paymentSnap.data() }));
@@ -383,6 +395,7 @@ export default function AdminSettingsPage() {
                         <Toggle label="แจ้งเตือนลูกค้า" checked={settings.customerNotifications.enabled} onChange={(value) => handleNotificationChange('customerNotifications', 'enabled', value)} disabled={!settings.allNotifications.enabled}/>
                         {settings.customerNotifications.enabled && (
                             <div className="pl-4 border-l-2 ml-4 space-y-2 text-xs">
+                                <Toggle label="เมื่อมีการจองใหม่" checked={settings.customerNotifications.newBooking} onChange={(value) => handleNotificationChange('customerNotifications', 'newBooking', value)} disabled={!settings.allNotifications.enabled}/>
                                 <Toggle label="เมื่อยืนยันการนัดหมาย" checked={settings.customerNotifications.appointmentConfirmed} onChange={(value) => handleNotificationChange('customerNotifications', 'appointmentConfirmed', value)} disabled={!settings.allNotifications.enabled}/>
                                 <Toggle label="เมื่อบริการเสร็จสิ้น" checked={settings.customerNotifications.serviceCompleted} onChange={(value) => handleNotificationChange('customerNotifications', 'serviceCompleted', value)} disabled={!settings.allNotifications.enabled}/>
                                 <Toggle label="เมื่อยกเลิกการนัดหมาย" checked={settings.customerNotifications.appointmentCancelled} onChange={(value) => handleNotificationChange('customerNotifications', 'appointmentCancelled', value)} disabled={!settings.allNotifications.enabled}/>

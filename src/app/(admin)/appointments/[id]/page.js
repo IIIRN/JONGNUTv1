@@ -192,6 +192,27 @@ export default function AdminAppointmentDetail() {
   };
 
 
+  const serializeFirestoreTimestamps = (data) => {
+  if (!data) return data;
+  if (Array.isArray(data)) {
+    return data.map(item => serializeFirestoreTimestamps(item));
+  }
+  if (typeof data === 'object' && data !== null) {
+    // Check for Firestore Timestamp structure
+    if (data._seconds !== undefined && data._nanoseconds !== undefined) {
+      return new Date(data._seconds * 1000 + data._nanoseconds / 1000000).toISOString();
+    }
+    const newData = {};
+    for (const key in data) {
+      if (Object.prototype.hasOwnProperty.call(data, key)) {
+        newData[key] = serializeFirestoreTimestamps(data[key]);
+      }
+    }
+    return newData;
+  }
+  return data;
+};
+
   useEffect(() => {
     if (!id || deleted) return;
     const fetchData = async () => {
@@ -205,7 +226,8 @@ export default function AdminAppointmentDetail() {
           setLoading(false);
           return;
         }
-        setAppointment({ id: snap.id, ...snap.data() });
+        const serializedData = serializeFirestoreTimestamps(snap.data());
+        setAppointment({ id: snap.id, ...serializedData });
       } catch (err) {
         console.error('Error fetching appointment:', err);
       } finally {

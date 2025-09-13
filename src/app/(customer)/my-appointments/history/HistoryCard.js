@@ -20,7 +20,7 @@ const HistoryCard = ({ appointment, onBookAgain }) => {
                 <div className="flex-grow">
                     <div className="flex justify-between items-start">
                         <div>
-                            <h2 className="font-bold text-lg text-gray-800">{appointment.serviceInfo?.name}</h2>
+                            <h2 className="font-bold text-md text-gray-800">{appointment.serviceInfo?.name}</h2>
                             <p className="text-sm text-gray-500">
                                 {format(appointmentDateTime, 'dd MMM yyyy', { locale: th })}
                             </p>
