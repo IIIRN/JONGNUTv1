@@ -123,7 +123,9 @@ function ServiceDetailContent() {
 
             {/* รายละเอียดบริการ */}
             <div className="py-2">
-                <p className="text-gray-600 text-sm mt-2">{service.details}</p>
+                <p className="text-gray-600 text-sm mt-2" style={{ whiteSpace: 'pre-line' }} >
+                {service.details}
+            </p>
             </div>
 
             {/* Add-on Services */}
@@ -168,3 +170,4 @@ export default function ServiceDetailPage() {
         </Suspense>
     );
 }
+
