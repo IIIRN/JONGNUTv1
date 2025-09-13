@@ -343,7 +343,7 @@ export default function AdminAppointmentDetail() {
                 || appointment.beautician?.firstName
                 || appointment.appointmentInfo?.beautician
                 || '-'} />
-              <InfoRow label="วันที่/เวลา" value={dateTime ? format(dateTime, 'dd MMM yyyy, HH:mm', { locale: th }) : '-'} />
+              <InfoRow label="วันที่/เวลา" value={dateTime instanceof Date && !isNaN(dateTime) ? format(dateTime, 'dd MMM yyyy, HH:mm', { locale: th }) : '-'} />
               <InfoRow label="สถานที่" value={appointment.locationInfo?.name || appointment.appointmentInfo?.locationName || '-'} />
               <InfoRow label="คิว" value={appointment.queue ?? appointment.appointmentInfo?.queue ?? appointment.queueNumber ?? '-'} />
             </div>
@@ -424,8 +424,8 @@ export default function AdminAppointmentDetail() {
                 ยืนยันการชำระเงิน (เงินสด/อื่นๆ)
             </button>
             <hr className="my-2"/>
-            <InfoRow label="สร้างเมื่อ" value={safeDate(appointment.createdAt) ? format(safeDate(appointment.createdAt), 'dd MMM yyyy, HH:mm', { locale: th }) : '-'} />
-            <InfoRow label="อัพเดตล่าสุด" value={safeDate(appointment.updatedAt) ? format(safeDate(appointment.updatedAt), 'dd MMM yyyy, HH:mm', { locale: th }) : '-'} />
+            <InfoRow label="สร้างเมื่อ" value={safeDate(appointment.createdAt) instanceof Date && !isNaN(safeDate(appointment.createdAt)) ? format(safeDate(appointment.createdAt), 'dd MMM yyyy, HH:mm', { locale: th }) : '-'} />
+            <InfoRow label="อัพเดตล่าสุด" value={safeDate(appointment.updatedAt) instanceof Date && !isNaN(safeDate(appointment.updatedAt)) ? format(safeDate(appointment.updatedAt), 'dd MMM yyyy, HH:mm', { locale: th }) : '-'} />
             <EditPaymentModal
               open={showEditPayment}
               onClose={() => setShowEditPayment(false)}
