@@ -1,3 +1,18 @@
+/**
+ * ตั้งค่าการแจ้งเตือน (customerNotifications, allNotifications) ใน Firestore
+ * @param {Object} notificationSettings - โครงสร้างข้อมูลการแจ้งเตือนที่ต้องการตั้งค่า
+ * @returns {Promise<Object>} ผลลัพธ์การตั้งค่า
+ */
+export async function setNotificationSettings(notificationSettings) {
+    if (!db) return { success: false, error: "Firebase Admin is not initialized." };
+    try {
+        const settingsRef = db.collection('settings').doc('notifications');
+        await settingsRef.set(notificationSettings, { merge: true });
+        return { success: true };
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+}
 // src/app/actions/settingsActions.js
 'use server';
 
