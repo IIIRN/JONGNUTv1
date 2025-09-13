@@ -31,26 +31,21 @@ export async function createOrUpdateCalendarEvent(appointmentId, appointmentData
             return { success: true, message: "Calendar sync disabled." };
         }
         
-        const { customerInfo, serviceInfo, date, time } = appointmentData;
-
-        // V V V V V V V V V V V V V V V V V V V V
-        //  แก้ไขวิธีสร้าง Date Object ให้เสถียรขึ้น
-        // V V V V V V V V V V V V V V V V V V V V
-        const [year, month, day] = date.split('-').map(Number);
-        const [hour, minute] = time.split(':').map(Number);
-        // เดือนใน JavaScript จะเริ่มนับจาก 0 (0=ม.ค., 1=ก.พ.) จึงต้อง -1
-        const startTime = new Date(year, month - 1, day, hour, minute);
+        // --- FIX: START ---
+        // ใช้ dateTime ที่สร้างจาก client ซึ่งมี timezone ที่ถูกต้องแล้ว
+        const startTime = new Date(appointmentData.appointmentInfo.dateTime);
         
-        // ตรวจสอบว่า serviceInfo.duration เป็นตัวเลขที่ถูกต้อง
-        const duration = Number(serviceInfo.duration);
+        // ใช้ total duration ที่รวมบริการเสริมแล้วจาก appointmentInfo
+        const duration = Number(appointmentData.appointmentInfo.duration);
         if (isNaN(duration)) {
-             throw new Error(`Invalid duration value for service: ${serviceInfo.name}`);
+             throw new Error(`Invalid duration value for service: ${appointmentData.serviceInfo.name}`);
         }
         const endTime = new Date(startTime.getTime() + duration * 60000);
+        // --- FIX: END ---
 
         const event = {
-            summary: `${serviceInfo.name} - ${customerInfo.fullName}`,
-            description: `ลูกค้า: ${customerInfo.fullName}\nเบอร์โทร: ${customerInfo.phone}\nบริการ: ${serviceInfo.name}\nราคา: ${serviceInfo.price} บาท\nสถานะ: ${appointmentData.status}`,
+            summary: `${appointmentData.serviceInfo.name} - ${appointmentData.customerInfo.fullName}`,
+            description: `ลูกค้า: ${appointmentData.customerInfo.fullName}\nเบอร์โทร: ${appointmentData.customerInfo.phone}\nบริการ: ${appointmentData.serviceInfo.name}\nราคา: ${appointmentData.paymentInfo.totalPrice} บาท\nสถานะ: ${appointmentData.status}`,
             start: {
                 dateTime: startTime.toISOString(),
                 timeZone: 'Asia/Bangkok',

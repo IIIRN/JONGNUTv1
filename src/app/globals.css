@@ -137,39 +137,7 @@ body {
     rgba(255, 255, 255, 0.3)
   );
 }
-
 .glitter {
-  position: relative;
-  overflow: hidden;
-
-  /* พื้นหลักเงินไล่ขาว */
-  background: linear-gradient(to bottom, #d9d9d9 0%, #b4a3a3 100%);
-  box-shadow: 0 4px 12px rgba(0,0,0,.08);
-}
-
-/* Sparkle holographic แบบสุ่มหลายชั้น */
-.glitter::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: 
-    radial-gradient(circle at 15% 20%, rgba(255,255,255,.9) 0 0.8px, transparent 1.5px),
-    radial-gradient(circle at 35% 40%, rgba(255,200,255,.8) 0 0.7px, transparent 1.4px),
-    radial-gradient(circle at 60% 30%, rgba(200,255,255,.8) 0 0.7px, transparent 1.4px),
-    radial-gradient(circle at 75% 55%, rgba(255,255,200,.8) 0 0.9px, transparent 1.6px),
-    radial-gradient(circle at 50% 80%, rgba(200,220,255,.8) 0 0.8px, transparent 1.5px),
-    radial-gradient(circle at 85% 25%, rgba(255,180,200,.7) 0 0.7px, transparent 1.4px),
-    radial-gradient(circle at 25% 70%, rgba(180,255,220,.7) 0 0.8px, transparent 1.5px);
-  background-repeat: no-repeat;
-  background-size: cover;
-  mix-blend-mode: screen;
-  opacity: 0.9;
-  animation: sparkle 6s linear infinite;
-  pointer-events: none;
-}
-
-@keyframes sparkle {
-  0%   { transform: translate(0,0); opacity:0.8; }
-  50%  { transform: translate(1px, -1px); opacity:1; }
-  100% { transform: translate(0,0); opacity:0.8; }
+  background: url("https://lh5.googleusercontent.com/d/1oRzZ7sopSDQpcubD9q4KHQiD83q_4kUI") repeat;
+  background-size: cover; /* ปรับเป็น 200px 200px ถ้าอยากให้ลายถี่ขึ้น */
 }
