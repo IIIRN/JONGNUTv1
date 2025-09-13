@@ -3,8 +3,8 @@
 import { db } from '@/app/lib/firebaseAdmin';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { sendBookingNotification } from '@/app/actions/lineActions';
-import { 
-    sendPaymentFlexMessage, 
+import {
+    sendPaymentFlexMessage,
     sendReviewFlexMessage,
     sendAppointmentConfirmedFlexMessage,
     sendServiceCompletedFlexMessage,
@@ -16,24 +16,7 @@ import { sendTelegramMessageToAdmin } from '@/app/actions/telegramActions';
 import { awardPointsForPurchase, awardPointsForVisit } from '@/app/actions/pointActions';
 import { findOrCreateCustomer } from '@/app/actions/customerActions';
 import { createOrUpdateCalendarEvent, deleteCalendarEvent } from './calendarActions';
-
-
-// --- HELPER FUNCTION ---
-// ดึงข้อมูลการตั้งค่าการแจ้งเตือน
-async function getNotificationSettings() {
-    try {
-        const docRef = db.collection('settings').doc('notifications');
-        const docSnap = await docRef.get();
-        if (docSnap.exists) {
-            return docSnap.data();
-        }
-        // คืนค่า object ว่างพร้อมโครงสร้างพื้นฐานเพื่อป้องกัน error
-        return { admin: { line: {} }, customer: {} };
-    } catch (error) {
-        console.error("Error fetching notification settings:", error);
-        return { admin: { line: {} }, customer: {} };
-    }
-}
+import { getNotificationSettings } from './settingsActions'; // Use the central settings function
 
 
 /**
@@ -121,9 +104,8 @@ export async function createAppointmentWithSlotCheck(appointmentData) {
             }
         }
 
-        // --- FIXED ---
-        const notificationSettings = await getNotificationSettings();
-        if (userId && notificationSettings.customer?.newBooking) {
+        const { success: settingsSuccess, settings: notificationSettings } = await getNotificationSettings();
+        if (settingsSuccess && userId && notificationSettings.customerNotifications?.newBooking) {
             await sendNewBookingFlexMessage(userId, {
                 serviceName: finalAppointmentData.serviceInfo.name,
                 date: date,
@@ -263,9 +245,8 @@ export async function confirmAppointmentAndPaymentByAdmin(appointmentId, adminId
             }
         }
         
-        // --- FIXED ---
-        const notificationSettings = await getNotificationSettings();
-        if (appointmentData.userId && notificationSettings.customer?.paymentConfirmation) {
+        const { success: settingsSuccess, settings: notificationSettings } = await getNotificationSettings();
+        if (settingsSuccess && appointmentData.userId && notificationSettings.customerNotifications?.appointmentConfirmed) {
           await sendPaymentConfirmationFlexMessage(appointmentData.userId, {
               id: appointmentId, 
               serviceInfo: appointmentData.serviceInfo, 
@@ -321,9 +302,8 @@ export async function cancelAppointmentByAdmin(appointmentId, reason) {
             await deleteCalendarEvent(appointmentData.googleCalendarEventId);
         }
 
-        // --- FIXED ---
-        const notificationSettings = await getNotificationSettings();
-        if (appointmentData.userId && notificationSettings.customer?.appointmentCancelled) {
+        const { success: settingsSuccess, settings: notificationSettings } = await getNotificationSettings();
+        if (settingsSuccess && appointmentData.userId && notificationSettings.customerNotifications?.appointmentCancelled) {
             await sendAppointmentCancelledFlexMessage(appointmentData.userId, {
                 appointmentId: appointmentId,
                 shortId: appointmentId.substring(0, 6).toUpperCase(),
@@ -399,16 +379,15 @@ export async function updateAppointmentStatusByAdmin(appointmentId, newStatus, n
             appointmentData._totalPointsAwarded = totalPointsAwarded;
         }
 
-        // --- FIXED ---
-        const notificationSettings = await getNotificationSettings();
-        if (appointmentData.userId) {
+        const { success: settingsSuccess, settings: notificationSettings } = await getNotificationSettings();
+        if (settingsSuccess && appointmentData.userId) {
             const serviceName = appointmentData.serviceInfo?.name || 'บริการของคุณ';
             const appointmentDate = appointmentData.date;
             const appointmentTime = appointmentData.time;
 
             switch (newStatus) {
                 case 'confirmed':
-                    if (notificationSettings.customer?.appointmentConfirmed) {
+                    if (notificationSettings.customerNotifications?.appointmentConfirmed) {
                         await sendAppointmentConfirmedFlexMessage(appointmentData.userId, {
                            serviceName, date: appointmentDate, time: appointmentTime,
                            appointmentId, id: appointmentId
@@ -416,19 +395,19 @@ export async function updateAppointmentStatusByAdmin(appointmentId, newStatus, n
                     }
                     break;
                 case 'completed':
-                    if (notificationSettings.customer?.serviceCompleted) {
+                    if (notificationSettings.customerNotifications?.serviceCompleted) {
                         await sendServiceCompletedFlexMessage(appointmentData.userId, {
                             serviceName, date: appointmentDate, time: appointmentTime,
                             appointmentId, id: appointmentId,
                             totalPointsAwarded: appointmentData._totalPointsAwarded || 0
                         });
                     }
-                    if (notificationSettings.customer?.reviewRequest) {
+                    if (notificationSettings.customerNotifications?.reviewRequest) {
                         await sendReviewRequestToCustomer(appointmentId);
                     }
                     break;
                 case 'cancelled':
-                    if (notificationSettings.customer?.appointmentCancelled) {
+                    if (notificationSettings.customerNotifications?.appointmentCancelled) {
                         await sendAppointmentCancelledFlexMessage(appointmentData.userId, {
                            appointmentId,
                            shortId: appointmentId.substring(0, 6).toUpperCase(),
@@ -462,9 +441,8 @@ export async function sendReviewRequestToCustomer(appointmentId) {
         if (appointmentData.reviewInfo?.submitted) throw new Error("การนัดหมายนี้ได้รับการรีวิวแล้ว");
         if (!appointmentData.userId) throw new Error("ไม่พบ LINE User ID ของลูกค้า");
         
-        // --- FIXED ---
-        const notificationSettings = await getNotificationSettings();
-        if (notificationSettings.customer?.reviewRequest) {
+        const { success: settingsSuccess, settings: notificationSettings } = await getNotificationSettings();
+        if (settingsSuccess && notificationSettings.customerNotifications?.reviewRequest) {
             await sendReviewFlexMessage(appointmentData.userId, {
                 id: appointmentId,
                 ...appointmentData
@@ -509,10 +487,9 @@ export async function updateAppointmentStatusByEmployee(appointmentId, employeeI
             await employeeRef.update({ status: 'available' });
         }
 
-        // --- FIXED ---
-        const notificationSettings = await getNotificationSettings();
-        if (appointmentData.userId) {
-            if (newStatus === 'completed' && notificationSettings.customer?.serviceCompleted) {
+        const { success: settingsSuccess, settings: notificationSettings } = await getNotificationSettings();
+        if (settingsSuccess && appointmentData.userId) {
+            if (newStatus === 'completed' && notificationSettings.customerNotifications?.serviceCompleted) {
                 await sendServiceCompletedFlexMessage(appointmentData.userId, {
                     serviceName: appointmentData.serviceInfo?.name || 'บริการ',
                     date: appointmentData.date,
@@ -521,7 +498,7 @@ export async function updateAppointmentStatusByEmployee(appointmentId, employeeI
                     id: appointmentId,
                     pointsAwarded: 0
                 });
-                if (notificationSettings.customer?.reviewRequest) {
+                if (notificationSettings.customerNotifications?.reviewRequest) {
                     await sendReviewRequestToCustomer(appointmentId);
                 }
             }
@@ -568,7 +545,6 @@ export async function cancelAppointmentByUser(appointmentId, userId) {
             await deleteCalendarEvent(googleCalendarEventId);
         }
         
-        // --- FIXED ---
         // For user-initiated actions, we still send them a confirmation.
         // But we check settings before notifying admin.
         await sendAppointmentCancelledFlexMessage(userId, {
@@ -606,9 +582,8 @@ export async function sendInvoiceToCustomer(appointmentId) {
             updatedAt: FieldValue.serverTimestamp()
         });
 
-        // --- FIXED ---
-        const notificationSettings = await getNotificationSettings();
-        if(notificationSettings.customer?.paymentInvoice){
+        const { success: settingsSuccess, settings: notificationSettings } = await getNotificationSettings();
+        if(settingsSuccess && notificationSettings.customerNotifications?.paymentInvoice){
             await sendPaymentFlexMessage(appointmentData.userId, {
                 id: appointmentId,
                 userId: appointmentData.userId,

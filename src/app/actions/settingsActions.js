@@ -1,22 +1,6 @@
 // src/app/actions/settingsActions.js
 'use server';
 
-/**
- * ตั้งค่าการแจ้งเตือน (customerNotifications, allNotifications) ใน Firestore
- * @param {Object} notificationSettings - โครงสร้างข้อมูลการแจ้งเตือนที่ต้องการตั้งค่า
- * @returns {Promise<Object>} ผลลัพธ์การตั้งค่า
- */
-export async function setNotificationSettings(notificationSettings) {
-    if (!db) return { success: false, error: "Firebase Admin is not initialized." };
-    try {
-        const settingsRef = db.collection('settings').doc('notifications');
-        await settingsRef.set(notificationSettings, { merge: true });
-        return { success: true };
-    } catch (error) {
-        return { success: false, error: error.message };
-    }
-}
-
 import { db } from '@/app/lib/firebaseAdmin';
 import { FieldValue } from 'firebase-admin/firestore';
 
@@ -80,8 +64,56 @@ export async function saveNotificationSettings(settingsData) {
             ...settingsData,
             updatedAt: FieldValue.serverTimestamp(),
         }, { merge: true });
+        notificationSettingsCache = null; // Invalidate cache
         return { success: true };
     } catch (error) {
+        return { success: false, error: error.message };
+    }
+}
+
+// --- Function to get notification settings with cache ---
+let notificationSettingsCache = null;
+let notificationCacheTimestamp = null;
+
+// Helper to make settings serializable
+const makeSerializable = (data) => {
+    if (!data) return {};
+    return JSON.parse(JSON.stringify(data, (key, value) => {
+        if (value && value.hasOwnProperty('_seconds') && value.hasOwnProperty('_nanoseconds')) {
+            return new Date(value._seconds * 1000 + value._nanoseconds / 1000000).toISOString();
+        }
+        return value;
+    }));
+};
+
+export async function getNotificationSettings() {
+    const now = Date.now();
+    // Cache for 1 minute
+    if (notificationSettingsCache && notificationCacheTimestamp && (now - notificationCacheTimestamp < 60000)) {
+        return { success: true, settings: notificationSettingsCache }; // Already serialized
+    }
+
+    if (!db) {
+        return { success: false, error: "Firebase Admin is not initialized." };
+    }
+    try {
+        const docRef = db.collection('settings').doc('notifications');
+        const docSnap = await docRef.get();
+
+        if (docSnap.exists) {
+            const settingsData = docSnap.data();
+            const serializableSettings = makeSerializable(settingsData);
+            
+            notificationSettingsCache = serializableSettings; // Cache the serializable version
+            notificationCacheTimestamp = now;
+            
+            return { success: true, settings: serializableSettings };
+        } else {
+            // Return default settings if not found
+            return { success: true, settings: {} };
+        }
+    } catch (error) {
+        console.error("Error getting notification settings:", error);
         return { success: false, error: error.message };
     }
 }

@@ -5,38 +5,13 @@ import { db } from '@/app/lib/firebaseAdmin';
 import { sendAppointmentReminderFlexMessage } from './lineFlexActions';
 import axios from 'axios';
 import { sendTelegramMessageToAdmin } from './telegramActions';
-import { getShopProfile } from './settingsActions';
+import { getNotificationSettings, getShopProfile } from './settingsActions';
 
 
 const client = new Client({
   channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
   channelSecret: process.env.LINE_CHANNEL_SECRET,
 });
-
-/**
- * Fetches and returns the notification settings object.
- */
-async function getNotificationSettings() {
-  try {
-    const settingsRef = db.collection('settings').doc('notifications');
-    const settingsDoc = await settingsRef.get();
-    
-    if (settingsDoc.exists) {
-      return settingsDoc.data();
-    }
-    
-    return {
-      admin: {},
-      customer: {}
-    };
-  } catch (error) {
-    console.error('Error fetching notification settings:', error);
-    return {
-      admin: {},
-      customer: {}
-    };
-  }
-}
 
 /**
  * Sends a push message to a single LINE user, checking customer notification settings first.
@@ -47,8 +22,8 @@ export async function sendLineMessage(to, messageText, notificationType) {
     return { success: false, error: "Missing recipient or message." };
   }
   
-  const settings = await getNotificationSettings();
-  if (!settings.customer?.[notificationType]) {
+  const { success, settings } = await getNotificationSettings();
+  if (!success || !settings.customerNotifications?.[notificationType]) {
       console.log(`Customer notification for type '${notificationType}' is disabled.`);
       return { success: true, message: "Customer notifications disabled for this type." };
   }
@@ -67,8 +42,8 @@ export async function sendLineMessage(to, messageText, notificationType) {
  * Sends a multicast message to all registered admins, checking admin notification settings first.
  */
 export async function sendLineMessageToAllAdmins(messageText, notificationType) {
-  const settings = await getNotificationSettings();
-  if (!settings.admin?.line?.enabled || (notificationType && !settings.admin?.line?.[notificationType])) {
+  const { success, settings } = await getNotificationSettings();
+  if (!success || !settings.lineNotifications?.enabled || (notificationType && !settings.adminNotifications?.[notificationType])) {
       console.log(`Admin LINE notification for type '${notificationType}' is disabled.`);
       return { success: true, message: "Admin notifications disabled for this type." };
   }
@@ -143,14 +118,21 @@ async function createMessage(details, type) {
 }
 
 export async function sendBookingNotification(details, type) {
-    const settings = await getNotificationSettings();
+    const { success, settings } = await getNotificationSettings();
 
-    const isAdminLineEnabled = settings.admin?.line?.enabled;
-    const isNotificationTypeEnabled = settings.admin?.line?.[type];
+    if (!success) {
+        console.error("Could not retrieve notification settings.");
+        const telegramMessage = `[Fallback from LINE - Settings Error] ${await createMessage(details, type)}`;
+        await sendTelegramMessageToAdmin(telegramMessage);
+        return { success: false, error: "Could not retrieve notification settings." };
+    }
+
+    const isAdminLineEnabled = settings.lineNotifications?.enabled;
+    const isNotificationTypeEnabled = settings.adminNotifications?.[type];
 
     if (!isAdminLineEnabled || !isNotificationTypeEnabled) {
         console.log(`Admin LINE notification for type '${type}' is disabled.`);
-        if (settings.admin?.telegram?.enabled) {
+        if (settings.adminNotifications?.telegram?.enabled) { // Assuming telegram setting is here
             const telegramMessage = `[Fallback from LINE] ${await createMessage(details, type)}`;
             await sendTelegramMessageToAdmin(telegramMessage);
         }
@@ -159,12 +141,12 @@ export async function sendBookingNotification(details, type) {
 
     const message = await createMessage(details, type);
     
-    if (settings.line?.notifyToken) {
+    if (settings.lineNotifications?.notifyToken) {
         try {
             await axios.post('https://notify-api.line.me/api/notify', `message=${message}`, {
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
-                    'Authorization': `Bearer ${settings.line.notifyToken}`,
+                    'Authorization': `Bearer ${settings.lineNotifications.notifyToken}`,
                 },
             });
         } catch (error) {
@@ -180,5 +162,13 @@ export async function sendBookingNotification(details, type) {
 }
 
 export async function sendReminderNotification(customerLineId, bookingData) {
+    const { success, settings } = await getNotificationSettings();
+    const notificationType = 'appointmentReminder'; // Corrected notification type
+
+    if (!success || !settings?.customerNotifications?.[notificationType]) {
+        console.log(`Customer notification for type '${notificationType}' is disabled.`);
+        return { success: true, message: `Customer notifications for '${notificationType}' are disabled.` };
+    }
+
     return await sendAppointmentReminderFlexMessage(customerLineId, bookingData);
 }

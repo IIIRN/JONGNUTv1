@@ -47,6 +47,7 @@ export default function AdminSettingsPage() {
         customerNotifications: { 
             enabled: true, 
             appointmentConfirmed: true, 
+            serviceCompleted: true, 
             appointmentCancelled: true, 
             appointmentReminder: true, 
             reviewRequest: true, 
@@ -383,6 +384,7 @@ export default function AdminSettingsPage() {
                         {settings.customerNotifications.enabled && (
                             <div className="pl-4 border-l-2 ml-4 space-y-2 text-xs">
                                 <Toggle label="เมื่อยืนยันการนัดหมาย" checked={settings.customerNotifications.appointmentConfirmed} onChange={(value) => handleNotificationChange('customerNotifications', 'appointmentConfirmed', value)} disabled={!settings.allNotifications.enabled}/>
+                                <Toggle label="เมื่อบริการเสร็จสิ้น" checked={settings.customerNotifications.serviceCompleted} onChange={(value) => handleNotificationChange('customerNotifications', 'serviceCompleted', value)} disabled={!settings.allNotifications.enabled}/>
                                 <Toggle label="เมื่อยกเลิกการนัดหมาย" checked={settings.customerNotifications.appointmentCancelled} onChange={(value) => handleNotificationChange('customerNotifications', 'appointmentCancelled', value)} disabled={!settings.allNotifications.enabled}/>
                                 <Toggle label="แจ้งเตือนล่วงหน้า 1 ชม." checked={settings.customerNotifications.appointmentReminder} onChange={(value) => handleNotificationChange('customerNotifications', 'appointmentReminder', value)} disabled={!settings.allNotifications.enabled}/>
                                 <Toggle label="แจ้งเตือนประจำวัน (08:00 น.)" checked={settings.customerNotifications.dailyAppointmentNotification} onChange={(value) => handleNotificationChange('customerNotifications', 'dailyAppointmentNotification', value)} disabled={!settings.allNotifications.enabled}/>
