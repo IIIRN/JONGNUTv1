@@ -1,3 +1,6 @@
+// src/app/actions/settingsActions.js
+'use server';
+
 /**
  * ตั้งค่าการแจ้งเตือน (customerNotifications, allNotifications) ใน Firestore
  * @param {Object} notificationSettings - โครงสร้างข้อมูลการแจ้งเตือนที่ต้องการตั้งค่า
@@ -13,8 +16,6 @@ export async function setNotificationSettings(notificationSettings) {
         return { success: false, error: error.message };
     }
 }
-// src/app/actions/settingsActions.js
-'use server';
 
 import { db } from '@/app/lib/firebaseAdmin';
 import { FieldValue } from 'firebase-admin/firestore';
