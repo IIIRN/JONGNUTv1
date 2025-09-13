@@ -1,9 +1,12 @@
+// src/app/(admin)/settings/page.js
 "use client";
 
 import { useState, useEffect } from 'react';
 import { db } from '@/app/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { 
+    // --- IMPORT FUNCTION ใหม่ ---
+    saveProfileSettings,
     saveNotificationSettings, 
     saveBookingSettings, 
     savePointSettings, 
@@ -14,7 +17,7 @@ import { fetchAllAdmins } from '@/app/actions/adminActions';
 import { sendDailyNotificationsNow } from '@/app/actions/dailyNotificationActions';
 import { useToast } from '@/app/components/Toast';
 
-// --- Helper Components ---
+// --- Helper Components (โค้ดเดิม) ---
 
 const SettingsCard = ({ title, children, className = '' }) => (
     <div className={`bg-white p-4 rounded-lg shadow-md h-full flex flex-col ${className}`}>
@@ -33,11 +36,10 @@ const Toggle = ({ label, checked, onChange, disabled = false }) => (
     </div>
 );
 
-
 // --- Main Page Component ---
 
 export default function AdminSettingsPage() {
-    // States for various settings sections
+    // States for various settings sections (โค้ดเดิม)
     const [settings, setSettings] = useState({
         allNotifications: { enabled: true },
         reportRecipients: [],
@@ -80,8 +82,18 @@ export default function AdminSettingsPage() {
         enabled: false,
         calendarId: ''
     });
+
+    // --- NEW STATE: เพิ่ม state สำหรับ profile ---
+    const [profileSettings, setProfileSettings] = useState({
+        storeName: '',
+        contactPhone: '',
+        address: '',
+        description: '',
+        currency: '฿',
+        currencySymbol: 'บาท',
+    });
     
-    // Other functional states
+    // Other functional states (โค้ดเดิม)
     const [allAdmins, setAllAdmins] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
@@ -92,15 +104,18 @@ export default function AdminSettingsPage() {
         const fetchInitialData = async () => {
             setLoading(true);
             try {
-                const docsToFetch = ['notifications', 'booking', 'points', 'payment', 'calendar'];
+                // เพิ่ม 'profile' เข้าไปใน list ที่จะดึงข้อมูล
+                const docsToFetch = ['notifications', 'booking', 'points', 'payment', 'calendar', 'profile'];
                 const promises = docsToFetch.map(id => getDoc(doc(db, 'settings', id)));
-                const [notificationsSnap, bookingSnap, pointsSnap, paymentSnap, calendarSnap] = await Promise.all(promises);
+                const [notificationsSnap, bookingSnap, pointsSnap, paymentSnap, calendarSnap, profileSnap] = await Promise.all(promises);
 
                 if (notificationsSnap.exists()) setSettings(prev => ({ ...prev, ...notificationsSnap.data() }));
                 if (bookingSnap.exists()) setBookingSettings(prev => ({ ...prev, ...bookingSnap.data() }));
                 if (pointsSnap.exists()) setPointSettings(prev => ({ ...prev, ...pointsSnap.data() }));
                 if (paymentSnap.exists()) setPaymentSettings(prev => ({ ...prev, ...paymentSnap.data() }));
                 if (calendarSnap.exists()) setCalendarSettings(prev => ({ ...prev, ...calendarSnap.data() }));
+                // ตั้งค่า state ของ profile
+                if (profileSnap.exists()) setProfileSettings(prev => ({ ...prev, ...profileSnap.data() }));
                 
                 const adminResult = await fetchAllAdmins();
                 if (adminResult.success) setAllAdmins(adminResult.admins);
@@ -113,7 +128,7 @@ export default function AdminSettingsPage() {
             }
         };
         fetchInitialData();
-    }, []);
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleNotificationChange = (group, key, value) => {
         setSettings(prev => ({ ...prev, [group]: { ...prev[group], [key]: value } }));
@@ -122,13 +137,18 @@ export default function AdminSettingsPage() {
     const handleSave = async () => {
         setIsSaving(true);
         try {
+            // เตรียมข้อมูลแต่ละส่วน (โค้ดเดิม)
             const { updatedAt: nUpdatedAt, ...notificationData } = settings;
             const { updatedAt: bUpdatedAt, ...bookingData } = bookingSettings;
             const { updatedAt: pUpdatedAt, ...pointData } = pointSettings;
             const { updatedAt: payUpdatedAt, ...paymentData } = paymentSettings;
             const { updatedAt: calUpdatedAt, ...calData } = calendarSettings;
+            // --- NEW: เตรียมข้อมูล profile ---
+            const { updatedAt: profUpdatedAt, ...profData } = profileSettings;
 
             const results = await Promise.all([
+                // --- NEW: เพิ่มการเรียก saveProfileSettings ---
+                saveProfileSettings(profData),
                 saveNotificationSettings(notificationData),
                 saveBookingSettings(bookingData),
                 savePointSettings(pointData),
@@ -149,6 +169,7 @@ export default function AdminSettingsPage() {
         }
     };
     
+    // โค้ดส่วน handleSendNow (โค้ดเดิม)
     const handleSendNow = async (isMock = false) => {
         setIsSending(true);
         try {
@@ -186,9 +207,43 @@ export default function AdminSettingsPage() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-                {/* --- Column 1: Booking, Holidays, Payment, Calendar --- */}
+                {/* --- Column 1: Profile, Booking, Holidays, Payment, Calendar --- */}
                 <div className="space-y-6">
+                    {/* --- NEW CARD: เพิ่ม Card สำหรับ Profile --- */}
+                    <SettingsCard title="โปรไฟล์ร้าน">
+                        <div className="space-y-2">
+                            <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">ชื่อร้าน</label>
+                                <input type="text" value={profileSettings.storeName || ''} onChange={e => setProfileSettings({...profileSettings, storeName: e.target.value})} className="border rounded-md px-2 py-1 w-full text-sm"/>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">เบอร์โทรติดต่อ</label>
+                                <input type="tel" value={profileSettings.contactPhone || ''} onChange={e => setProfileSettings({...profileSettings, contactPhone: e.target.value})} className="border rounded-md px-2 py-1 w-full text-sm"/>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">ที่อยู่</label>
+                                <textarea value={profileSettings.address || ''} onChange={e => setProfileSettings({...profileSettings, address: e.target.value})} rows="2" className="border rounded-md px-2 py-1 w-full text-sm"></textarea>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">รายละเอียดร้าน (ไม่บังคับ)</label>
+                                <textarea value={profileSettings.description || ''} onChange={e => setProfileSettings({...profileSettings, description: e.target.value})} rows="2" className="border rounded-md px-2 py-1 w-full text-sm"></textarea>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">หน่วยเงิน (ย่อ)</label>
+                                    <input type="text" value={profileSettings.currency || ''} onChange={e => setProfileSettings({...profileSettings, currency: e.target.value})} className="border rounded-md px-2 py-1 w-full text-sm" placeholder="฿"/>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">หน่วยเงิน (เต็ม)</label>
+                                    <input type="text" value={profileSettings.currencySymbol || ''} onChange={e => setProfileSettings({...profileSettings, currencySymbol: e.target.value})} className="border rounded-md px-2 py-1 w-full text-sm" placeholder="บาท"/>
+                                </div>
+                            </div>
+                        </div>
+                    </SettingsCard>
+                    
+                    {/* โค้ดเดิมสำหรับ Card อื่นๆ */}
                     <SettingsCard title="โหมดและคิวการจอง">
+                        {/* ... เนื้อหาเดิมของ Card นี้ ... */}
                         <div>
                             <label className="block text-sm font-medium mb-1">Buffer (นาที) ระหว่างคิว</label>
                             <input 
@@ -241,7 +296,8 @@ export default function AdminSettingsPage() {
                         </div>
                     </SettingsCard>
                     <SettingsCard title="การตั้งค่าการชำระเงิน">
-                        <div className="flex items-center mb-2 space-x-6">
+                       {/* ... เนื้อหาเดิมของ Card นี้ ... */}
+                       <div className="flex items-center mb-2 space-x-6">
                             <label className="flex items-center"><input type="radio" name="paymentMethod" value="promptpay" checked={paymentSettings.method === 'promptpay'} onChange={e => setPaymentSettings({...paymentSettings, method: e.target.value})} className="mr-2"/>PromptPay</label>
                             <label className="flex items-center"><input type="radio" name="paymentMethod" value="image" checked={paymentSettings.method === 'image'} onChange={e => setPaymentSettings({...paymentSettings, method: e.target.value})} className="mr-2"/>รูปภาพ QR</label>
                         </div>
@@ -266,6 +322,7 @@ export default function AdminSettingsPage() {
                         )}
                     </SettingsCard>
                      <SettingsCard title="Google Calendar Sync">
+                        {/* ... เนื้อหาเดิมของ Card นี้ ... */}
                         <Toggle 
                             label="เปิดการเชื่อมต่อ" 
                             checked={calendarSettings.enabled}
@@ -289,7 +346,7 @@ export default function AdminSettingsPage() {
                     </SettingsCard>
                 </div>
 
-                {/* --- Column 2: Schedule & Notifications --- */}
+                {/* --- Column 2: Schedule & Notifications (โค้ดเดิม) --- */}
                 <div className="space-y-6">
                     <SettingsCard title="เวลาทำการ">
                         {["อาทิตย์","จันทร์","อังคาร","พุธ","พฤหัสบดี","ศุกร์","เสาร์"].map((dayName, dayIndex) => {
@@ -336,7 +393,7 @@ export default function AdminSettingsPage() {
                     </SettingsCard>
                 </div>
                 
-                {/* --- Column 3: Points & Daily Notifications --- */}
+                {/* --- Column 3: Points & Daily Notifications (โค้ดเดิม) --- */}
                 <div className="space-y-6">
                      <SettingsCard title="ระบบสะสมพ้อยต์">
                         <Toggle 
@@ -361,7 +418,7 @@ export default function AdminSettingsPage() {
                         />
                         {pointSettings.enablePurchasePoints && (
                             <div className="pl-4 border-l-2 ml-4">
-                                <label className="block text-xs font-medium text-gray-700 mb-1">ยอดซื้อกี่บาทต่อ 1 พ้อยต์</label>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">ยอดซื้อกี่{profileSettings.currencySymbol}ต่อ 1 พ้อยต์</label>
                                 <input 
                                     type="number" min={1} value={pointSettings.pointsPerCurrency || 100} 
                                     onChange={e => setPointSettings(prev => ({ ...prev, pointsPerCurrency: parseInt(e.target.value) || 100 }))} 

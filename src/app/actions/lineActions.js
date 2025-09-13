@@ -3,6 +3,10 @@
 import { Client } from '@line/bot-sdk';
 import { db } from '@/app/lib/firebaseAdmin';
 import { sendAppointmentReminderFlexMessage } from './lineFlexActions';
+import axios from 'axios';
+import { sendTelegramMessageToAdmin } from './telegramActions';
+import { getShopProfile } from './settingsActions';
+
 
 const client = new Client({
   channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
@@ -21,19 +25,15 @@ async function getNotificationSettings() {
       return settingsDoc.data();
     }
     
-    // Default settings if document doesn't exist (fail-safe: disabled)
     return {
-      allNotifications: { enabled: false },
-      adminNotifications: { enabled: false, newBooking: false, bookingCancelled: false, paymentReceived: false, customerConfirmed: false },
-      customerNotifications: { enabled: false, appointmentConfirmed: false, appointmentCancelled: false, appointmentReminder: false, reviewRequest: false, paymentInvoice: false },
+      admin: {},
+      customer: {}
     };
   } catch (error) {
     console.error('Error fetching notification settings:', error);
-    // Return default disabled settings on error (fail-safe)
     return {
-      allNotifications: { enabled: false },
-      adminNotifications: { enabled: false, newBooking: false, bookingCancelled: false, paymentReceived: false, customerConfirmed: false },
-      customerNotifications: { enabled: false, appointmentConfirmed: false, appointmentCancelled: false, appointmentReminder: false, reviewRequest: false, paymentInvoice: false },
+      admin: {},
+      customer: {}
     };
   }
 }
@@ -48,8 +48,8 @@ export async function sendLineMessage(to, messageText, notificationType) {
   }
   
   const settings = await getNotificationSettings();
-  if (!settings.allNotifications?.enabled || !settings.customerNotifications?.enabled || (notificationType && !settings.customerNotifications[notificationType])) {
-  // ...existing code...
+  if (!settings.customer?.[notificationType]) {
+      console.log(`Customer notification for type '${notificationType}' is disabled.`);
       return { success: true, message: "Customer notifications disabled for this type." };
   }
 
@@ -66,11 +66,11 @@ export async function sendLineMessage(to, messageText, notificationType) {
 /**
  * Sends a multicast message to all registered admins, checking admin notification settings first.
  */
-export async function sendLineMessageToAllAdmins(messageText) {
+export async function sendLineMessageToAllAdmins(messageText, notificationType) {
   const settings = await getNotificationSettings();
-  if (!settings.allNotifications?.enabled || !settings.adminNotifications?.enabled) {
-  // ...existing code...
-      return { success: true, message: "Admin notifications disabled." };
+  if (!settings.admin?.line?.enabled || (notificationType && !settings.admin?.line?.[notificationType])) {
+      console.log(`Admin LINE notification for type '${notificationType}' is disabled.`);
+      return { success: true, message: "Admin notifications disabled for this type." };
   }
 
   try {
@@ -82,12 +82,11 @@ export async function sendLineMessageToAllAdmins(messageText) {
       return { success: true, message: "No admins to notify." };
     }
 
-    const adminLineIds = adminSnapshot.docs.map(doc => doc.data().lineUserId);
+    const adminLineIds = adminSnapshot.docs.map(doc => doc.data().lineUserId).filter(id => id);
 
     if (adminLineIds.length > 0) {
       const messageObject = { type: 'text', text: messageText };
       await client.multicast(adminLineIds, [messageObject]);
-  // ...existing code...
     }
 
     return { success: true };
@@ -99,62 +98,87 @@ export async function sendLineMessageToAllAdmins(messageText) {
 }
 
 /**
- * Send booking notification to admins
+ * Send booking notification to admins via LINE Notify and LINE Bot
  */
-export async function sendBookingNotification(bookingData, notificationType) {
-  const settings = await getNotificationSettings();
-  if (!settings.allNotifications?.enabled || !settings.adminNotifications?.enabled || !settings.adminNotifications?.[notificationType]) {
-  // ...existing code...
-    return { success: true, message: "Notification type disabled for admins." };
-  }
+async function createMessage(details, type) {
+    const { customerName, serviceName, appointmentDate, appointmentTime, totalPrice } = details;
+    const formattedDate = new Date(appointmentDate).toLocaleDateString('th-TH', {
+        year: 'numeric', month: 'long', day: 'numeric'
+    });
+    const { profile } = await getShopProfile();
+    const currencySymbol = profile.currencySymbol || 'บาท';
 
-  let message = '';
-  const { customerName, serviceName, appointmentDate, appointmentTime, totalPrice } = bookingData;
-  
-  switch (notificationType) {
-    case 'newBooking':
-      message = `🆕 การจองใหม่\n` +
-               `👤 ลูกค้า: ${customerName}\n` +
-               `💅 บริการ: ${serviceName}\n` +
-               `📅 วันที่: ${appointmentDate}\n` +
-               `⏰ เวลา: ${appointmentTime}\n` +
-               `💰 ราคา: ${totalPrice} บาท`;
-      break;
-      
-    case 'customerConfirmed':
-      message = `✅ ลูกค้ายืนยันนัดหมาย\n` +
-               `👤 ลูกค้า: ${customerName}\n` +
-               `💅 บริการ: ${serviceName}\n` +
-               `📅 วันที่: ${appointmentDate}\n` +
-               `⏰ เวลา: ${appointmentTime}`;
-      break;
-      
-    case 'bookingCancelled':
-      message = `❌ ยกเลิกการจอง\n` +
-               `👤 ลูกค้า: ${customerName}\n` +
-               `💅 บริการ: ${serviceName}\n` +
-               `📅 วันที่: ${appointmentDate}\n` +
-               `⏰ เวลา: ${appointmentTime}`;
-      break;
-      
-    case 'paymentReceived':
-      message = `💳 ได้รับการชำระเงิน\n` +
-               `👤 ลูกค้า: ${customerName}\n` +
-               `💅 บริการ: ${serviceName}\n` +
-               `💰 จำนวน: ${totalPrice} บาท\n` +
-               `📅 วันที่จอง: ${appointmentDate} ${appointmentTime}`;
-      break;
-      
-    default:
-      message = 'การแจ้งเตือนจากระบบจองคิว';
-  }
-
-  return await sendLineMessageToAllAdmins(message);
+    switch (type) {
+        case 'newBooking':
+            return `
+✅ จองคิวใหม่
+ลูกค้า: ${customerName}
+บริการ: ${serviceName}
+วันที่: ${formattedDate}
+เวลา: ${appointmentTime} น.
+ยอดรวม: ${totalPrice.toLocaleString()} ${currencySymbol}`;
+        case 'paymentReceived':
+            return `
+💰 ได้รับชำระเงิน
+ลูกค้า: ${customerName}
+บริการ: ${serviceName}
+วันที่: ${formattedDate}
+เวลา: ${appointmentTime} น.
+ยอดชำระ: ${totalPrice.toLocaleString()} ${currencySymbol}`;
+        case 'customerConfirmed':
+            return `
+👍 ลูกค้ายืนยันนัดหมาย
+ลูกค้า: ${customerName}
+บริการ: ${serviceName}
+วันที่: ${formattedDate}
+เวลา: ${appointmentTime} น.`;
+        default:
+            return `
+🔔 การแจ้งเตือนใหม่
+ลูกค้า: ${customerName}
+บริการ: ${serviceName}
+วันที่: ${formattedDate}
+เวลา: ${appointmentTime} น.`;
+    }
 }
 
-/**
- * Send reminder notification to customer
- */
+export async function sendBookingNotification(details, type) {
+    const settings = await getNotificationSettings();
+
+    const isAdminLineEnabled = settings.admin?.line?.enabled;
+    const isNotificationTypeEnabled = settings.admin?.line?.[type];
+
+    if (!isAdminLineEnabled || !isNotificationTypeEnabled) {
+        console.log(`Admin LINE notification for type '${type}' is disabled.`);
+        if (settings.admin?.telegram?.enabled) {
+            const telegramMessage = `[Fallback from LINE] ${await createMessage(details, type)}`;
+            await sendTelegramMessageToAdmin(telegramMessage);
+        }
+        return { success: true, message: `Admin notification for ${type} disabled.` };
+    }
+
+    const message = await createMessage(details, type);
+    
+    if (settings.line?.notifyToken) {
+        try {
+            await axios.post('https://notify-api.line.me/api/notify', `message=${message}`, {
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'Authorization': `Bearer ${settings.line.notifyToken}`,
+                },
+            });
+        } catch (error) {
+            console.error('Error sending LINE Notify message:', error.response ? error.response.data : error.message);
+            const fallbackMessage = `🚨 LINE Notify Error for ${type}: ${error.message}`;
+            await sendTelegramMessageToAdmin(fallbackMessage);
+        }
+    }
+
+    await sendLineMessageToAllAdmins(message, type);
+
+    return { success: true };
+}
+
 export async function sendReminderNotification(customerLineId, bookingData) {
     return await sendAppointmentReminderFlexMessage(customerLineId, bookingData);
 }

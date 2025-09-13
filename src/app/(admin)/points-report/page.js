@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { db } from '@/app/lib/firebase';
-import { collection, query, orderBy, limit, getDocs, where } from 'firebase/firestore';
+import { collection, query, orderBy, limit, getDocs, where, doc, getDoc } from 'firebase/firestore';
+import { useProfile } from '@/context/ProfileProvider';
 
 export default function PointsReportPage() {
     const [reportData, setReportData] = useState({
@@ -11,54 +12,48 @@ export default function PointsReportPage() {
         recentReviews: [],
         topCustomers: []
     });
+    const [pointSettings, setPointSettings] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const { profile, loading: profileLoading } = useProfile();
 
     useEffect(() => {
         const fetchReportData = async () => {
             try {
                 setLoading(true);
                 
-                // Get recent reviews with points
                 const reviewsQuery = query(
                     collection(db, 'reviews'),
                     where('pointsAwarded', '>', 0),
                     orderBy('createdAt', 'desc'),
                     limit(10)
                 );
-                const reviewsSnapshot = await getDocs(reviewsQuery);
-                const recentReviews = reviewsSnapshot.docs.map(doc => ({
-                    id: doc.id,
-                    ...doc.data()
-                }));
-
-                // Get top customers by points
                 const customersQuery = query(
                     collection(db, 'customers'),
                     orderBy('points', 'desc'),
                     limit(10)
                 );
-                const customersSnapshot = await getDocs(customersQuery);
-                const topCustomers = customersSnapshot.docs.map(doc => ({
-                    id: doc.id,
-                    ...doc.data()
-                }));
+                const pointSettingsRef = doc(db, 'settings', 'points');
 
-                // Calculate totals
+                const [reviewsSnapshot, customersSnapshot, pointSettingsSnap] = await Promise.all([
+                    getDocs(reviewsQuery),
+                    getDocs(customersSnapshot),
+                    getDoc(pointSettingsRef)
+                ]);
+
+                const recentReviews = reviewsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                const topCustomers = customersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+                if (pointSettingsSnap.exists()) {
+                    setPointSettings(pointSettingsSnap.data());
+                }
+
                 let totalPointsAwarded = 0;
                 recentReviews.forEach(review => {
                     totalPointsAwarded += review.pointsAwarded || 0;
                 });
 
-                // Get total points redeemed from rewards collection
-                const rewardsQuery = query(collection(db, 'rewards'));
-                const rewardsSnapshot = await getDocs(rewardsQuery);
                 let totalPointsRedeemed = 0;
-                rewardsSnapshot.docs.forEach(doc => {
-                    const reward = doc.data();
-                    // This would need to be calculated based on redemption history
-                    // For now, we'll leave it as 0 until we implement redemption tracking
-                });
 
                 setReportData({
                     totalPointsAwarded,
@@ -78,7 +73,7 @@ export default function PointsReportPage() {
         fetchReportData();
     }, []);
 
-    if (loading) {
+    if (loading || profileLoading) {
         return (
             <div className="flex justify-center items-center h-64">
                 <div className="text-lg">กำลังโหลดข้อมูล...</div>
@@ -98,7 +93,6 @@ export default function PointsReportPage() {
         <div className="container mx-auto p-6">
             <h1 className="text-3xl font-bold mb-6 text-gray-800">รายงานระบบพ้อยต์</h1>
             
-            {/* Summary Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                 <div className="bg-blue-500 text-white p-6 rounded-lg shadow-md">
                     <h3 className="text-lg font-semibold mb-2">พ้อยต์ที่แจกออกไป</h3>
@@ -120,7 +114,6 @@ export default function PointsReportPage() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Recent Reviews */}
                 <div className="bg-white p-6 rounded-lg shadow-md">
                     <h2 className="text-xl font-bold mb-4 text-gray-800">รีวิวล่าสุดที่ได้รับพ้อยต์</h2>
                     <div className="space-y-3">
@@ -149,7 +142,6 @@ export default function PointsReportPage() {
                     </div>
                 </div>
 
-                {/* Top Customers */}
                 <div className="bg-white p-6 rounded-lg shadow-md">
                     <h2 className="text-xl font-bold mb-4 text-gray-800">ลูกค้าที่มีพ้อยต์สูงสุด</h2>
                     <div className="space-y-3">
@@ -179,32 +171,39 @@ export default function PointsReportPage() {
                 </div>
             </div>
 
-            {/* Point Settings Summary */}
-            <div className="mt-8 bg-gray-100 p-6 rounded-lg">
-                <h2 className="text-xl font-bold mb-4 text-gray-800">การตั้งค่าพ้อยต์ปัจจุบัน</h2>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                    <div>
-                        <p className="font-semibold text-gray-700">รีวิว</p>
-                        <p className="text-gray-600">ได้รับ 5 พ้อยต์ต่อครั้ง</p>
+            {pointSettings && (
+                <div className="mt-8 bg-gray-100 p-6 rounded-lg">
+                    <h2 className="text-xl font-bold mb-4 text-gray-800">การตั้งค่าพ้อยต์ปัจจุบัน</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                        {pointSettings.enableReviewPoints && (
+                            <div>
+                                <p className="font-semibold text-gray-700">รีวิว</p>
+                                <p className="text-gray-600">ได้รับ {pointSettings.reviewPoints} พ้อยต์ต่อครั้ง</p>
+                            </div>
+                        )}
+                        {pointSettings.enablePurchasePoints && (
+                            <div>
+                                <p className="font-semibold text-gray-700">ยอดซื้อ</p>
+                                <p className="text-gray-600">{pointSettings.pointsPerCurrency} {profile.currencySymbol} = 1 พ้อย</p>
+                            </div>
+                        )}
+                        {pointSettings.enableVisitPoints && (
+                            <div>
+                                <p className="font-semibold text-gray-700">เข้าใช้บริการ</p>
+                                <p className="text-gray-600">{pointSettings.pointsPerVisit} พ้อยต์ต่อครั้ง</p>
+                            </div>
+                        )}
                     </div>
-                    <div>
-                        <p className="font-semibold text-gray-700">ยอดซื้อ</p>
-                        <p className="text-gray-600">100 บาท = 1 พ้อย</p>
-                    </div>
-                    <div>
-                        <p className="font-semibold text-gray-700">เข้าใช้บริการ</p>
-                        <p className="text-gray-600">1 พ้อยต์ต่อครั้ง</p>
+                    <div className="mt-4">
+                        <a 
+                            href="/admin/settings" 
+                            className="inline-block bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors"
+                        >
+                            แก้ไขการตั้งค่า
+                        </a>
                     </div>
                 </div>
-                <div className="mt-4">
-                    <a 
-                        href="/admin/settings" 
-                        className="inline-block bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors"
-                    >
-                        แก้ไขการตั้งค่า
-                    </a>
-                </div>
-            </div>
+            )}
         </div>
     );
 }

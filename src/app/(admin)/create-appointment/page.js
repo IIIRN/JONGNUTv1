@@ -8,24 +8,26 @@ import { collection, getDocs, query, orderBy, where, doc, getDoc } from 'firebas
 import { useToast } from '@/app/components/Toast';
 import { createAppointmentWithSlotCheck } from '@/app/actions/appointmentActions';
 import { findOrCreateCustomer } from '@/app/actions/customerActions';
+import { useProfile } from '@/context/ProfileProvider';
 
 export default function CreateAppointmentPage() {
     const router = useRouter();
     const { showToast } = useToast();
+    const { profile, loading: profileLoading } = useProfile();
 
     // State for form data
     const [customerInfo, setCustomerInfo] = useState({ 
         fullName: '', 
         phone: '', 
         note: '', 
-        lineUserId: '' // เพิ่ม LINE User ID
+        lineUserId: ''
     });
     const [selectedServiceId, setSelectedServiceId] = useState('');
     const [selectedAddOnNames, setSelectedAddOnNames] = useState([]);
     const [selectedBeauticianId, setSelectedBeauticianId] = useState('');
     const [appointmentDate, setAppointmentDate] = useState('');
     const [appointmentTime, setAppointmentTime] = useState('');
-    const [noBeauticianMode, setNoBeauticianMode] = useState(false); // New state for no beautician mode
+    const [noBeauticianMode, setNoBeauticianMode] = useState(false);
 
     // State for data from Firestore
     const [services, setServices] = useState([]);
@@ -43,20 +45,17 @@ export default function CreateAppointmentPage() {
     const [existingCustomer, setExistingCustomer] = useState(null);
     const [isCheckingCustomer, setIsCheckingCustomer] = useState(false);
 
-    // Add CSS for highlighting disabled dates
     useEffect(() => {
         const style = document.createElement('style');
         style.textContent = `
             input[type="date"]::-webkit-calendar-picker-indicator {
                 cursor: pointer;
             }
-            /* Custom styles for holiday dates - limited support in HTML date input */
         `;
         document.head.appendChild(style);
         return () => document.head.removeChild(style);
     }, []);
 
-    // Fetch services, beauticians, and settings on component mount
     useEffect(() => {
         const fetchData = async () => {
             try {
@@ -86,7 +85,6 @@ export default function CreateAppointmentPage() {
         fetchData();
     }, [showToast]);
 
-    // Effect to check for unavailable beauticians when date or time changes
     useEffect(() => {
         const checkAvailability = async () => {
             if (!appointmentDate || !appointmentTime) {
@@ -105,7 +103,6 @@ export default function CreateAppointmentPage() {
                 const unavailableIds = new Set(querySnapshot.docs.map(doc => doc.data().beauticianId));
                 setUnavailableBeauticianIds(unavailableIds);
 
-                // If the currently selected beautician is now unavailable, reset the selection
                 if (unavailableIds.has(selectedBeauticianId)) {
                     setSelectedBeauticianId('');
                     showToast('ช่างที่เลือกไม่ว่างในเวลานี้แล้ว', 'warning');
@@ -119,7 +116,6 @@ export default function CreateAppointmentPage() {
         checkAvailability();
     }, [appointmentDate, appointmentTime, selectedBeauticianId, showToast]);
 
-    // Memoized values for selected service and calculated price
     const selectedService = useMemo(() => services.find(s => s.id === selectedServiceId), [services, selectedServiceId]);
     const selectedAddOns = useMemo(() => (selectedService?.addOnServices || []).filter(a => selectedAddOnNames.includes(a.name)), [selectedService, selectedAddOnNames]);
     
@@ -131,7 +127,6 @@ export default function CreateAppointmentPage() {
         return { basePrice: base, addOnsTotal: addOnsPrice, totalPrice: base + addOnsPrice, totalDuration: duration };
     }, [selectedService, selectedAddOns]);
 
-    // Function to check existing customer
     const checkExistingCustomer = async (phone, lineUserId) => {
         if (!phone && !lineUserId) {
             setExistingCustomer(null);
@@ -141,7 +136,6 @@ export default function CreateAppointmentPage() {
         setIsCheckingCustomer(true);
         try {
             if (lineUserId) {
-                // Check by LINE User ID first
                 const customerDoc = await getDoc(doc(db, 'customers', lineUserId));
                 if (customerDoc.exists()) {
                     setExistingCustomer({ id: customerDoc.id, ...customerDoc.data() });
@@ -151,7 +145,6 @@ export default function CreateAppointmentPage() {
             }
             
             if (phone) {
-                // Check by phone number
                 const q = query(collection(db, 'customers'), where('phone', '==', phone));
                 const snapshot = await getDocs(q);
                 
@@ -170,7 +163,6 @@ export default function CreateAppointmentPage() {
         }
     };
 
-    // Debounced customer check
     useEffect(() => {
         const timeoutId = setTimeout(() => {
             checkExistingCustomer(customerInfo.phone, customerInfo.lineUserId);
@@ -184,12 +176,10 @@ export default function CreateAppointmentPage() {
         const dateString = date.toISOString().split('T')[0];
         const weeklyDaySetting = bookingSettings.weeklySchedule?.[day];
 
-        // Check if it's a holiday
         if (bookingSettings.holidayDates?.some(holiday => holiday.date === dateString)) {
             return true;
         }
 
-        // Check if the day is closed in weekly schedule
         if (!weeklyDaySetting || !weeklyDaySetting.isOpen) {
             return true;
         }
@@ -210,7 +200,6 @@ export default function CreateAppointmentPage() {
             return bookingSettings.timeQueues.map(queue => queue.time).sort();
         }
 
-        // Generate 30-minute slots if no time queues are defined
         const slots = [];
         const [startHour, startMinute] = daySchedule.openTime.split(':').map(Number);
         const [endHour, endMinute] = daySchedule.closeTime.split(':').map(Number);
@@ -233,7 +222,7 @@ export default function CreateAppointmentPage() {
 
     const handleServiceChange = (e) => {
         setSelectedServiceId(e.target.value);
-        setSelectedAddOnNames([]); // Reset add-ons when service changes
+        setSelectedAddOnNames([]);
     };
 
     const handleAddOnToggle = (addOnName) => {
@@ -252,7 +241,6 @@ export default function CreateAppointmentPage() {
     const handleSubmit = async (e) => {
         e.preventDefault();
         
-        // Validation - beautician is not required in no-beautician mode
         const isBeauticianRequired = !noBeauticianMode;
         if (!selectedServiceId || (isBeauticianRequired && !selectedBeauticianId) || !appointmentDate || !appointmentTime || !customerInfo.fullName || !customerInfo.phone) {
             showToast('กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน', 'error');
@@ -261,7 +249,6 @@ export default function CreateAppointmentPage() {
         setIsSubmitting(true);
 
         try {
-            // Step 1: Find or create customer with automatic phone/LINE ID merging
             const customerResult = await findOrCreateCustomer({
                 fullName: customerInfo.fullName,
                 phone: customerInfo.phone,
@@ -272,25 +259,22 @@ export default function CreateAppointmentPage() {
                 throw new Error(customerResult.error || 'ไม่สามารถสร้างข้อมูลลูกค้าได้');
             }
 
-            // Show message if points were merged
             if (customerResult.mergedPoints > 0) {
                 showToast(`พบการรวมแต้ม: ${customerResult.mergedPoints} แต้ม`, 'info');
             }
 
-            // Handle beautician data - use default values for no-beautician mode
             let beautician = null;
             if (!noBeauticianMode && selectedBeauticianId) {
                 beautician = beauticians.find(b => b.id === selectedBeauticianId);
             }
 
-            // Step 2: Create appointment data with customer ID
             const appointmentData = {
-                userId: customerResult.customerId, // Use the customer ID from findOrCreateCustomer
+                userId: customerResult.customerId,
                 userInfo: { displayName: customerInfo.fullName },
                 status: 'confirmed',
                 customerInfo: {
                     ...customerInfo,
-                    customerId: customerResult.customerId // Add customer ID reference
+                    customerId: customerResult.customerId
                 },
                 serviceInfo: { id: selectedService.id, name: selectedService.serviceName, imageUrl: selectedService.imageUrl || '' },
                 date: appointmentDate,
@@ -316,7 +300,6 @@ export default function CreateAppointmentPage() {
                 createdAt: new Date(),
             };
 
-            // Step 3: Create appointment
             const result = await createAppointmentWithSlotCheck(appointmentData);
             if (result.success) {
                 showToast('สร้างการนัดหมายสำเร็จ!', 'success');
@@ -332,7 +315,7 @@ export default function CreateAppointmentPage() {
         }
     };
 
-    if (loading) {
+    if (loading || profileLoading) {
         return <div className="text-center p-10">กำลังโหลดข้อมูล...</div>;
     }
 
@@ -341,7 +324,6 @@ export default function CreateAppointmentPage() {
             <div className="max-w-3xl mx-auto bg-white p-6 rounded-lg shadow-md">
                 <h1 className="text-2xl font-bold mb-6 text-gray-800">สร้างการนัดหมายใหม่</h1>
                 <form onSubmit={handleSubmit} className="space-y-6">
-                    {/* Service and Add-ons */}
                     <div className="p-4 border rounded-lg">
                         <h2 className="text-lg font-semibold mb-3">1. บริการ</h2>
                         <select
@@ -351,7 +333,7 @@ export default function CreateAppointmentPage() {
                             required
                         >
                             <option value="">-- เลือกบริการ --</option>
-                            {services.map(s => <option key={s.id} value={s.id}>{s.serviceName} ({s.price} บาท)</option>)}
+                            {services.map(s => <option key={s.id} value={s.id}>{s.serviceName} ({s.price} {profile.currencySymbol})</option>)}
                         </select>
                         {selectedService?.addOnServices?.length > 0 && (
                             <div className="mt-4">
@@ -366,7 +348,7 @@ export default function CreateAppointmentPage() {
                                                 className="h-4 w-4 rounded"
                                             />
                                             <span className="flex-1">{addOn.name}</span>
-                                            <span className="text-sm text-gray-600">+{addOn.duration} นาที / +{addOn.price} บาท</span>
+                                            <span className="text-sm text-gray-600">+{addOn.duration} นาที / +{addOn.price} {profile.currencySymbol}</span>
                                         </label>
                                     ))}
                                 </div>
@@ -374,11 +356,9 @@ export default function CreateAppointmentPage() {
                         )}
                     </div>
 
-                    {/* Beautician, Date, Time */}
                     <div className="p-4 border rounded-lg">
                         <h2 className="text-lg font-semibold mb-3">2. ช่างและวันเวลา</h2>
                         
-                        {/* No Beautician Mode Toggle */}
                         <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
                             <label className="flex items-center gap-3 cursor-pointer">
                                 <input
@@ -399,7 +379,6 @@ export default function CreateAppointmentPage() {
                             </label>
                         </div>
                         
-                        {/* Holiday Notice */}
                         {bookingSettings.holidayDates && bookingSettings.holidayDates.length > 0 && (
                             <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
                                 <h3 className="text-sm font-medium text-yellow-800 mb-2">วันหยุดที่กำหนด:</h3>
@@ -442,7 +421,7 @@ export default function CreateAppointmentPage() {
                                             setAppointmentDate(selectedDate);
                                         }
                                         setAppointmentTime('');
-                                        setSelectedBeauticianId(''); // Reset beautician when date changes
+                                        setSelectedBeauticianId('');
                                     }}
                                     className="w-full p-2 border rounded-md"
                                     required
@@ -467,7 +446,7 @@ export default function CreateAppointmentPage() {
                                     value={appointmentTime}
                                     onChange={e => {
                                         setAppointmentTime(e.target.value);
-                                        setSelectedBeauticianId(''); // Reset beautician when time changes
+                                        setSelectedBeauticianId('');
                                     }}
                                     className="w-full p-2 border rounded-md bg-white disabled:bg-gray-100"
                                     required
@@ -519,7 +498,6 @@ export default function CreateAppointmentPage() {
                         </div>
                     </div>
 
-                    {/* Customer Info */}
                     <div className="p-4 border rounded-lg">
                         <h2 className="text-lg font-semibold mb-3">3. ข้อมูลลูกค้า</h2>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -555,7 +533,6 @@ export default function CreateAppointmentPage() {
                             </p>
                         </div>
 
-                        {/* Existing Customer Info Display */}
                         {isCheckingCustomer && (
                             <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-md">
                                 <div className="flex items-center gap-2">
@@ -605,9 +582,7 @@ export default function CreateAppointmentPage() {
                         ></textarea>
                     </div>
 
-                    {/* Summary and Submit */}
                     <div className="p-4 border-t mt-6">
-                        {/* Mode indicator */}
                         {noBeauticianMode && (
                             <div className="mb-4 p-3 bg-orange-50 border border-orange-200 rounded-md">
                                 <div className="flex items-center gap-2">
@@ -622,7 +597,7 @@ export default function CreateAppointmentPage() {
                         
                         <div className="flex justify-end items-center gap-6 mb-4">
                             <span className="text-gray-600">ยอดรวม:</span>
-                            <span className="text-2xl font-bold text-gray-800">{totalPrice.toLocaleString()} บาท</span>
+                            <span className="text-2xl font-bold text-gray-800">{totalPrice.toLocaleString()} {profile.currencySymbol}</span>
                         </div>
                         <button
                             type="submit"

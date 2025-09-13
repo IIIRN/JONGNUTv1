@@ -7,18 +7,18 @@ import { findAppointmentsByPhone, findAppointmentById, updateAppointmentStatus, 
 import EmployeeHeader from '@/app/components/EmployeeHeader';
 import { format, isToday, parseISO } from 'date-fns';
 import { th } from 'date-fns/locale';
+import { useProfile } from '@/context/ProfileProvider';
 
-// --- Import ใหม่ที่จำเป็น ---
 import { getPaymentSettings } from '@/app/actions/settingsActions';
 import QRCode from 'qrcode';
 import generatePayload from 'promptpay-qr';
 
 
-// --- Payment QR Code Modal (ฉบับแก้ไขใหม่) ---
 const PaymentQrModal = ({ show, onClose, appointment }) => {
     const [qrCodeUrl, setQrCodeUrl] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const { profile } = useProfile();
 
     useEffect(() => {
         if (show && appointment) {
@@ -27,18 +27,13 @@ const PaymentQrModal = ({ show, onClose, appointment }) => {
                 setError('');
                 setQrCodeUrl('');
                 try {
-                    // 1. ดึงข้อมูลการตั้งค่า Payment ล่าสุดจาก Server Action
                     const settingsResult = await getPaymentSettings();
                     
-                    // V V V V V V V V V V V V V V V V V V V V V
-                    //  แก้ไขการตรวจสอบข้อมูลให้ถูกต้องตรงนี้
-                    // V V V V V V V V V V V V V V V V V V V V V
                     if (!settingsResult.success) {
                         throw new Error(settingsResult.error || "ไม่พบการตั้งค่าการชำระเงิน");
                     }
-                    const { settings } = settingsResult; // ดึง settings object ออกมาใช้งาน
+                    const { settings } = settingsResult;
 
-                    // 2. ตรวจสอบเงื่อนไขและสร้าง QR Code
                     if (settings.method === 'image') {
                         if (!settings.qrCodeImageUrl) {
                             throw new Error("แอดมินยังไม่ได้ตั้งค่ารูปภาพ QR Code");
@@ -72,7 +67,7 @@ const PaymentQrModal = ({ show, onClose, appointment }) => {
         <div className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50 p-4" onClick={onClose}>
             <div className="bg-white p-6 rounded-xl shadow-lg w-full max-w-xs text-center" onClick={(e) => e.stopPropagation()}>
                 <h2 className="text-lg font-bold mb-1 text-gray-800">Scan to Pay</h2>
-                <p className="text-2xl font-bold text-blue-600 mb-3">{appointment.paymentInfo.totalPrice?.toLocaleString()} THB</p>
+                <p className="text-2xl font-bold text-blue-600 mb-3">{appointment.paymentInfo.totalPrice?.toLocaleString()} {profile.currencySymbol}</p>
                 <div className="h-64 w-64 mx-auto flex items-center justify-center">
                     {loading ? (
                         <p>กำลังสร้าง QR Code...</p>
@@ -88,9 +83,8 @@ const PaymentQrModal = ({ show, onClose, appointment }) => {
     );
 };
 
-
-// --- Appointment Card (โค้ดเดิมของคุณ ไม่มีการแก้ไข) ---
 const AppointmentCard = ({ appointment, onConfirm, onUpdatePayment, onShowPaymentQr }) => {
+    const { profile } = useProfile();
     const appointmentDate = parseISO(appointment.date);
     const isAppointmentToday = isToday(appointmentDate);
     const isPaid = appointment.paymentInfo?.paymentStatus === 'paid';
@@ -156,7 +150,7 @@ const AppointmentCard = ({ appointment, onConfirm, onUpdatePayment, onShowPaymen
             <div className="text-sm text-gray-700 border-t pt-3">
                 <p><strong>วันที่:</strong> {format(appointmentDate, 'dd MMMM yyyy', { locale: th })}</p>
                 <p><strong>เวลา:</strong> {appointment.time} น.</p>
-                <p><strong>ยอดชำระ:</strong> <span className="font-bold">{appointment.paymentInfo.totalPrice?.toLocaleString()} บาท</span></p>
+                <p><strong>ยอดชำระ:</strong> <span className="font-bold">{appointment.paymentInfo.totalPrice?.toLocaleString()} {profile.currencySymbol}</span></p>
             </div>
             <div className="grid grid-cols-2 gap-2 border-t pt-3">
                  <button
@@ -216,8 +210,6 @@ const AppointmentCard = ({ appointment, onConfirm, onUpdatePayment, onShowPaymen
     );
 };
 
-
-// --- Main Page Component (โค้ดเดิมของคุณ ไม่มีการแก้ไข) ---
 export default function CheckInPage() {
     const { liff, profile, loading: liffLoading } = useLiffContext();
     const [phoneNumber, setPhoneNumber] = useState('');

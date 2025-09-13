@@ -1,3 +1,4 @@
+// src/app/(admin)/layout.js
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -9,8 +10,9 @@ import AdminNavbar from '@/app/components/AdminNavbar';
 import { ToastProvider, useToast } from '@/app/components/Toast';
 import { markAllNotificationsAsRead, clearAllNotifications } from '@/app/actions/notificationActions';
 import { ConfirmationModal } from '@/app/components/common/NotificationComponent';
+import { ProfileProvider } from '@/context/ProfileProvider'; // --- IMPORT ---
 
-// Inner component to use Toast context within the provider
+// Inner component to use Toast context within the provider (โค้ดเดิม)
 function AdminLayoutContent({ children }) {
   const [loading, setLoading] = useState(true);
   const [isAuthorized, setIsAuthorized] = useState(false);
@@ -110,11 +112,14 @@ function AdminLayoutContent({ children }) {
   return null;
 }
 
-// Main Layout component that provides the Toast context
+// Main Layout component that provides the Toast context (โค้ดเดิม)
 export default function AdminLayout({ children }) {
     return (
         <ToastProvider>
-            <AdminLayoutContent>{children}</AdminLayoutContent>
+            {/* --- WRAP with ProfileProvider --- */}
+            <ProfileProvider>
+                <AdminLayoutContent>{children}</AdminLayoutContent>
+            </ProfileProvider>
         </ToastProvider>
     )
 }

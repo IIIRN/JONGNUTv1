@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { addReward } from '@/app/actions/rewardActions'; // Using server action
+import { addReward } from '@/app/actions/rewardActions';
+import { useProfile } from '@/context/ProfileProvider';
 
 export default function AddRewardPage() {
     const [name, setName] = useState('');
@@ -12,6 +13,7 @@ export default function AddRewardPage() {
     const [discountValue, setDiscountValue] = useState('');
     const [loading, setLoading] = useState(false);
     const router = useRouter();
+    const { profile } = useProfile();
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -20,7 +22,7 @@ export default function AddRewardPage() {
             name,
             description,
             pointsRequired: Number(pointsRequired),
-            discountType, // 'percentage' หรือ 'fixed'
+            discountType,
             discountValue: Number(discountValue),
         };
         
@@ -60,7 +62,7 @@ export default function AddRewardPage() {
                 </div>
                  <div>
                     <label className="block text-sm font-medium text-gray-700">
-                        {discountType === 'percentage' ? 'เปอร์เซ็นต์ส่วนลด (เช่น 10 สำหรับ 10%)' : 'จำนวนเงินส่วนลด (เช่น 50 สำหรับ 50 บาท)'}
+                        {discountType === 'percentage' ? 'เปอร์เซ็นต์ส่วนลด (เช่น 10 สำหรับ 10%)' : `จำนวนเงินส่วนลด (เช่น 50 สำหรับ 50 ${profile.currencySymbol})`}
                     </label>
                     <input 
                         type="number" 

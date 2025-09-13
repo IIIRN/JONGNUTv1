@@ -6,12 +6,14 @@ import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import CustomerHeader from '@/app/components/CustomerHeader';
+import { useProfile } from '@/context/ProfileProvider';
 
 export default function AppointmentPage() {
     const [services, setServices] = useState([]);
     const [loading, setLoading] = useState(true);
     const [errorMsg, setErrorMsg] = useState('');
     const router = useRouter();
+    const { profile } = useProfile();
 
     const fetchServices = async () => {
         setLoading(true);
@@ -86,7 +88,7 @@ export default function AppointmentPage() {
                                         {service.serviceName}
                                     </div>
                                     <div className="text-white text-xs mt-0.5 drop-shadow">
-                                        ({service.duration || '-'} นาที | ฿{(service.price ?? service.basePrice ?? 0).toLocaleString()})
+                                        ({service.duration || '-'} นาที | {profile?.currency}{(service.price ?? service.basePrice ?? 0).toLocaleString()})
                                     </div>
                                 </div>
                             </div>

@@ -3,6 +3,7 @@
 import { db } from '@/app/lib/firebaseAdmin';
 import { sendLineMessage } from './lineActions';
 import { Timestamp, FieldPath } from 'firebase-admin/firestore';
+import { getShopProfile } from './settingsActions';
 
 /**
  * Generates and sends a daily report to selected admins.
@@ -50,11 +51,14 @@ export async function sendDailyReportNow() {
       .filter(b => b.paymentInfo.paymentStatus === 'paid')
       .reduce((sum, b) => sum + b.paymentInfo.totalPrice, 0);
 
+    const { profile } = await getShopProfile();
+    const currencySymbol = profile.currencySymbol || 'บาท';
+
     const reportMessage = `📊 Report สรุปประจำวันที่ ${today.toLocaleDateString('th-TH')}\n\n` +
       `- รายการนัดหมายใหม่: ${totalAppointments} รายการ\n` +
       `- งานที่สำเร็จ: ${completedAppointments} รายการ\n` +
       `- ยกเลิก: ${cancelledAppointments} รายการ\n` +
-      `- รายได้รวม: ${totalRevenue.toLocaleString()} บาท\n\n` +
+      `- รายได้รวม: ${totalRevenue.toLocaleString()} ${currencySymbol}\n\n` +
       `(ข้อความนี้ถูกสร้างโดยการกดส่งทันที)`;
 
     const sendPromises = recipientLineIds.map(lineId => sendLineMessage(lineId, reportMessage));

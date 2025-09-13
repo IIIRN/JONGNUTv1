@@ -6,6 +6,7 @@ import { db } from '@/app/lib/firebase';
 import { collection, getDocs, query, orderBy, doc, deleteDoc } from 'firebase/firestore';
 import { ConfirmationModal } from '@/app/components/common/NotificationComponent';
 import { useToast } from '@/app/components/Toast';
+import { useProfile } from '@/context/ProfileProvider';
 
 export default function AdminRewardsPage() {
     const [rewards, setRewards] = useState([]);
@@ -13,6 +14,7 @@ export default function AdminRewardsPage() {
     const [rewardToDelete, setRewardToDelete] = useState(null);
     const [isDeleting, setIsDeleting] = useState(false);
     const { showToast } = useToast();
+    const { profile, loading: profileLoading } = useProfile();
 
     useEffect(() => {
         const fetchRewards = async () => {
@@ -50,7 +52,7 @@ export default function AdminRewardsPage() {
         }
     };
     
-    if (loading) return <div className="text-center mt-20">กำลังโหลดข้อมูลของรางวัล...</div>;
+    if (loading || profileLoading) return <div className="text-center mt-20">กำลังโหลดข้อมูลของรางวัล...</div>;
 
     return (
         <div className="container mx-auto p-4 md:p-8">
@@ -77,7 +79,7 @@ export default function AdminRewardsPage() {
                             <p className="text-sm text-gray-600 mt-2">{reward.description}</p>
                             <div className="mt-2">
                                 <span className="text-sm text-purple-600 font-medium">
-                                    {reward.discountType === 'percentage' ? `ส่วนลด ${reward.discountValue}%` : `ส่วนลด ${reward.discountValue} บาท`}
+                                    {reward.discountType === 'percentage' ? `ส่วนลด ${reward.discountValue}%` : `ส่วนลด ${reward.discountValue} ${profile.currencySymbol}`}
                                 </span>
                             </div>
                         </div>

@@ -13,16 +13,29 @@ import {
     sendPaymentConfirmationFlexMessage
 } from '@/app/actions/lineFlexActions';
 import { sendTelegramMessageToAdmin } from '@/app/actions/telegramActions';
-import { awardPointsForPurchase, awardPointsForVisit, awardPointsByPhone } from '@/app/actions/pointActions';
+import { awardPointsForPurchase, awardPointsForVisit } from '@/app/actions/pointActions';
 import { findOrCreateCustomer } from '@/app/actions/customerActions';
-// --- V V V V V V V V V V V V ---
-//  Import Actions ของ Calendar
-// --- V V V V V V V V V V V V ---
 import { createOrUpdateCalendarEvent, deleteCalendarEvent } from './calendarActions';
 
-/**
- * Creates a new appointment, checking for slot availability.
- */
+
+// --- HELPER FUNCTION ---
+// ดึงข้อมูลการตั้งค่าการแจ้งเตือน
+async function getNotificationSettings() {
+    try {
+        const docRef = db.collection('settings').doc('notifications');
+        const docSnap = await docRef.get();
+        if (docSnap.exists) {
+            return docSnap.data();
+        }
+        // คืนค่า object ว่างพร้อมโครงสร้างพื้นฐานเพื่อป้องกัน error
+        return { admin: { line: {} }, customer: {} };
+    } catch (error) {
+        console.error("Error fetching notification settings:", error);
+        return { admin: { line: {} }, customer: {} };
+    }
+}
+
+
 /**
  * Creates a new appointment, checking for slot availability.
  */
@@ -33,51 +46,23 @@ export async function createAppointmentWithSlotCheck(appointmentData) {
         const settingsRef = db.collection('settings').doc('booking');
         const settingsSnap = await settingsRef.get();
         
-        // --- V V V V V V V V V V V V V V V V V V V V ---
-        //  แก้ไขตรรกะการคำนวณ maxSlot ที่นี่
-        // --- V V V V V V V V V V V V V V V V V V V V ---
-        let maxSlot = 1; // เริ่มต้นด้วยค่าพื้นฐาน
+        let maxSlot = 1;
         let useBeautician = false;
         
         if (settingsSnap.exists) {
             const data = settingsSnap.data();
             useBeautician = !!data.useBeautician;
-
-            // 1. กำหนดค่าสูงสุดจากค่าทั่วไปก่อนเสมอ
             if (data.totalBeauticians) {
                 maxSlot = Number(data.totalBeauticians);
             }
-
-            // 2. หากมีการตั้งค่าแบบเจาะจงเวลา ให้ใช้ค่านั้นมาเขียนทับ
             if (Array.isArray(data.timeQueues) && data.timeQueues.length > 0) {
                 const specificQueue = data.timeQueues.find(q => q.time === time);
                 if (specificQueue && typeof specificQueue.count === 'number') {
                     maxSlot = specificQueue.count;
                 }
             }
-
-            // --- ตรวจสอบเวลาทำการ (โค้ดเดิม) ---
-            const weeklySchedule = data.weeklySchedule || {};
-            const appointmentDate = new Date(date);
-            const dayOfWeek = appointmentDate.getDay();
-            const daySchedule = weeklySchedule[dayOfWeek];
-            
-            if (daySchedule && !daySchedule.isOpen) {
-                return { success: false, error: 'วันที่เลือกปิดทำการ กรุณาเลือกวันอื่น' };
-            }
-            
-            if (daySchedule && daySchedule.isOpen) {
-                const timeSlot = time.replace(':', '');
-                const openTime = daySchedule.openTime.replace(':', '');
-                const closeTime = daySchedule.closeTime.replace(':', '');
-                
-                if (timeSlot < openTime || timeSlot > closeTime) {
-                    return { success: false, error: `เวลาที่เลือกอยู่นอกเวลาทำการ (${daySchedule.openTime} - ${daySchedule.closeTime})` };
-                }
-            }
         }
 
-        // --- ส่วนของการ Query เพื่อนับจำนวนคิวที่ถูกจอง (โค้ดเดิม) ---
         let queryConditions = [
             ['date', '==', date],
             ['time', '==', time],
@@ -97,16 +82,15 @@ export async function createAppointmentWithSlotCheck(appointmentData) {
         const snap = await q.get();
         if (snap.size >= maxSlot) {
             const errorMsg = useBeautician && beauticianId !== 'auto-assign' 
-                ? 'ช่างท่านนี้ไม่ว่างในช่วงเวลาดังกล่าว กรุณาเลือกช่างอื่นหรือเวลาอื่น'
-                : 'ช่วงเวลานี้ถูกจองเต็มแล้ว กรุณาเลือกเวลาอื่น';
+                ? 'ช่างท่านนี้ไม่ว่างในช่วงเวลาดังกล่าว'
+                : 'ช่วงเวลานี้ถูกจองเต็มแล้ว';
             return { success: false, error: errorMsg };
         }
 
-        // --- ส่วนที่เหลือของฟังก์ชัน (โค้ดเดิม) ---
         const serviceRef = db.collection('services').doc(serviceId);
         const serviceSnap = await serviceRef.get();
         if (!serviceSnap.exists) {
-            return { success: false, error: 'ไม่พบบริการที่เลือกในระบบ' };
+            return { success: false, error: 'ไม่พบบริการที่เลือก' };
         }
         const authoritativeServiceData = serviceSnap.data();
 
@@ -133,11 +117,13 @@ export async function createAppointmentWithSlotCheck(appointmentData) {
             try {
                 await findOrCreateCustomer(appointmentData.customerInfo, appointmentData.userId);
             } catch (customerError) {
-                console.error(`Error creating customer record for appointment ${newRef.id}:`, customerError);
+                console.error(`Error creating customer for appointment ${newRef.id}:`, customerError);
             }
         }
 
-        if (userId) {
+        // --- FIXED ---
+        const notificationSettings = await getNotificationSettings();
+        if (userId && notificationSettings.customer?.newBooking) {
             await sendNewBookingFlexMessage(userId, {
                 serviceName: finalAppointmentData.serviceInfo.name,
                 date: date,
@@ -157,18 +143,18 @@ export async function createAppointmentWithSlotCheck(appointmentData) {
             };
             await sendBookingNotification(notificationData, 'newBooking');
         } catch (notificationError) {
-            console.error('Error sending booking notification to admin:', notificationError);
+            console.error('Error sending admin notification:', notificationError);
         }
 
         return { success: true, id: newRef.id };
     } catch (error) {
-        console.error('Error creating appointment with slot check:', error);
+        console.error('Error creating appointment:', error);
         return { success: false, error: error.message };
     }
 }
 
 /**
- * NEW: Updates an existing appointment by an admin.
+ * Updates an existing appointment by an admin.
  */
 export async function updateAppointmentByAdmin(appointmentId, updateData) {
     if (!appointmentId || !updateData) {
@@ -217,7 +203,7 @@ export async function updateAppointmentByAdmin(appointmentId, updateData) {
             'appointmentInfo.beauticianId': beauticianId,
             'appointmentInfo.employeeId': beauticianId,
             'appointmentInfo.beauticianInfo': { firstName: beauticianData.firstName, lastName: beauticianData.lastName },
-            'appointmentInfo.dateTime': Timestamp.fromDate(new Date(`${date}T${time}`)),
+            'appointmentInfo.dateTime': Timestamp.fromDate(new Date(`${date}T${time}:00+07:00`)), // Fixed Timezone
             'appointmentInfo.addOns': selectedAddOns,
             'appointmentInfo.duration': totalDuration,
             'paymentInfo.basePrice': basePrice,
@@ -232,9 +218,6 @@ export async function updateAppointmentByAdmin(appointmentId, updateData) {
         
         await appointmentRef.update(finalUpdateData);
 
-        // --- V V V V V V V V V V V V ---
-        //  อัปเดต Event ใน Google Calendar
-        // --- V V V V V V V V V V V V ---
         const updatedDoc = await appointmentRef.get();
         if (updatedDoc.exists) {
             await createOrUpdateCalendarEvent(appointmentId, updatedDoc.data());
@@ -261,18 +244,11 @@ export async function confirmAppointmentAndPaymentByAdmin(appointmentId, adminId
         const appointmentDoc = await appointmentRef.get();
         if (!appointmentDoc.exists) throw new Error("ไม่พบข้อมูลการนัดหมาย");
         const appointmentData = appointmentDoc.data();
-
-        if (appointmentData.status === 'cancelled') {
-            throw new Error("ไม่สามารถชำระเงินสำหรับการนัดหมายที่ยกเลิกแล้ว");
-        }
         
         const wasAwaitingConfirmation = appointmentData.status === 'awaiting_confirmation';
-        const currentStatus = appointmentData.status;
 
         await appointmentRef.update({
-            status: wasAwaitingConfirmation ? 'confirmed' : currentStatus,
-            'appointmentInfo.employeeId': adminId, 
-            'appointmentInfo.timestamp': FieldValue.serverTimestamp(),
+            status: wasAwaitingConfirmation ? 'confirmed' : appointmentData.status,
             'paymentInfo.paymentStatus': 'paid',
             'paymentInfo.paidAt': FieldValue.serverTimestamp(),
             'paymentInfo.amountPaid': data.amount,
@@ -280,49 +256,26 @@ export async function confirmAppointmentAndPaymentByAdmin(appointmentId, adminId
             updatedAt: FieldValue.serverTimestamp(),
         });
 
-        // --- V V V V V V V V V V V V ---
-        //  อัปเดต Event ใน Google Calendar (ถ้าสถานะเปลี่ยนเป็น confirmed)
-        // --- V V V V V V V V V V V V ---
         if (wasAwaitingConfirmation) {
             const updatedDoc = await appointmentRef.get();
             if(updatedDoc.exists){
                 await createOrUpdateCalendarEvent(appointmentId, updatedDoc.data());
             }
         }
-
-
-        if (appointmentData.customerInfo && (appointmentData.userId || appointmentData.customerInfo.phone)) {
-            try {
-                const customerResult = await findOrCreateCustomer(
-                    appointmentData.customerInfo, 
-                    appointmentData.userId
-                );
-                if (customerResult.success) {
-                    if (customerResult.mergedPoints > 0) {
-                       //...
-                    }
-                } else {
-                    console.error(`Failed to create customer record for payment confirmation ${appointmentId}:`, customerResult.error);
-                }
-            } catch (customerError) {
-                console.error(`Error creating customer record for payment confirmation ${appointmentId}:`, customerError);
-            }
-        }
-
-        if (appointmentData.userId) {
-          if (wasAwaitingConfirmation) {
-              await sendPaymentConfirmationFlexMessage(appointmentData.userId, {
-                  id: appointmentId, serviceInfo: appointmentData.serviceInfo, customerInfo: appointmentData.customerInfo,
-                  paymentInfo: { amountPaid: data.amount, paymentMethod: data.method },
-                  date: appointmentData.date, time: appointmentData.time, appointmentId: appointmentId, isConfirmed: true
-              });
-          } else {
-              await sendPaymentConfirmationFlexMessage(appointmentData.userId, {
-                  id: appointmentId, serviceInfo: appointmentData.serviceInfo, customerInfo: appointmentData.customerInfo,
-                  paymentInfo: { amountPaid: data.amount, paymentMethod: data.method },
-                  date: appointmentData.date, time: appointmentData.time, appointmentId: appointmentId, isConfirmed: false
-              });
-          }
+        
+        // --- FIXED ---
+        const notificationSettings = await getNotificationSettings();
+        if (appointmentData.userId && notificationSettings.customer?.paymentConfirmation) {
+          await sendPaymentConfirmationFlexMessage(appointmentData.userId, {
+              id: appointmentId, 
+              serviceInfo: appointmentData.serviceInfo, 
+              customerInfo: appointmentData.customerInfo,
+              paymentInfo: { amountPaid: data.amount, paymentMethod: data.method },
+              date: appointmentData.date, 
+              time: appointmentData.time, 
+              appointmentId: appointmentId, 
+              isConfirmed: wasAwaitingConfirmation
+          });
         }
 
         try {
@@ -364,14 +317,13 @@ export async function cancelAppointmentByAdmin(appointmentId, reason) {
             updatedAt: FieldValue.serverTimestamp()
         });
         
-        // --- V V V V V V V V V V V V ---
-        //  ลบ Event ใน Google Calendar
-        // --- V V V V V V V V V V V V ---
         if (appointmentData.googleCalendarEventId) {
             await deleteCalendarEvent(appointmentData.googleCalendarEventId);
         }
 
-        if (appointmentData.userId) {
+        // --- FIXED ---
+        const notificationSettings = await getNotificationSettings();
+        if (appointmentData.userId && notificationSettings.customer?.appointmentCancelled) {
             await sendAppointmentCancelledFlexMessage(appointmentData.userId, {
                 appointmentId: appointmentId,
                 shortId: appointmentId.substring(0, 6).toUpperCase(),
@@ -411,37 +363,14 @@ export async function updateAppointmentStatusByAdmin(appointmentId, newStatus, n
             updatedAt: FieldValue.serverTimestamp()
         });
 
-        // --- V V V V V V V V V V V V ---
-        //  จัดการ Event ใน Google Calendar ตามสถานะใหม่
-        // --- V V V V V V V V V V V V ---
         if (newStatus === 'cancelled') {
             if (appointmentData.googleCalendarEventId) {
                 await deleteCalendarEvent(appointmentData.googleCalendarEventId);
             }
         } else {
-            // สำหรับสถานะอื่นๆ ให้อัปเดตข้อมูลใน Calendar เสมอ
             const updatedDoc = await appointmentRef.get();
             if (updatedDoc.exists) {
                  await createOrUpdateCalendarEvent(appointmentId, updatedDoc.data());
-            }
-        }
-
-
-        if (appointmentData.customerInfo && (appointmentData.userId || appointmentData.customerInfo.phone)) {
-            try {
-                const customerResult = await findOrCreateCustomer(
-                    appointmentData.customerInfo, 
-                    appointmentData.userId
-                );
-                if (customerResult.success) {
-                    if (customerResult.mergedPoints > 0) {
-                        // ...
-                    }
-                } else {
-                    console.error(`Failed to create customer record for status change ${appointmentId}:`, customerResult.error);
-                }
-            } catch (customerError) {
-                console.error(`Error creating customer record for status change ${appointmentId}:`, customerError);
             }
         }
 
@@ -470,6 +399,8 @@ export async function updateAppointmentStatusByAdmin(appointmentId, newStatus, n
             appointmentData._totalPointsAwarded = totalPointsAwarded;
         }
 
+        // --- FIXED ---
+        const notificationSettings = await getNotificationSettings();
         if (appointmentData.userId) {
             const serviceName = appointmentData.serviceInfo?.name || 'บริการของคุณ';
             const appointmentDate = appointmentData.date;
@@ -477,26 +408,34 @@ export async function updateAppointmentStatusByAdmin(appointmentId, newStatus, n
 
             switch (newStatus) {
                 case 'confirmed':
-                    await sendAppointmentConfirmedFlexMessage(appointmentData.userId, {
-                        serviceName: serviceName, date: appointmentDate, time: appointmentTime,
-                        appointmentId: appointmentId, id: appointmentId
-                    });
+                    if (notificationSettings.customer?.appointmentConfirmed) {
+                        await sendAppointmentConfirmedFlexMessage(appointmentData.userId, {
+                           serviceName, date: appointmentDate, time: appointmentTime,
+                           appointmentId, id: appointmentId
+                        });
+                    }
                     break;
                 case 'completed':
-                    await sendServiceCompletedFlexMessage(appointmentData.userId, {
-                        serviceName: serviceName, date: appointmentDate, time: appointmentTime,
-                        appointmentId: appointmentId, id: appointmentId,
-                        totalPointsAwarded: appointmentData._totalPointsAwarded || 0
-                    });
-                    await sendReviewRequestToCustomer(appointmentId);
+                    if (notificationSettings.customer?.serviceCompleted) {
+                        await sendServiceCompletedFlexMessage(appointmentData.userId, {
+                            serviceName, date: appointmentDate, time: appointmentTime,
+                            appointmentId, id: appointmentId,
+                            totalPointsAwarded: appointmentData._totalPointsAwarded || 0
+                        });
+                    }
+                    if (notificationSettings.customer?.reviewRequest) {
+                        await sendReviewRequestToCustomer(appointmentId);
+                    }
                     break;
                 case 'cancelled':
-                    await sendAppointmentCancelledFlexMessage(appointmentData.userId, {
-                        appointmentId: appointmentId,
-                        shortId: appointmentId.substring(0, 6).toUpperCase(),
-                        serviceName: serviceName, date: appointmentDate, time: appointmentTime,
-                        reason: note || 'ไม่ได้ระบุเหตุผล', cancelledBy: 'admin'
-                    });
+                    if (notificationSettings.customer?.appointmentCancelled) {
+                        await sendAppointmentCancelledFlexMessage(appointmentData.userId, {
+                           appointmentId,
+                           shortId: appointmentId.substring(0, 6).toUpperCase(),
+                           serviceName, date: appointmentDate, time: appointmentTime,
+                           reason: note || 'ไม่ได้ระบุเหตุผล', cancelledBy: 'admin'
+                        });
+                    }
                     break;
             }
         }
@@ -508,8 +447,6 @@ export async function updateAppointmentStatusByAdmin(appointmentId, newStatus, n
         return { success: false, error: error.message };
     }
 }
-
-
 
 /**
  * Sends a review request link to the customer after a service is completed.
@@ -524,11 +461,15 @@ export async function sendReviewRequestToCustomer(appointmentId) {
         if (appointmentData.status !== 'completed') throw new Error("ไม่สามารถส่งรีวิวสำหรับงานที่ยังไม่เสร็จสิ้น");
         if (appointmentData.reviewInfo?.submitted) throw new Error("การนัดหมายนี้ได้รับการรีวิวแล้ว");
         if (!appointmentData.userId) throw new Error("ไม่พบ LINE User ID ของลูกค้า");
-
-        await sendReviewFlexMessage(appointmentData.userId, {
-            id: appointmentId,
-            ...appointmentData
-        });
+        
+        // --- FIXED ---
+        const notificationSettings = await getNotificationSettings();
+        if (notificationSettings.customer?.reviewRequest) {
+            await sendReviewFlexMessage(appointmentData.userId, {
+                id: appointmentId,
+                ...appointmentData
+            });
+        }
 
         return { success: true };
     } catch (error) {
@@ -559,9 +500,6 @@ export async function updateAppointmentStatusByEmployee(appointmentId, employeeI
 
         await appointmentRef.update(updateData);
         
-        // --- V V V V V V V V V V V V ---
-        //  อัปเดต Event ใน Google Calendar
-        // --- V V V V V V V V V V V V ---
         const updatedDoc = await appointmentRef.get();
         if (updatedDoc.exists) {
             await createOrUpdateCalendarEvent(appointmentId, updatedDoc.data());
@@ -571,8 +509,10 @@ export async function updateAppointmentStatusByEmployee(appointmentId, employeeI
             await employeeRef.update({ status: 'available' });
         }
 
+        // --- FIXED ---
+        const notificationSettings = await getNotificationSettings();
         if (appointmentData.userId) {
-            if (newStatus === 'completed') {
+            if (newStatus === 'completed' && notificationSettings.customer?.serviceCompleted) {
                 await sendServiceCompletedFlexMessage(appointmentData.userId, {
                     serviceName: appointmentData.serviceInfo?.name || 'บริการ',
                     date: appointmentData.date,
@@ -581,7 +521,9 @@ export async function updateAppointmentStatusByEmployee(appointmentId, employeeI
                     id: appointmentId,
                     pointsAwarded: 0
                 });
-                await sendReviewRequestToCustomer(appointmentId);
+                if (notificationSettings.customer?.reviewRequest) {
+                    await sendReviewRequestToCustomer(appointmentId);
+                }
             }
         }
         return { success: true };
@@ -600,7 +542,7 @@ export async function cancelAppointmentByUser(appointmentId, userId) {
     }
     const appointmentRef = db.collection('appointments').doc(appointmentId);
     try {
-        const { customerName, serviceName, googleCalendarEventId } = await db.runTransaction(async (transaction) => {
+        const { customerName, serviceName, googleCalendarEventId, date, time } = await db.runTransaction(async (transaction) => {
             const appointmentDoc = await transaction.get(appointmentRef);
             if (!appointmentDoc.exists) throw new Error("ไม่พบข้อมูลการนัดหมาย");
             
@@ -616,28 +558,30 @@ export async function cancelAppointmentByUser(appointmentId, userId) {
             return { 
                 customerName: appointmentData.customerInfo.fullName, 
                 serviceName: appointmentData.serviceInfo.name,
-                googleCalendarEventId: appointmentData.googleCalendarEventId || null
+                googleCalendarEventId: appointmentData.googleCalendarEventId || null,
+                date: appointmentData.date,
+                time: appointmentData.time
             };
         });
 
-        // --- V V V V V V V V V V V V ---
-        //  ลบ Event ใน Google Calendar
-        // --- V V V V V V V V V V V V ---
         if (googleCalendarEventId) {
             await deleteCalendarEvent(googleCalendarEventId);
         }
         
+        // --- FIXED ---
+        // For user-initiated actions, we still send them a confirmation.
+        // But we check settings before notifying admin.
         await sendAppointmentCancelledFlexMessage(userId, {
             appointmentId: appointmentId,
             shortId: appointmentId.substring(0, 6).toUpperCase(),
             serviceName: serviceName || 'บริการ',
-            date: '',
-            time: '',
+            date: date,
+            time: time,
             reason: 'ยกเลิกโดยลูกค้า',
             cancelledBy: 'customer'
         });
         
-        const adminMessage = `🚫 การนัดหมายถูกยกเลิกโดยลูกค้า\n\n*ลูกค้า:* ${customerName}\n*บริการ:* ${serviceName}\n*Appointment ID:* ${appointmentId.substring(0, 6).toUpperCase()}`;
+        const adminMessage = `🚫 การนัดหมายถูกยกเลิกโดยลูกค้า\n\n*ลูกค้า:* ${customerName}\n*บริการ:* ${serviceName}\n*ID:* ${appointmentId.substring(0, 6).toUpperCase()}`;
         await sendTelegramMessageToAdmin(adminMessage);
         
         return { success: true };
@@ -648,7 +592,7 @@ export async function cancelAppointmentByUser(appointmentId, userId) {
 }
 
 /**
- * Sends an invoice link to the customer via LINE using a dedicated payment LIFF.
+ * Sends an invoice link to the customer via LINE.
  */
 export async function sendInvoiceToCustomer(appointmentId) {
     const appointmentRef = db.collection('appointments').doc(appointmentId);
@@ -662,15 +606,19 @@ export async function sendInvoiceToCustomer(appointmentId) {
             updatedAt: FieldValue.serverTimestamp()
         });
 
-        await sendPaymentFlexMessage(appointmentData.userId, {
-            id: appointmentId,
-            userId: appointmentData.userId,
-            serviceInfo: appointmentData.serviceInfo,
-            paymentInfo: appointmentData.paymentInfo,
-            customerInfo: appointmentData.customerInfo,
-            date: appointmentData.date,
-            time: appointmentData.time
-        });
+        // --- FIXED ---
+        const notificationSettings = await getNotificationSettings();
+        if(notificationSettings.customer?.paymentInvoice){
+            await sendPaymentFlexMessage(appointmentData.userId, {
+                id: appointmentId,
+                userId: appointmentData.userId,
+                serviceInfo: appointmentData.serviceInfo,
+                paymentInfo: appointmentData.paymentInfo,
+                customerInfo: appointmentData.customerInfo,
+                date: appointmentData.date,
+                time: appointmentData.time
+            });
+        }
  
         return { success: true };
     } catch (error) {
@@ -696,7 +644,6 @@ export async function confirmPayment(appointmentId) {
         return { success: false, error: error.message };
     }
 }
-
 
 /**
  * Finds appointments based on a customer's phone number.
@@ -754,7 +701,6 @@ export async function findAppointmentById(appointmentId) {
     }
 }
 
-
 /**
  * Confirms an appointment by the user who owns it.
  */
@@ -778,7 +724,7 @@ export async function confirmAppointmentByUser(appointmentId, userId) {
         }
 
         if (appointmentData.status !== 'awaiting_confirmation') {
-            throw new Error("This appointment cannot be confirmed as it's not awaiting confirmation.");
+            throw new Error("This appointment cannot be confirmed.");
         }
 
         await appointmentRef.update({
@@ -786,9 +732,6 @@ export async function confirmAppointmentByUser(appointmentId, userId) {
             updatedAt: FieldValue.serverTimestamp(),
         });
         
-        // --- V V V V V V V V V V V V ---
-        //  อัปเดต Event ใน Google Calendar
-        // --- V V V V V V V V V V V V ---
         const updatedDoc = await appointmentRef.get();
         if (updatedDoc.exists) {
             await createOrUpdateCalendarEvent(appointmentId, updatedDoc.data());

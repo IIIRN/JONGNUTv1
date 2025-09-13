@@ -1,9 +1,61 @@
+// src/app/actions/settingsActions.js
 'use server';
 
 import { db } from '@/app/lib/firebaseAdmin';
 import { FieldValue } from 'firebase-admin/firestore';
 
-// ฟังก์ชันบันทึกการตั้งค่าการแจ้งเตือน
+// --- Function to get shop profile settings with cache ---
+let shopProfileCache = null;
+let cacheTimestamp = null;
+
+export async function getShopProfile() {
+    const now = Date.now();
+    // Cache for 1 minute to prevent multiple reads in a short time
+    if (shopProfileCache && cacheTimestamp && (now - cacheTimestamp < 60000)) {
+        return { success: true, profile: shopProfileCache };
+    }
+
+    if (!db) {
+        return { success: false, error: "Firebase Admin is not initialized." };
+    }
+    try {
+        const docRef = db.collection('settings').doc('profile');
+        const docSnap = await docRef.get();
+
+        if (docSnap.exists) {
+            const profileData = docSnap.data();
+            shopProfileCache = profileData;
+            cacheTimestamp = now;
+            return { success: true, profile: profileData };
+        } else {
+            const defaultProfile = {
+                storeName: 'ชื่อร้านค้า',
+                currency: '฿',
+                currencySymbol: 'บาท',
+            };
+            return { success: true, profile: defaultProfile };
+        }
+    } catch (error) {
+        console.error("Error getting shop profile:", error);
+        return { success: false, error: error.message };
+    }
+}
+
+export async function saveProfileSettings(settingsData) {
+    if (!db) return { success: false, error: "Firebase Admin is not initialized." };
+    try {
+        const settingsRef = db.collection('settings').doc('profile');
+        await settingsRef.set({
+            ...settingsData,
+            updatedAt: FieldValue.serverTimestamp(),
+        }, { merge: true });
+        shopProfileCache = null; // Invalidate cache
+        return { success: true };
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+}
+
 export async function saveNotificationSettings(settingsData) {
     if (!db) return { success: false, error: "Firebase Admin is not initialized." };
     try {
@@ -18,7 +70,6 @@ export async function saveNotificationSettings(settingsData) {
     }
 }
 
-// ฟังก์ชันบันทึกการตั้งค่าการจอง
 export async function saveBookingSettings(settingsData) {
     if (!db) return { success: false, error: "Firebase Admin is not initialized." };
     try {
@@ -33,7 +84,6 @@ export async function saveBookingSettings(settingsData) {
     }
 }
 
-// ฟังก์ชันบันทึกการตั้งค่าคะแนน
 export async function savePointSettings(settingsData) {
     if (!db) return { success: false, error: "Firebase Admin is not initialized." };
     try {
@@ -48,7 +98,6 @@ export async function savePointSettings(settingsData) {
     }
 }
 
-// ฟังก์ชันบันทึกการตั้งค่า Payment
 export async function savePaymentSettings(settingsData) {
     if (!db) return { success: false, error: "Firebase Admin is not initialized." };
     try {
@@ -64,7 +113,6 @@ export async function savePaymentSettings(settingsData) {
     }
 }
 
-// ฟังก์ชันสำหรับบันทึกการตั้งค่า Calendar
 export async function saveCalendarSettings(settingsData) {
     if (!db) return { success: false, error: "Firebase Admin is not initialized." };
     try {
@@ -80,8 +128,6 @@ export async function saveCalendarSettings(settingsData) {
     }
 }
 
-
-// ฟังก์ชันดึงข้อมูลการตั้งค่า Payment
 export async function getPaymentSettings() {
     if (!db) {
         console.error("Firebase Admin SDK has not been initialized.");

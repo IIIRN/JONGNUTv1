@@ -3,8 +3,10 @@
 
 import { format } from 'date-fns';
 import { th } from 'date-fns/locale';
+import { useProfile } from '../../../context/ProfileProvider';
 
 const AppointmentCard = ({ job, onQrCodeClick, onCancelClick, onConfirmClick, isConfirming }) => {
+    const { profile } = useProfile();
     const statusInfo = {
         'awaiting_confirmation': { text: 'รอยืนยัน' },
         'confirmed': { text: 'ยืนยันแล้ว' },
@@ -32,7 +34,7 @@ const AppointmentCard = ({ job, onQrCodeClick, onCancelClick, onConfirmClick, is
                 {/* Main Service */}
                 <div className="flex justify-between items-start text-sm mb-2">
                     <span className="font-semibold text-gray-800">{job.serviceInfo?.name}</span>
-                    <span className="text-gray-700">{job.paymentInfo?.basePrice?.toLocaleString()} บาท</span>
+                    <span className="text-gray-700">{job.paymentInfo?.basePrice?.toLocaleString()} {profile?.currencySymbol}</span>
                 </div>
 
                 {/* Add-on Services */}
@@ -41,7 +43,7 @@ const AppointmentCard = ({ job, onQrCodeClick, onCancelClick, onConfirmClick, is
                         {addOns.map((addon, index) => (
                             <div key={index} className="flex justify-between">
                                 <span>+ {addon.name}</span>
-                                <span>{addon.price?.toLocaleString()} บาท</span>
+                                <span>{addon.price?.toLocaleString()} {profile?.currencySymbol}</span>
                             </div>
                         ))}
                     </div>
@@ -51,7 +53,7 @@ const AppointmentCard = ({ job, onQrCodeClick, onCancelClick, onConfirmClick, is
                 <div className="border-t pt-3 mb-4">
                     <div className="flex justify-between items-center">
                         <span className="font-semibold text-black">ราคารวม</span>
-                        <span className="font-bold text-lg text-black">{job.paymentInfo?.totalPrice?.toLocaleString() || 'N/A'} บาท</span>
+                        <span className="font-bold text-lg text-black">{job.paymentInfo?.totalPrice?.toLocaleString() || 'N/A'} {profile?.currencySymbol}</span>
                     </div>
                 </div>
 

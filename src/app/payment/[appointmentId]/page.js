@@ -103,7 +103,7 @@ export default function PaymentPage() {
                 <div className="text-center mb-6 bg-blue-50 p-4 rounded-lg border border-blue-200">
                     <p className="text-md text-blue-800">ยอดชำระทั้งหมด</p>
                     <p className="text-4xl font-bold text-blue-600">
-                        {appointment?.paymentInfo?.totalPrice?.toLocaleString() || '0'} บาท
+                        {appointment?.paymentInfo?.totalPrice?.toLocaleString() || '0'} 
                     </p>
                 </div>
                 

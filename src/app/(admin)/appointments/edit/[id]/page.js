@@ -6,12 +6,14 @@ import { db } from '@/app/lib/firebase';
 import { doc, getDoc, collection, getDocs, query, where, orderBy } from 'firebase/firestore';
 import { useToast } from '@/app/components/Toast';
 import { updateAppointmentByAdmin } from '@/app/actions/appointmentActions';
+import { useProfile } from '@/context/ProfileProvider';
 
 export default function EditAppointmentPage() {
     const router = useRouter();
     const params = useParams();
     const { id } = params;
     const { showToast } = useToast();
+    const { profile, loading: profileLoading } = useProfile();
 
     const [formData, setFormData] = useState(null);
     const [services, setServices] = useState([]);
@@ -26,7 +28,6 @@ export default function EditAppointmentPage() {
         const fetchData = async () => {
             if (!id) return;
             try {
-                // Fetch appointment, services, and beauticians in parallel
                 const appointmentRef = doc(db, 'appointments', id);
                 const servicesQuery = query(collection(db, 'services'), orderBy('serviceName'));
                 const beauticiansQuery = query(collection(db, 'beauticians'), where('status', '==', 'available'), orderBy('firstName'));
@@ -81,7 +82,6 @@ export default function EditAppointmentPage() {
                     where('status', 'in', ['confirmed', 'awaiting_confirmation', 'in_progress'])
                 );
                 const querySnapshot = await getDocs(q);
-                // Exclude the current appointment being edited from the check
                 const unavailableIds = new Set(
                     querySnapshot.docs
                         .filter(doc => doc.id !== id) 
@@ -142,7 +142,7 @@ export default function EditAppointmentPage() {
         }
     };
 
-    if (loading || !formData) return <div className="text-center p-10">กำลังโหลดข้อมูลการจอง...</div>;
+    if (loading || profileLoading || !formData) return <div className="text-center p-10">กำลังโหลดข้อมูลการจอง...</div>;
 
     return (
         <div className="container mx-auto p-4 md:p-8">
@@ -158,7 +158,7 @@ export default function EditAppointmentPage() {
                             onChange={handleInputChange}
                             className="w-full p-2 border rounded-md bg-white"
                         >
-                            {services.map(s => <option key={s.id} value={s.id}>{s.serviceName} ({s.price} บาท)</option>)}
+                            {services.map(s => <option key={s.id} value={s.id}>{s.serviceName} ({s.price} {profile.currencySymbol})</option>)}
                         </select>
                         {selectedService?.addOnServices?.length > 0 && (
                             <div className="mt-4">
@@ -169,7 +169,7 @@ export default function EditAppointmentPage() {
                                             checked={formData.addOnNames.includes(addOn.name)}
                                             onChange={() => handleAddOnToggle(addOn.name)}
                                         />
-                                        <span>{addOn.name} (+{addOn.price} บาท)</span>
+                                        <span>{addOn.name} (+{addOn.price} {profile.currencySymbol})</span>
                                     </label>
                                 ))}
                             </div>
@@ -239,7 +239,7 @@ export default function EditAppointmentPage() {
                     <div className="p-4 border-t mt-6">
                         <div className="flex justify-end items-center gap-6 mb-4">
                             <span className="text-gray-600">ยอดรวม:</span>
-                            <span className="text-2xl font-bold text-gray-800">{totalPrice.toLocaleString()} บาท</span>
+                            <span className="text-2xl font-bold text-gray-800">{totalPrice.toLocaleString()} {profile.currencySymbol}</span>
                         </div>
                         <button
                             type="submit"

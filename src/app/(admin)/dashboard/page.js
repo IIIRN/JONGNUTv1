@@ -1,4 +1,3 @@
-// src/app/(admin)/dashboard/page.js
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
@@ -10,6 +9,7 @@ import Image from 'next/image';
 import { cancelAppointmentByAdmin } from '@/app/actions/appointmentActions';
 import { format, startOfDay, endOfDay, parseISO } from 'date-fns';
 import { th } from 'date-fns/locale';
+import { useProfile } from '@/context/ProfileProvider';
 
 // --- Modal Component (No Changes) ---
 function CancelAppointmentModal({ appointment, onClose, onConfirm }) {
@@ -59,7 +59,7 @@ const TABS = [
 
 // --- Appointment Card Component ---
 const AppointmentCard = ({ appointment, onCancelClick }) => {
-    // รวมเวลาทั้งหมด (บริการหลัก + addOns)
+    const { profile } = useProfile();
     const mainDuration = appointment.serviceInfo?.duration || appointment.appointmentInfo?.duration || 0;
     const addOns = appointment.appointmentInfo?.addOns || appointment.addOns || [];
     const addOnsDuration = addOns.reduce((sum, addon) => sum + (addon.duration || 0), 0);
@@ -74,16 +74,13 @@ const AppointmentCard = ({ appointment, onCancelClick }) => {
                 <p className="font-bold text-gray-800">{appointment.customerInfo?.fullName || appointment.customerInfo?.name}</p>
                 <span className={`px-2 py-0.5 text-xs font-semibold rounded ${statusInfo.color}`}>{statusInfo.label}</span>
             </div>
-                        <p className="text-gray-600">
-                                {appointment.serviceInfo?.name}
-                                {/* ราคาบริการหลัก */}
-                                {appointment.serviceInfo?.price ? ` • ${Number(appointment.serviceInfo.price).toLocaleString()} บาท` :
-                                    appointment.appointmentInfo?.price ? ` • ${Number(appointment.appointmentInfo.price).toLocaleString()} บาท` : ''}
-                                {/* นาทีบริการหลัก */}
-                                {appointment.serviceInfo?.duration ? ` • ${appointment.serviceInfo.duration} นาที` :
-                                    appointment.appointmentInfo?.duration ? ` • ${appointment.appointmentInfo.duration} นาที` : ''}
-                        </p>
-            {/* บริการเสริม */}
+            <p className="text-gray-600">
+                {appointment.serviceInfo?.name}
+                {appointment.serviceInfo?.price ? ` • ${Number(appointment.serviceInfo.price).toLocaleString()} ${profile.currencySymbol}` :
+                    appointment.appointmentInfo?.price ? ` • ${Number(appointment.appointmentInfo.price).toLocaleString()} ${profile.currencySymbol}` : ''}
+                {appointment.serviceInfo?.duration ? ` • ${appointment.serviceInfo.duration} นาที` :
+                    appointment.appointmentInfo?.duration ? ` • ${appointment.appointmentInfo.duration} นาที` : ''}
+            </p>
             {addOns.length > 0 && (
                 <div className="mt-1 text-xs text-gray-700 bg-gray-50 rounded p-2">
                     <span className="font-semibold">บริการเสริม:</span>
@@ -91,18 +88,17 @@ const AppointmentCard = ({ appointment, onCancelClick }) => {
                         {addOns.map((addon, idx) => (
                             <li key={idx}>
                                 {addon.name || addon.title || 'ไม่มีชื่อ'}
-                                {addon.price ? ` (${Number(addon.price).toLocaleString()} บาท)` : ''}
+                                {addon.price ? ` (${Number(addon.price).toLocaleString()} ${profile.currencySymbol})` : ''}
                                 {addon.duration ? ` • ${addon.duration} นาที` : ''}
                             </li>
                         ))}
                     </ul>
                 </div>
             )}
-            {/* รวมเวลาทั้งหมด */}
             <div className="text-xs text-blue-700 mt-1">รวมเวลาทั้งหมด: {totalDuration ? `${totalDuration} นาที` : '-'}</div>
             <div className="text-xs text-gray-500 border-t pt-2 mt-2">
                 <p>{appointmentDate ? format(appointmentDate, 'dd MMM yy, HH:mm', { locale: th }) : '-'}</p>
-                <p>ราคา: {(appointment.paymentInfo?.totalPrice || 0).toLocaleString()} บาท</p>
+                <p>ราคา: {(appointment.paymentInfo?.totalPrice || 0).toLocaleString()} {profile.currencySymbol}</p>
             </div>
              <div className="flex justify-end gap-2 mt-1">
                 <button onClick={() => navigateToDetail(router, appointment.id)} className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold py-1 px-2 rounded">รายละเอียด</button>
@@ -123,7 +119,8 @@ export default function AdminDashboardPage() {
     const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'table'
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 12;
-    // Set default startDate to first day of current month, endDate to last day of current month
+    const { profile, loading: profileLoading } = useProfile();
+
     const getMonthRange = () => {
         const now = new Date();
         const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -137,7 +134,7 @@ export default function AdminDashboardPage() {
         ...getMonthRange(),
         search: '',
     });
-    const router = useRouter(); // Correct: Initialize hook at the top level
+    const router = useRouter();
 
     useEffect(() => {
         const appointmentsQuery = query(collection(db, 'appointments'), orderBy('appointmentInfo.dateTime', 'desc'));
@@ -180,19 +177,17 @@ export default function AdminDashboardPage() {
 
     const appointmentsForActiveTab = filteredAppointments.filter(a => a.status === activeTab);
     
-    // Pagination logic
     const totalItems = appointmentsForActiveTab.length;
     const totalPages = Math.ceil(totalItems / itemsPerPage);
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
     const currentAppointments = appointmentsForActiveTab.slice(startIndex, endIndex);
 
-    // Reset to page 1 when changing tabs
     useEffect(() => {
         setCurrentPage(1);
     }, [activeTab, filters]);
     
-    if (loading) return <div className="text-center p-10">Loading Dashboard...</div>;
+    if (loading || profileLoading) return <div className="text-center p-10">Loading Dashboard...</div>;
 
     return (
         <div className="container mx-auto p-4 md:p-8">
@@ -216,7 +211,6 @@ export default function AdminDashboardPage() {
                 </div>
             </header>
 
-            {/* Tabs and View Toggler */}
             <div className="flex flex-col md:flex-row justify-between items-center mb-4 gap-4">
                 <div className="flex flex-wrap gap-2">
                     {TABS.map(tab => (
@@ -232,7 +226,6 @@ export default function AdminDashboardPage() {
                 </div>
             </div>
 
-            {/* Pagination Info */}
             {totalItems > 0 && (
                 <div className="flex justify-between items-center mb-4 text-sm text-gray-600">
                     <div>
@@ -244,7 +237,6 @@ export default function AdminDashboardPage() {
                 </div>
             )}
 
-            {/* Content Display */}
             <div className="mt-4">
                 {viewMode === 'grid' ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -271,45 +263,21 @@ export default function AdminDashboardPage() {
                                             <div className="font-medium text-gray-900">{app.customerInfo?.fullName || app.customerInfo?.name}</div>
                                             <div className="text-sm text-gray-500">{app.customerInfo?.phone}</div>
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{app.serviceInfo?.name}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">
-                                        {/* รวมเวลาทั้งหมด (table view) */}
-                                        <div className="text-xs text-blue-700">รวมเวลาทั้งหมด: {((app.serviceInfo?.duration || app.appointmentInfo?.duration || 0) + ((app.appointmentInfo?.addOns || app.addOns || []).reduce((sum, addon) => sum + (addon.duration || 0), 0)) || '-') + ' นาที'}</div>
-                                                                                                                        {app.serviceInfo?.name}
-                                                                                                                        {/* ราคาบริการหลัก */}
-                                                                                                                        {app.serviceInfo?.price ? ` • ${Number(app.serviceInfo.price).toLocaleString()} บาท` :
-                                                                                                                            app.appointmentInfo?.price ? ` • ${Number(app.appointmentInfo.price).toLocaleString()} บาท` : ''}
-                                                                                                                        {/* นาทีบริการหลัก */}
-                                                                                                                        {app.serviceInfo?.duration ? ` • ${app.serviceInfo.duration} นาที` :
-                                                                                                                            app.appointmentInfo?.duration ? ` • ${app.appointmentInfo.duration} นาที` : ''}
-                                                                                                                        {/* บริการเสริม (table view) */}
-                                                                                                                        {(app.appointmentInfo?.addOns?.length || app.addOns?.length) > 0 && (
-                                                                                                                                <ul className="list-disc ml-4">
-                                                                                                                                        {(app.appointmentInfo?.addOns || app.addOns || []).map((addon, idx) => (
-                                                                                                                                                <li key={idx}>
-                                                                                                                                                        {addon.name || addon.title || 'ไม่มีชื่อ'}
-                                                                                                                                                        {addon.price ? ` (${Number(addon.price).toLocaleString()} บาท)` : ''}
-                                                                                                                                                        {addon.duration ? ` • ${addon.duration} นาที` : ''}
-                                                                                                                                                </li>
-                                                                                                                                        ))}
-                                                                                                                                </ul>
-                                                                                                                        )}
-                                    </td>
-                                    {/* บริการเสริมใน table view */}
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">
-                                        {app.appointmentInfo?.addOns?.length || app.addOns?.length ? (
-                                            <ul className="list-disc ml-4">
-                                                {(app.appointmentInfo?.addOns || app.addOns || []).map((addon, idx) => (
-                                                    <li key={idx}>
-                                                        {addon.name || addon.title || 'ไม่มีชื่อ'}
-                                                        {addon.price ? ` (${Number(addon.price).toLocaleString()} บาท)` : ''}
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        ) : <span className="text-gray-400">-</span>}
-                                    </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">
+                                            <p>{app.serviceInfo?.name}</p>
+                                            {(app.appointmentInfo?.addOns?.length || app.addOns?.length) > 0 && (
+                                                <ul className="list-disc ml-4 text-xs text-gray-600">
+                                                    {(app.appointmentInfo?.addOns || app.addOns || []).map((addon, idx) => (
+                                                        <li key={idx}>
+                                                            {addon.name || addon.title || 'ไม่มีชื่อ'}
+                                                            {addon.price ? ` (${Number(addon.price).toLocaleString()} ${profile.currencySymbol})` : ''}
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            )}
+                                        </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{app.appointmentInfo?.dateTime?.toDate() ? format(app.appointmentInfo.dateTime.toDate(), 'dd MMM yy, HH:mm', { locale: th }) : '-'}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{(app.paymentInfo?.totalPrice || 0).toLocaleString()}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{(app.paymentInfo?.totalPrice || 0).toLocaleString()} {profile.currencySymbol}</td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
                                              <button onClick={() => navigateToDetail(router, app.id)} className="text-indigo-600 hover:text-indigo-900">ดูรายละเอียด</button>
                                         </td>
@@ -324,7 +292,6 @@ export default function AdminDashboardPage() {
                 )}
             </div>
 
-            {/* Pagination Controls */}
             {totalPages > 1 && (
                 <div className="flex justify-center items-center mt-6 space-x-2">
                     <button
@@ -335,16 +302,13 @@ export default function AdminDashboardPage() {
                         ก่อนหน้า
                     </button>
                     
-                    {/* Page Numbers */}
                     <div className="flex space-x-1">
                         {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => {
-                            // Show first page, last page, current page, and 2 pages around current
                             const showPage = pageNum === 1 || 
                                            pageNum === totalPages || 
                                            Math.abs(pageNum - currentPage) <= 2;
                             
                             if (!showPage) {
-                                // Show ellipsis for gaps
                                 if (pageNum === currentPage - 3 || pageNum === currentPage + 3) {
                                     return <span key={pageNum} className="px-2 py-1 text-gray-400">...</span>;
                                 }
@@ -355,7 +319,7 @@ export default function AdminDashboardPage() {
                                 <button
                                     key={pageNum}
                                     onClick={() => setCurrentPage(pageNum)}
-                                    className={`px-3 py-2 rounded-md ${
+                                    className={`px-3 py-2 rounded-md ${ 
                                         currentPage === pageNum
                                             ? 'bg-slate-800 text-white'
                                             : 'bg-gray-200 text-gray-700 hover:bg-gray-300'

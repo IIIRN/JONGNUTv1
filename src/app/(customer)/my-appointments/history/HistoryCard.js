@@ -2,6 +2,7 @@
 
 import { format } from 'date-fns';
 import { th } from 'date-fns/locale';
+import { useProfile } from '@/context/ProfileProvider';
 
 const statusConfig = {
     'completed': { text: 'เสร็จสมบูรณ์', color: 'bg-green-100 text-green-800' },
@@ -9,6 +10,7 @@ const statusConfig = {
 };
 
 const HistoryCard = ({ appointment, onBookAgain }) => {
+    const { profile } = useProfile();
     const appointmentDateTime = appointment.appointmentInfo.dateTime.toDate();
     const statusInfo = statusConfig[appointment.status] || { text: appointment.status, color: 'bg-gray-100 text-gray-800' };
 
@@ -22,7 +24,7 @@ const HistoryCard = ({ appointment, onBookAgain }) => {
                             <p className="text-sm text-gray-500">
                                 {format(appointmentDateTime, 'dd MMM yyyy', { locale: th })}
                             </p>
-                             <p className="font-bold text-md text-gray-400">{appointment.paymentInfo?.totalPrice?.toLocaleString() || 'N/A'} บาท</p>
+                             <p className="font-bold text-md text-gray-400">{appointment.paymentInfo?.totalPrice?.toLocaleString() || 'N/A'} {profile.currencySymbol}</p>
                         </div>
                         <span className={`px-3 py-1 text-xs font-semibold rounded-full ${statusInfo.color}`}>
                             {statusInfo.text}

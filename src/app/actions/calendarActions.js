@@ -2,6 +2,7 @@
 
 import { google } from 'googleapis';
 import { db } from '@/app/lib/firebaseAdmin';
+import { getShopProfile } from './settingsActions';
 
 // Function to get Google API authentication
 const getGoogleAuth = () => {
@@ -31,21 +32,19 @@ export async function createOrUpdateCalendarEvent(appointmentId, appointmentData
             return { success: true, message: "Calendar sync disabled." };
         }
         
-        // --- FIX: START ---
-        // ใช้ dateTime ที่สร้างจาก client ซึ่งมี timezone ที่ถูกต้องแล้ว
         const startTime = new Date(appointmentData.appointmentInfo.dateTime);
-        
-        // ใช้ total duration ที่รวมบริการเสริมแล้วจาก appointmentInfo
         const duration = Number(appointmentData.appointmentInfo.duration);
         if (isNaN(duration)) {
              throw new Error(`Invalid duration value for service: ${appointmentData.serviceInfo.name}`);
         }
         const endTime = new Date(startTime.getTime() + duration * 60000);
-        // --- FIX: END ---
+
+        const { profile } = await getShopProfile();
+        const currencySymbol = profile.currencySymbol || 'บาท';
 
         const event = {
             summary: `${appointmentData.serviceInfo.name} - ${appointmentData.customerInfo.fullName}`,
-            description: `ลูกค้า: ${appointmentData.customerInfo.fullName}\nเบอร์โทร: ${appointmentData.customerInfo.phone}\nบริการ: ${appointmentData.serviceInfo.name}\nราคา: ${appointmentData.paymentInfo.totalPrice} บาท\nสถานะ: ${appointmentData.status}`,
+            description: `ลูกค้า: ${appointmentData.customerInfo.fullName}\nเบอร์โทร: ${appointmentData.customerInfo.phone}\nบริการ: ${appointmentData.serviceInfo.name}\nราคา: ${appointmentData.paymentInfo.totalPrice} ${currencySymbol}\nสถานะ: ${appointmentData.status}`,
             start: {
                 dateTime: startTime.toISOString(),
                 timeZone: 'Asia/Bangkok',
@@ -114,7 +113,6 @@ export async function deleteCalendarEvent(eventId) {
         console.log(`Event with ID: ${eventId} deleted successfully.`);
         return { success: true };
     } catch (error) {
-        // ถ้า Event ถูกลบไปแล้วใน Google Calendar ให้ถือว่าสำเร็จ
         if (error.code === 410 || error.message.includes('Not Found')) {
             console.log(`Event with ID: ${eventId} was already deleted or not found. Continuing.`);
             return { success: true, message: "Event already deleted." };

@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { db } from '@/app/lib/firebase';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { useToast } from '@/app/components/Toast';
+import { useProfile } from '@/context/ProfileProvider';
 
 export default function EditServicePage() {
   const [formData, setFormData] = useState(null);
@@ -12,6 +13,7 @@ export default function EditServicePage() {
   const router = useRouter();
   const { id } = useParams();
   const { showToast } = useToast();
+  const { profile } = useProfile();
 
   useEffect(() => {
     if (!id) return;
@@ -104,7 +106,7 @@ export default function EditServicePage() {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700">ราคา (บาท)</label>
+            <label className="block text-sm font-medium text-gray-700">ราคา ({profile.currencySymbol})</label>
             <input type="number" name="price" value={formData.price} onChange={handleChange} placeholder="200" required className="w-full mt-1 p-2 border rounded-md" />
           </div>
           <div>
@@ -120,7 +122,6 @@ export default function EditServicePage() {
           <label className="block text-sm font-medium text-gray-700">รายละเอียดเพิ่มเติม</label>
           <textarea name="details" value={formData.details} onChange={handleChange} rows="3" placeholder="รายละเอียดบริการ เช่น ใช้ผลิตภัณฑ์อะไร ฯลฯ" className="w-full mt-1 p-2 border rounded-md"></textarea>
         </div>
-        {/* Add-on services section */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">บริการเสริม</label>
           {(formData.addOnServices || []).map((addOn, idx) => (

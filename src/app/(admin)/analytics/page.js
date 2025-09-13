@@ -5,6 +5,7 @@ import { db } from '@/app/lib/firebase';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, parseISO } from 'date-fns';
+import { useProfile } from '@/context/ProfileProvider';
 
 // --- Helper Components ---
 
@@ -35,6 +36,7 @@ export default function AnalyticsPage() {
     const [reviews, setReviews] = useState([]);
     const [services, setServices] = useState([]);
     const [loading, setLoading] = useState(true);
+    const { profile, loading: profileLoading } = useProfile();
     const [dateRange, setDateRange] = useState({
         start: startOfMonth(new Date()),
         end: endOfMonth(new Date()),
@@ -78,13 +80,11 @@ export default function AnalyticsPage() {
     const analyticsData = useMemo(() => {
         if (loading) return null;
 
-        // Filter appointments by date range
         const filteredAppointments = appointments.filter(a => {
             const date = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
             return date >= dateRange.start && date <= dateRange.end;
         });
 
-        // 1. Appointment Analytics
         const appointmentsByDay = filteredAppointments.reduce((acc, a) => {
             const day = format(a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt), 'yyyy-MM-dd');
             acc[day] = (acc[day] || 0) + 1;
@@ -98,7 +98,6 @@ export default function AnalyticsPage() {
             };
         });
 
-        // 2. Revenue Analytics
         const paidAppointments = filteredAppointments.filter(a => a.paymentInfo && a.paymentInfo.paymentStatus === 'paid');
         const revenueByDay = paidAppointments.reduce((acc, a) => {
             const paidAt = a.paymentInfo?.paidAt?.toDate ? a.paymentInfo.paidAt.toDate() : new Date(a.paymentInfo?.paidAt);
@@ -115,7 +114,6 @@ export default function AnalyticsPage() {
         });
         const totalRevenue = paidAppointments.reduce((sum, a) => sum + (a.paymentInfo?.totalPrice || 0), 0);
 
-        // 3. Service Popularity
         const serviceTypeData = filteredAppointments.reduce((acc, a) => {
             const type = a.serviceInfo?.name || 'Unknown';
             acc[type] = (acc[type] || 0) + 1;
@@ -126,7 +124,6 @@ export default function AnalyticsPage() {
             value: serviceTypeData[key]
         }));
 
-        // 4. Review Analytics
         const averageRating = reviews.length > 0
             ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(2)
             : 'N/A';
@@ -142,13 +139,10 @@ export default function AnalyticsPage() {
         };
     }, [loading, appointments, reviews, dateRange]);
     
-    // [!code focus start]
-    // Function สำหรับ Export ข้อมูลเป็น CSV ที่ปรับปรุงแล้ว
     const exportToCSV = () => {
-        // Header สำหรับ appointments
         const headers = ['Appointment ID', 'Customer Name', 'Service', 'Date/Time', 'Total Price', 'Payment Status', 'Status', 'Note'];
         const rows = appointments.map(a => {
-            const escapeCSV = (str) => `"${String(str || '').replace(/"/g, '""')}"`;
+            const escapeCSV = (str) => `"${String(str || '').replace(/"/g, '""')}"`
             return [
                 a.id,
                 escapeCSV(a.customerInfo?.fullName || a.customerInfo?.name || ''),
@@ -174,14 +168,13 @@ export default function AnalyticsPage() {
             document.body.removeChild(link);
         }
     };
-    // [!code focus end]
 
     const handleDateChange = (e) => {
         const { name, value } = e.target;
         setDateRange(prev => ({...prev, [name]: parseISO(value) }));
     };
 
-    if (loading) return <div className="text-center mt-20">กำลังโหลดและวิเคราะห์ข้อมูล...</div>;
+    if (loading || profileLoading) return <div className="text-center mt-20">กำลังโหลดและวิเคราะห์ข้อมูล...</div>;
     if (!analyticsData) return <div className="text-center mt-20">ไม่มีข้อมูลเพียงพอสำหรับการวิเคราะห์</div>;
 
     const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
@@ -207,7 +200,7 @@ export default function AnalyticsPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                  <AnalyticsCard title="ยอดนัดหมาย" value={analyticsData.totalAppointments.toLocaleString()} subtext={`ในช่วงเวลาที่เลือก`} />
-                <AnalyticsCard title="รายได้รวม" value={`${analyticsData.totalRevenue.toLocaleString()}`} subtext="บาท" />
+                <AnalyticsCard title="รายได้รวม" value={`${analyticsData.totalRevenue.toLocaleString()}`} subtext={profile.currencySymbol} />
                 <AnalyticsCard title="คะแนนรีวิวเฉลี่ย" value={`${analyticsData.averageRating} ★`} subtext={`จาก ${analyticsData.reviewCount} รีวิว`} />
             </div>
 
@@ -223,7 +216,7 @@ export default function AnalyticsPage() {
                     </BarChart>
                 </ChartContainer>
 
-                <ChartContainer title="รายได้รายวัน (บาท)">
+                <ChartContainer title={`รายได้รายวัน (${profile.currencySymbol})`}>
                     <LineChart data={analyticsData.revenueChartData}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="name" />

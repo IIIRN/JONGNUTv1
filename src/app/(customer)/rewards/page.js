@@ -3,13 +3,14 @@
 import { useState, useEffect } from 'react';
 import { useLiffContext } from '@/context/LiffProvider';
 import { db } from '@/app/lib/firebase';
-// --- CORRECTED IMPORT ---
 import { collection, doc, getDocs, onSnapshot, query, orderBy } from 'firebase/firestore'; 
 import { redeemReward } from '@/app/actions/rewardActions';
 import { Notification } from '@/app/components/common/NotificationComponent';
 import CustomerHeader from '@/app/components/CustomerHeader';
+import { useProfile } from '@/context/ProfileProvider';
 
 const RewardCard = ({ reward, userPoints, onRedeem, isRedeeming }) => {
+    const { profile } = useProfile();
     const canRedeem = userPoints >= reward.pointsRequired;
     return (
         <div className="bg-white p-4 rounded-lg shadow-md flex justify-between items-center">
@@ -17,7 +18,7 @@ const RewardCard = ({ reward, userPoints, onRedeem, isRedeeming }) => {
                 <h3 className="font-bold text-indigo-600">{reward.name}</h3>
                 <p className="text-sm text-gray-600">{reward.description}</p>
                 <div className="text-sm text-purple-600 font-medium mt-1">
-                    {reward.discountType === 'percentage' ? `ส่วนลด ${reward.discountValue}%` : `ส่วนลด ${reward.discountValue} บาท`}
+                    {reward.discountType === 'percentage' ? `ส่วนลด ${reward.discountValue}%` : `ส่วนลด ${reward.discountValue} ${profile.currencySymbol}`}
                 </div>
                 <p className="text-sm text-gray-500 mt-1">ใช้ {reward.pointsRequired} คะแนน</p>
             </div>
@@ -33,7 +34,7 @@ const RewardCard = ({ reward, userPoints, onRedeem, isRedeeming }) => {
 };
 
 export default function RewardsPage() {
-    const { profile, loading: liffLoading } = useLiffContext();
+    const { profile: liffProfile, loading: liffLoading } = useLiffContext();
     const [customer, setCustomer] = useState(null);
     const [rewards, setRewards] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -42,20 +43,20 @@ export default function RewardsPage() {
 
     useEffect(() => {
         let unsubCustomer = () => {};
-        if (profile?.userId) {
-            const customerRef = doc(db, "customers", profile.userId);
+        if (liffProfile?.userId) {
+            const customerRef = doc(db, "customers", liffProfile.userId);
             unsubCustomer = onSnapshot(customerRef, (doc) => {
                 if (doc.exists()) setCustomer(doc.data());
             });
         }
         return () => unsubCustomer();
-    }, [profile]);
+    }, [liffProfile]);
 
     useEffect(() => {
         const fetchRewards = async () => {
             setLoading(true);
             const q = query(collection(db, 'rewards'), orderBy('pointsRequired'));
-            const snapshot = await getDocs(q); // This line will now work
+            const snapshot = await getDocs(q);
             setRewards(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
             setLoading(false);
         };
@@ -66,7 +67,7 @@ export default function RewardsPage() {
         if (!window.confirm("คุณต้องการใช้คะแนนเพื่อแลกของรางวัลนี้ใช่หรือไม่?")) return;
         
         setIsRedeeming(true);
-        const result = await redeemReward(profile.userId, rewardId);
+        const result = await redeemReward(liffProfile.userId, rewardId);
         if (result.success) {
             setNotification({ show: true, title: "แลกสำเร็จ!", message: "คุณได้รับคูปองใหม่แล้ว", type: 'success' });
         } else {

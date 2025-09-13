@@ -9,6 +9,7 @@ import { format } from 'date-fns';
 import { th } from 'date-fns/locale';
 import { ConfirmationModal } from '@/app/components/common/NotificationComponent';
 import { useToast } from '@/app/components/Toast';
+import { useProfile } from '@/context/ProfileProvider';
 
 // --- Helper Components ---
 const StatusButton = ({ status }) => {
@@ -52,6 +53,7 @@ export default function ServicesListPage() {
   const [serviceToDelete, setServiceToDelete] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const { showToast } = useToast();
+  const { profile, loading: profileLoading } = useProfile();
 
   const handleDeleteService = (service) => {
     setServiceToDelete(service);
@@ -93,7 +95,7 @@ export default function ServicesListPage() {
     fetchServices();
   }, []);
 
-  if (loading) return <div className="text-center mt-20">กำลังโหลดข้อมูลบริการ...</div>;
+  if (loading || profileLoading) return <div className="text-center mt-20">กำลังโหลดข้อมูลบริการ...</div>;
 
   return (
     <div className="container mx-auto p-4 md:p-8">
@@ -124,7 +126,7 @@ export default function ServicesListPage() {
                               <p className="font-bold text-lg text-gray-800">{service.serviceName || service.name}</p>
                               <p className="text-xs text-gray-400">{service.category}</p>
                           </div>
-                          <div className="text-sm font-semibold bg-pink-500 text-white px-3 py-1 rounded">{formatPrice(service.price)} บาท</div>
+                          <div className="text-sm font-semibold bg-pink-500 text-white px-3 py-1 rounded">{formatPrice(service.price)} {profile.currencySymbol}</div>
                       </div>
                       <div className="text-sm text-gray-600 mt-2 border-t pt-2 space-y-1">
                           <p><strong>ระยะเวลา:</strong> {service.duration ?? '-'} นาที</p>
@@ -136,7 +138,7 @@ export default function ServicesListPage() {
                                 {service.addOnServices.map((a, i) => (
                                   <li key={i} className="flex justify-between">
                                     <span>{a.name || a.title || a.label || 'ไม่มีชื่อ'}</span>
-                                    <span className="font-medium">{formatPrice(a.price)} บาท</span>
+                                    <span className="font-medium">{formatPrice(a.price)} {profile.currencySymbol}</span>
                                   </li>
                                 ))}
                               </ul>

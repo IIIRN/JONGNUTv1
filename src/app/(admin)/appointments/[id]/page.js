@@ -12,9 +12,10 @@ import { useToast } from '@/app/components/Toast';
 import { format } from 'date-fns';
 import { th } from 'date-fns/locale';
 import Image from 'next/image';
+import { useProfile } from '@/context/ProfileProvider';
 
 // --- Modal Component for editing payment info ---
-function EditPaymentModal({ open, onClose, onSave, defaultAmount, defaultMethod }) {
+function EditPaymentModal({ open, onClose, onSave, defaultAmount, defaultMethod, currencySymbol }) {
   const [amount, setAmount] = useState(defaultAmount || '');
   const [method, setMethod] = useState(defaultMethod || 'เงินสด');
   const [saving, setSaving] = useState(false);
@@ -24,7 +25,7 @@ function EditPaymentModal({ open, onClose, onSave, defaultAmount, defaultMethod 
       <div className="bg-white rounded-lg p-6 w-full max-w-sm">
         <h2 className="text-lg font-bold mb-4">ยืนยันการชำระเงิน</h2>
         <div className="mb-3">
-          <label className="block text-sm font-medium mb-1">ยอดชำระ (บาท)</label>
+          <label className="block text-sm font-medium mb-1">ยอดชำระ ({currencySymbol})</label>
           <input type="number" className="w-full border rounded px-2 py-1" value={amount} onChange={e => setAmount(e.target.value)} min="0" />
         </div>
         <div className="mb-3">
@@ -97,6 +98,7 @@ export default function AdminAppointmentDetail() {
   const [isSendingInvoice, setIsSendingInvoice] = useState(false);
   const [deleted, setDeleted] = useState(false);
   const { showToast } = useToast();
+  const { profile, loading: profileLoading } = useProfile();
 
   const handleSavePayment = async (amount, method) => {
     if (!appointment?.id) return;
@@ -106,7 +108,7 @@ export default function AdminAppointmentDetail() {
         showToast('อัพเดตข้อมูลการชำระเงินสำเร็จ', 'success');
         setAppointment(prev => ({
           ...prev,
-          status: 'confirmed', // Update status to confirmed
+          status: 'confirmed',
           paymentInfo: {
             ...prev.paymentInfo,
             amountPaid: Number(amount),
@@ -159,7 +161,7 @@ export default function AdminAppointmentDetail() {
       setDeleted(true);
       setTimeout(() => {
         router.push('/dashboard');
-      }, 1500); // รอ 1.5 วินาที
+      }, 1500);
     } catch (err) {
       showToast('ลบการจองไม่สำเร็จ', 'error');
     } finally {
@@ -214,7 +216,7 @@ export default function AdminAppointmentDetail() {
   }, [id, router, deleted]);
 
   if (deleted) return <div className="text-center mt-20">ข้อมูลการนัดหมายถูกลบแล้ว กำลังกลับไปหน้าหลัก...</div>;
-  if (loading) return <div className="text-center mt-20">กำลังโหลดข้อมูล...</div>;
+  if (loading || profileLoading) return <div className="text-center mt-20">กำลังโหลดข้อมูล...</div>;
   if (!appointment) return <div className="text-center mt-20">ไม่พบข้อมูลการนัดหมาย</div>;
 
   const dateTime = appointment.appointmentInfo?.dateTime && typeof appointment.appointmentInfo.dateTime.toDate === 'function'
@@ -331,7 +333,7 @@ export default function AdminAppointmentDetail() {
                 {(appointment.appointmentInfo?.addOns || appointment.addOns || []).map((a, idx) => (
                   <li key={idx} className="flex justify-between">
                     <span>{a.name || a.title || 'ไม่มีชื่อ'}</span>
-                    <span className="font-medium">{formatPrice(a.price)} บาท</span>
+                    <span className="font-medium">{formatPrice(a.price)} {profile.currencySymbol}</span>
                   </li>
                 ))}
               </ul>
@@ -344,27 +346,27 @@ export default function AdminAppointmentDetail() {
           <h2 className="text-xl font-bold mb-2">สรุปการชำระเงิน</h2>
           <InfoRow label="ราคาบริการ" value={
             appointment.paymentInfo?.originalPrice
-              ? `${formatPrice(appointment.paymentInfo.originalPrice)} บาท`
+              ? `${formatPrice(appointment.paymentInfo.originalPrice)} ${profile.currencySymbol}`
               : appointment.paymentInfo?.basePrice
-                ? `${formatPrice(appointment.paymentInfo.basePrice)} บาท`
+                ? `${formatPrice(appointment.paymentInfo.basePrice)} ${profile.currencySymbol}`
                 : appointment.serviceInfo?.price
-                  ? `${formatPrice(appointment.serviceInfo.price)} บาท`
+                  ? `${formatPrice(appointment.serviceInfo.price)} ${profile.currencySymbol}`
                   : appointment.appointmentInfo?.price
-                    ? `${formatPrice(appointment.appointmentInfo.price)} บาท`
+                    ? `${formatPrice(appointment.appointmentInfo.price)} ${profile.currencySymbol}`
                     : appointment.price
-                      ? `${formatPrice(appointment.price)} บาท`
+                      ? `${formatPrice(appointment.price)} ${profile.currencySymbol}`
                       : '-'
           } />
           <InfoRow label="รวมบริการเสริม" value={
             appointment.paymentInfo?.addOnsTotal
-              ? `${formatPrice(appointment.paymentInfo.addOnsTotal)} บาท`
+              ? `${formatPrice(appointment.paymentInfo.addOnsTotal)} ${profile.currencySymbol}`
               : appointment.appointmentInfo?.addOns
-                ? `${formatPrice((appointment.appointmentInfo.addOns||[]).reduce((s,a)=>s+Number(a.price||0),0))} บาท`
+                ? `${formatPrice((appointment.appointmentInfo.addOns||[]).reduce((s,a)=>s+Number(a.price||0),0))} ${profile.currencySymbol}`
                 : '-'
           } />
           <InfoRow label="ยอดรวม" value={
             appointment.paymentInfo?.totalPrice
-              ? `${formatPrice(appointment.paymentInfo.totalPrice)} บาท`
+              ? `${formatPrice(appointment.paymentInfo.totalPrice)} ${profile.currencySymbol}`
               : (
                   (appointment.paymentInfo?.originalPrice || appointment.paymentInfo?.basePrice || appointment.serviceInfo?.price || appointment.appointmentInfo?.price || appointment.price || 0)
                   + (appointment.paymentInfo?.addOnsTotal || (appointment.appointmentInfo?.addOns||[]).reduce((s,a)=>s+Number(a.price||0),0))
@@ -374,7 +376,7 @@ export default function AdminAppointmentDetail() {
                     (appointment.paymentInfo?.originalPrice || appointment.paymentInfo?.basePrice || appointment.serviceInfo?.price || appointment.appointmentInfo?.price || appointment.price || 0)
                     + (appointment.paymentInfo?.addOnsTotal || (appointment.appointmentInfo?.addOns||[]).reduce((s,a)=>s+Number(a.price||0),0))
                     - (appointment.paymentInfo?.discount || 0)
-                  )} บาท`
+                  )} ${profile.currencySymbol}`
                 : '-'
           } />
           <InfoRow label="ช่องทางชำระ" value={appointment.paymentInfo?.paymentMethod || '-'} />
@@ -385,7 +387,6 @@ export default function AdminAppointmentDetail() {
             : appointment.paymentInfo?.paymentStatus === 'pending' ? 'รอดำเนินการ'
             : appointment.paymentInfo?.paymentStatus || '-'
           } />
-          {/* [!code focus start] */}
           <div className="border-t mt-3 pt-3 space-y-2">
             <button
                 onClick={handleSendInvoice}
@@ -409,9 +410,9 @@ export default function AdminAppointmentDetail() {
               onSave={handleSavePayment}
               defaultAmount={appointment.paymentInfo?.amountPaid || appointment.paymentInfo?.totalPrice || ''}
               defaultMethod={appointment.paymentInfo?.paymentMethod || 'เงินสด'}
+              currencySymbol={profile.currencySymbol}
             />
           </div>
-          {/* [!code focus end] */}
         </div>
       </div>
     </div>
