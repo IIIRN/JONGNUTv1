@@ -1,12 +1,26 @@
 "use server";
 
 import { db } from '@/app/lib/firebaseAdmin';
-import { FieldValue, Timestamp } from 'firebase-admin/firestore';
+import { FieldValue } from 'firebase-admin/firestore';
 import { revalidatePath } from 'next/cache';
-import { sendBookingNotification } from './lineActions';
-import { sendServiceCompletedFlexMessage, sendReviewFlexMessage } from './lineFlexActions';
+import { 
+    sendBookingNotification
+    // sendCancellationNotification has been removed
+} from './lineActions';
+import { 
+    sendServiceCompletedFlexMessage, 
+    sendReviewFlexMessage,
+    sendPaymentConfirmationFlexMessage
+} from './lineFlexActions';
 import { awardPointsForPurchase, awardPointsForVisit, awardPointsByPhone } from './pointActions'; 
 import { findOrCreateCustomer } from './customerActions'; 
+
+// --- Helper to get notification settings ---
+const getNotificationSettings = async () => {
+    const settingsRef = db.collection('settings').doc('notifications');
+    const settingsDoc = await settingsRef.get();
+    return settingsDoc.exists ? settingsDoc.data() : {};
+};
 
 // --- Registration and Status Updates ---
 
@@ -38,14 +52,21 @@ export async function updateAppointmentStatus(appointmentId, newStatus, employee
     if (!appointmentId || !newStatus || !employeeId) {
         return { success: false, error: 'ข้อมูลไม่ครบถ้วน' };
     }
+
     const appointmentRef = db.collection('appointments').doc(appointmentId);
 
     try {
-        const appointmentDoc = await appointmentRef.get();
+        const [appointmentDoc, settings] = await Promise.all([
+            appointmentRef.get(),
+            getNotificationSettings()
+        ]);
+
         if (!appointmentDoc.exists) throw new Error("ไม่พบข้อมูลนัดหมาย");
         
         const appointmentData = appointmentDoc.data();
-        
+        const notificationsEnabled = settings.allNotifications?.enabled;
+        const customerNotificationsEnabled = notificationsEnabled && settings.customerNotifications?.enabled;
+
         const updateData = {
             status: newStatus,
             updatedAt: FieldValue.serverTimestamp(),
@@ -56,101 +77,48 @@ export async function updateAppointmentStatus(appointmentId, newStatus, employee
             updateData['timeline.checkedInBy'] = employeeId;
         } else if (newStatus === 'completed') {
             updateData['timeline.completedAt'] = FieldValue.serverTimestamp();
+        } else if (newStatus === 'cancelled') {
+            updateData['timeline.cancelledAt'] = FieldValue.serverTimestamp();
+            updateData['timeline.cancelledBy'] = `employee:${employeeId}`;
+            updateData['timeline.cancellationReason'] = 'Cancelled by employee';
         }
 
         await appointmentRef.update(updateData);
 
-        // Create or update customer record when status changes  
-        if (appointmentData.customerInfo && (appointmentData.userId || appointmentData.customerInfo.phone)) {
-            try {
-                const customerResult = await findOrCreateCustomer(
-                    appointmentData.customerInfo, 
-                    appointmentData.userId
-                );
-                if (customerResult.success) {
-                    // ...existing code...
-                    if (customerResult.mergedPoints > 0) {
-                        // ...existing code...
-                    }
-                } else {
-                    console.error(`Failed to create customer record by employee for appointment ${appointmentId}:`, customerResult.error);
+        // --- Conditional Notifications ---
+        if (appointmentData.userId) {
+            const notificationPayload = {
+                ...appointmentData,
+                id: appointmentId,
+                appointmentId: appointmentId,
+            };
+
+            // Notification for cancellation has been removed as per user request.
+
+            if (newStatus === 'completed') {
+                const totalPrice = appointmentData.paymentInfo?.totalPrice || 0;
+                let totalPointsAwarded = 0;
+                if (totalPrice > 0) {
+                    const purchasePointsResult = await awardPointsForPurchase(appointmentData.userId, totalPrice);
+                    if (purchasePointsResult.success) totalPointsAwarded += purchasePointsResult.pointsAwarded || 0;
                 }
-            } catch (customerError) {
-                console.error(`Error creating customer record by employee for appointment ${appointmentId}:`, customerError);
+                const visitPointsResult = await awardPointsForVisit(appointmentData.userId);
+                if (visitPointsResult.success) totalPointsAwarded += visitPointsResult.pointsAwarded || 0;
+
+                notificationPayload.totalPointsAwarded = totalPointsAwarded;
+
+                if (customerNotificationsEnabled && settings.customerNotifications?.serviceCompleted) {
+                    await sendServiceCompletedFlexMessage(appointmentData.userId, notificationPayload);
+                }
+
+                if (customerNotificationsEnabled && settings.customerNotifications?.reviewRequest) {
+                    await sendReviewFlexMessage(appointmentData.userId, notificationPayload);
+                }
             }
         }
 
-        // Award points when status changes to completed
-        if (newStatus === 'completed') {
-            const totalPrice = appointmentData.paymentInfo?.totalPrice || appointmentData.paymentInfo?.amountPaid || 0;
-            let totalPointsAwarded = 0;
-
-            // Check if customer has userId (LINE ID) for points award
-            if (appointmentData.userId) {
-                // Award points for purchase amount
-                if (totalPrice > 0) {
-                    const purchasePointsResult = await awardPointsForPurchase(appointmentData.userId, totalPrice);
-                    if (purchasePointsResult.success) {
-                        totalPointsAwarded += purchasePointsResult.pointsAwarded || 0;
-                    }
-                }
-
-                // Award points for visit
-                const visitPointsResult = await awardPointsForVisit(appointmentData.userId);
-                if (visitPointsResult.success) {
-                    totalPointsAwarded += visitPointsResult.pointsAwarded || 0;
-                }
-
-                // Send service completed Flex message to customer
-                try {
-                    const serviceName = appointmentData.serviceInfo?.name || 'บริการเสริมสวย';
-                    await sendServiceCompletedFlexMessage(appointmentData.userId, {
-                        serviceName: serviceName,
-                        appointmentId: appointmentId,
-                        id: appointmentId,
-                        totalPointsAwarded: totalPointsAwarded
-                    });
-                    // ...existing code...
-                } catch (notificationError) {
-                    console.error(`Failed to send service completed Flex message to customer ${appointmentData.userId}:`, notificationError);
-                }
-
-                // Send review request Flex message if enabled in settings
-                try {
-                    // Check if review requests are enabled in settings
-                    const settingsRef = db.collection('settings').doc('general');
-                    const settingsDoc = await settingsRef.get();
-                    const settings = settingsDoc.exists ? settingsDoc.data() : {};
-                    const reviewEnabled = settings.enableReviewRequests !== false; // Default to true if not set
-
-                    if (reviewEnabled) {
-                        await sendReviewFlexMessage(appointmentData.userId, {
-                            id: appointmentId,
-                            appointmentId: appointmentId,
-                            ...appointmentData
-                        });
-                        // ...existing code...
-                    } else {
-                        // ...existing code...
-                    }
-                } catch (reviewError) {
-                    console.error(`Failed to send review Flex message to customer ${appointmentData.userId}:`, reviewError);
-                }
-            } else if (appointmentData.customerInfo?.phone) {
-                // Customer doesn't have LINE ID but has phone number - use alternative point system
-                const phonePointsResult = await awardPointsByPhone(
-                    appointmentData.customerInfo.phone, 
-                    totalPrice, 
-                    appointmentId
-                );
-                if (phonePointsResult.success) {
-                    totalPointsAwarded = phonePointsResult.pointsAwarded || 0;
-                    // ...existing code...
-                }
-            } else {
-                // Customer has neither LINE ID nor phone number - log for admin awareness
-                // ...existing code...
-            }
+        if (appointmentData.customerInfo && (appointmentData.userId || appointmentData.customerInfo.phone)) {
+            await findOrCreateCustomer(appointmentData.customerInfo, appointmentData.userId);
         }
 
         return { success: true };
@@ -160,10 +128,6 @@ export async function updateAppointmentStatus(appointmentId, newStatus, employee
     }
 }
 
-
-/**
- * NEW FUNCTION: Updates an appointment's payment status by an employee
- */
 export async function updatePaymentStatusByEmployee(appointmentId, employeeId) {
     if (!appointmentId || !employeeId) {
         return { success: false, error: 'ข้อมูลไม่ครบถ้วน' };
@@ -172,52 +136,62 @@ export async function updatePaymentStatusByEmployee(appointmentId, employeeId) {
     const appointmentRef = db.collection('appointments').doc(appointmentId);
     
     try {
-        const appointmentDoc = await appointmentRef.get();
+        const [appointmentDoc, settings] = await Promise.all([
+            appointmentRef.get(),
+            getNotificationSettings()
+        ]);
+
         if (!appointmentDoc.exists) {
             throw new Error("ไม่พบข้อมูลนัดหมาย!");
         }
         const appointmentData = appointmentDoc.data();
 
-        // Update payment status in Firestore
         await appointmentRef.update({
             'paymentInfo.paymentStatus': 'paid',
             'paymentInfo.paidAt': FieldValue.serverTimestamp(),
-            'paymentInfo.paymentReceivedBy': employeeId, // Track who received the payment
+            'paymentInfo.paymentReceivedBy': employeeId,
             updatedAt: FieldValue.serverTimestamp()
         });
 
-        // Award points for purchase and visit
         const userId = appointmentData.userId;
         const totalPrice = appointmentData.paymentInfo?.totalPrice || 0;
-        
         let totalPointsAwarded = 0;
 
-        // Award points for purchase amount
-        if (totalPrice > 0) {
-            const purchasePointsResult = await awardPointsForPurchase(userId, totalPrice);
-            if (purchasePointsResult.success) {
-                totalPointsAwarded += purchasePointsResult.pointsAwarded || 0;
+        if (userId) {
+            if (totalPrice > 0) {
+                const purchasePointsResult = await awardPointsForPurchase(userId, totalPrice);
+                if (purchasePointsResult.success) totalPointsAwarded += purchasePointsResult.pointsAwarded || 0;
+            }
+            const visitPointsResult = await awardPointsForVisit(userId);
+            if (visitPointsResult.success) totalPointsAwarded += visitPointsResult.pointsAwarded || 0;
+        }
+
+        // --- Conditional Admin Notification ---
+        const adminNotificationsEnabled = settings.allNotifications?.enabled && settings.adminNotifications?.enabled;
+        if (adminNotificationsEnabled && settings.adminNotifications?.paymentReceived) {
+            try {
+                const notificationData = {
+                    customerName: appointmentData.customerInfo?.fullName || 'ลูกค้า',
+                    serviceName: appointmentData.serviceInfo?.name || 'บริการ',
+                    appointmentDate: appointmentData.date,
+                    appointmentTime: appointmentData.time,
+                    totalPrice: appointmentData.paymentInfo.totalPrice
+                };
+                await sendBookingNotification(notificationData, 'paymentReceived');
+            } catch (notificationError) {
+                console.error('Error sending payment notification to admin:', notificationError);
             }
         }
 
-        // Award points for visit
-        const visitPointsResult = await awardPointsForVisit(userId);
-        if (visitPointsResult.success) {
-            totalPointsAwarded += visitPointsResult.pointsAwarded || 0;
-        }
-
-        // Send notification to admins
-        try {
-            const notificationData = {
-                customerName: appointmentData.customerInfo?.fullName || 'ลูกค้า',
-                serviceName: appointmentData.serviceInfo?.name || 'บริการ',
-                appointmentDate: appointmentData.date,
-                appointmentTime: appointmentData.time,
-                totalPrice: appointmentData.paymentInfo.totalPrice
-            };
-            await sendBookingNotification(notificationData, 'paymentReceived');
-        } catch (notificationError) {
-            console.error('Error sending payment notification from employee action:', notificationError);
+        // --- Conditional Customer Notification for Payment ---
+        const customerNotificationsEnabled = settings.allNotifications?.enabled && settings.customerNotifications?.enabled;
+        if (customerNotificationsEnabled && settings.customerNotifications?.paymentInvoice && userId) {
+            try {
+                const payload = { ...appointmentData, id: appointmentId, appointmentId: appointmentId };
+                await sendPaymentConfirmationFlexMessage(userId, payload);
+            } catch (notificationError) {
+                console.error('Error sending payment invoice to customer:', notificationError);
+            }
         }
 
         return { 
@@ -241,8 +215,7 @@ export async function findAppointmentsByPhone(phoneNumber) {
 
         const q = db.collection('appointments')
             .where('customerInfo.phone', '==', phoneNumber)
-            .where('status', 'in', ['confirmed', 'awaiting_confirmation'])
-            .where('date', '>=', todayStr)
+            .where('status', 'in', ['confirmed', 'awaiting_confirmation', 'pending'])
             .orderBy('date', 'asc')
             .orderBy('time', 'asc');
 
@@ -300,7 +273,6 @@ export async function promoteEmployeeToAdmin(employeeId) {
             transaction.delete(employeeRef);
         });
 
-    // ...existing code...
         revalidatePath('/employees');
         revalidatePath(`/employees/${employeeId}`);
 
@@ -311,10 +283,6 @@ export async function promoteEmployeeToAdmin(employeeId) {
     }
 }
 
-/**
- * Fetches only employees from Firestore.
- * @returns {Promise<{success: boolean, employees?: Array, error?: string}>}
- */
 export async function fetchEmployees() {
   try {
     const employeesRef = db.collection('employees');
@@ -326,7 +294,6 @@ export async function fetchEmployees() {
       type: 'employee', // เพิ่ม property 'type' เพื่อระบุประเภท
     }));
 
-    // เรียงลำดับตามวันที่สร้างล่าสุด
     const sortedEmployees = employees.sort((a, b) => {
         const dateA = a.createdAt?.toDate() || 0;
         const dateB = b.createdAt?.toDate() || 0;
@@ -340,11 +307,6 @@ export async function fetchEmployees() {
   }
 }
 
-/**
- * Deletes an employee from the 'employees' collection.
- * @param {string} employeeId - The UID of the employee to delete.
- * @returns {Promise<{success: boolean, error?: string}>}
- */
 export async function deleteEmployee(employeeId) {
     if (!employeeId) {
         return { success: false, error: 'Employee ID is required.' };
@@ -353,7 +315,6 @@ export async function deleteEmployee(employeeId) {
     try {
         const docRef = db.collection('employees').doc(employeeId);
         await docRef.delete();
-    // ...existing code...
         revalidatePath('/employees');
         return { success: true };
     } catch (error) {
@@ -362,12 +323,6 @@ export async function deleteEmployee(employeeId) {
     }
 }
 
-/**
- * Updates employee status
- * @param {string} employeeId - The UID of the employee to update.
- * @param {string} status - New status ('available', 'on_leave', 'suspended').
- * @returns {Promise<{success: boolean, error?: string}>}
- */
 export async function updateEmployeeStatus(employeeId, status) {
     if (!employeeId || !status) {
         return { success: false, error: 'Employee ID and status are required.' };
@@ -379,7 +334,6 @@ export async function updateEmployeeStatus(employeeId, status) {
             status: status,
             updatedAt: new Date()
         });
-    // ...existing code...
         revalidatePath('/employees');
         return { success: true };
     } catch (error) {

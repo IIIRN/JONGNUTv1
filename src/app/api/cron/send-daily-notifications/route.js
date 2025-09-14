@@ -137,13 +137,6 @@ export async function GET(request) {
                 failureCount,
                 skipCount,
                 date: todayString
-            },
-            data: {
-                totalAppointments: appointmentsSnapshot.size,
-                sentCount: successCount,
-                failureCount,
-                skipCount,
-                date: todayString
             }
         });
 
