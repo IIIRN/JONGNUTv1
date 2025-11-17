@@ -57,8 +57,8 @@ export default function AdminSettingsPage() {
         },
     });
     const [bookingSettings, setBookingSettings] = useState({ 
-        useTechnician: false,
-        totalTechnicians: 1,
+        useBeautician: false,
+        totalBeauticians: 1,
         bufferMinutes: 0,
         timeQueues: [],
         weeklySchedule: {},
@@ -289,14 +289,14 @@ export default function AdminSettingsPage() {
                         </div>
                         <Toggle 
                             label="โหมดเลือกช่าง" 
-                            checked={bookingSettings.useTechnician}
-                            onChange={(value) => setBookingSettings(prev => ({...prev, useTechnician: value}))}
+                            checked={bookingSettings.useBeautician}
+                            onChange={(value) => setBookingSettings(prev => ({...prev, useBeautician: value}))}
                         />
                         <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">{bookingSettings.useTechnician ? 'จำนวนช่างทั้งหมด' : 'จำนวนคิวสูงสุด'}</label>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">{bookingSettings.useBeautician ? 'จำนวนช่างทั้งหมด' : 'จำนวนคิวสูงสุด'}</label>
                             <input 
-                                type="number" min={1} value={bookingSettings.totalTechnicians || 1} 
-                                onChange={e => setBookingSettings(prev => ({ ...prev, totalTechnicians: parseInt(e.target.value) || 1 }))} 
+                                type="number" min={1} value={bookingSettings.totalBeauticians || 1} 
+                                onChange={e => setBookingSettings(prev => ({ ...prev, totalBeauticians: parseInt(e.target.value) || 1 }))} 
                                 className="border rounded-md px-2 py-1 w-full text-sm"
                             />
                         </div>
@@ -313,7 +313,7 @@ export default function AdminSettingsPage() {
                                     type="number" min={1} value={bookingSettings._queueCount || ''} 
                                     onChange={e => setBookingSettings(prev => ({ ...prev, _queueCount: e.target.value.replace(/[^0-9]/g, '') || '' }))} 
                                     className="border rounded-md px-2 py-1 w-16 text-sm" 
-                                    placeholder={bookingSettings.useTechnician ? "ช่าง" : "คิว"}
+                                    placeholder={bookingSettings.useBeautician ? "ช่าง" : "คิว"}
                                 />
                                 <button type="button" className="bg-indigo-500 text-white px-3 py-1 rounded hover:bg-indigo-600 text-sm" onClick={() => setBookingSettings(prev => ({...prev, timeQueues: [...(prev.timeQueues || []), { time: prev._queueTime, count: parseInt(prev._queueCount) }].sort((a,b) => a.time.localeCompare(b.time)), _queueTime: '', _queueCount: '' }))} disabled={!bookingSettings._queueTime || !bookingSettings._queueCount}>เพิ่ม</button>
                             </div>
@@ -582,4 +582,3 @@ export default function AdminSettingsPage() {
         </div>
     );
 }
-

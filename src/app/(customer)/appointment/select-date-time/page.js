@@ -84,6 +84,8 @@ function SelectDateTimeContent() {
     const [weeklySchedule, setWeeklySchedule] = useState({});
     const [holidayDates, setHolidayDates] = useState([]);
     const [unavailableTechnicianIds, setUnavailableTechnicianIds] = useState(new Set());
+    const [bufferMinutes, setBufferMinutes] = useState(0);
+    const [unavailableSlots, setUnavailableSlots] = useState(new Set());
 
     // Fetch service data
     useEffect(() => {
@@ -125,13 +127,13 @@ function SelectDateTimeContent() {
                     orderBy('firstName')
                 );
                 const querySnapshot = await getDocs(q);
-                settechnicians(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                setTechnicians(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
             } catch (e) {
                 console.error("Error fetching technicians:", e);
             }
             setLoading(false);
         };
-        fetchtechnicians();
+        fetchTechnicians();
     }, []);
 
     // Fetch booking settings
@@ -146,6 +148,7 @@ function SelectDateTimeContent() {
                     setUseTechnician(!!settings.useTechnician);
                     setWeeklySchedule(settings.weeklySchedule || {});
                     setHolidayDates(Array.isArray(settings.holidayDates) ? settings.holidayDates : []);
+                    setBufferMinutes(Number(settings.bufferMinutes) || 0);
                 }
             } catch (error) {
                 console.error("Error fetching booking settings:", error);
@@ -177,6 +180,46 @@ function SelectDateTimeContent() {
             });
             setSlotCounts(counts);
 
+            // คำนวณช่วงเวลาที่ทับซ้อนกัน (Time Overlap Detection)
+            // เก็บจำนวนการทับซ้อนจากช่วงเวลาอื่น (ไม่นับเวลาเริ่มต้น)
+            const slotOverlapCounts = {};
+            const unavailable = new Set();
+            const bufferTime = bufferMinutes || 0;
+            
+            appointmentsForDay.forEach(appt => {
+                if (!appt.time || !appt.serviceInfo?.duration) return;
+                
+                const [hours, minutes] = appt.time.split(':').map(Number);
+                const startMinutes = hours * 60 + minutes;
+                const duration = appt.serviceInfo.duration || appt.appointmentInfo?.duration || 60;
+                const endMinutes = startMinutes + duration + bufferTime;
+                
+                timeQueues.forEach(queue => {
+                    if (!queue.time) return;
+                    const [qHours, qMinutes] = queue.time.split(':').map(Number);
+                    const qTimeMinutes = qHours * 60 + qMinutes;
+                    
+                    // นับเฉพาะช่วงเวลาที่ทับซ้อน (ไม่ใช่เวลาเริ่มต้น) เพื่อไม่ให้นับซ้ำ
+                    if (qTimeMinutes > startMinutes && qTimeMinutes < endMinutes) {
+                        slotOverlapCounts[queue.time] = (slotOverlapCounts[queue.time] || 0) + 1;
+                    }
+                });
+            });
+            
+            // ตรวจสอบว่าช่วงเวลาไหนที่มีการทับซ้อนเต็มทุกคิว
+            timeQueues.forEach(queue => {
+                if (!queue.time) return;
+                const maxSlots = useTechnician ? technicians.length : (queue.count || totalTechnicians);
+                const overlapCount = slotOverlapCounts[queue.time] || 0;
+                const bookedCount = counts[queue.time] || 0;
+                
+                if (bookedCount + overlapCount >= maxSlots) {
+                    unavailable.add(queue.time);
+                }
+            });
+            
+            setUnavailableSlots(unavailable);
+
             // Update unavailable technicians for the selected time
             if (time) {
                 const unavailableIds = new Set(
@@ -197,7 +240,7 @@ function SelectDateTimeContent() {
         };
 
         fetchAppointmentsForDate();
-    }, [date, time, selectedTechnician, showToast]);
+    }, [date, time, selectedTechnician, showToast, timeQueues, bufferMinutes, useTechnician, technicians, totalTechnicians]);
     
     // Reset time and technician when date changes
     useEffect(() => {
@@ -212,7 +255,7 @@ function SelectDateTimeContent() {
             return;
         }
         
-        if (usetechnician && !selectedtechnician) {
+        if (useTechnician && !selectedTechnician) {
             showToast('กรุณาเลือกช่างเสริมสวยที่ต้องการ', "warning", "ข้อมูลไม่ครบถ้วน");
             return;
         }
@@ -225,8 +268,8 @@ function SelectDateTimeContent() {
         params.set('date', format(date, 'yyyy-MM-dd'));
         params.set('time', time);
         
-        if (usetechnician && selectedtechnician) {
-            params.set('technicianId', selectedtechnician.id);
+        if (useTechnician && selectedTechnician) {
+            params.set('technicianId', selectedTechnician.id);
         } else {
             params.set('technicianId', 'auto-assign');
         }
@@ -280,7 +323,7 @@ function SelectDateTimeContent() {
                                 />
                             </div>
                             <div className="flex-1">
-                                <h3 className="font-bold text-gray-800">{service.serviceName}</h3>
+                                <h3 className="text-md font-bold text-gray-800">{service.serviceName}</h3>
                                 {service.serviceType === 'multi-area' && areaIndex !== null && packageIndex !== null && service.areas?.[areaIndex] && (
                                     <p className="text-sm text-gray-600">
                                         {service.areas[areaIndex].name} - {service.areas[areaIndex].packages[packageIndex].duration} นาที
@@ -324,7 +367,7 @@ function SelectDateTimeContent() {
                                         }
                                         const addOnsPrice = selectedAddOns.reduce((total, addOn) => total + (addOn.price || 0), 0);
                                         return (price + addOnsPrice).toLocaleString();
-                                    })()} บาท
+                                    })()}  
                                 </span>
                             </div>
                         </div>
@@ -467,20 +510,22 @@ function SelectDateTimeContent() {
                             .sort((a, b) => String(a.time).localeCompare(String(b.time)))
                             .map(queue => {
                                 const slot = queue.time;
-                                const max = usetechnician ? technicians.length : (queue.count || totaltechnicians);
+                                const max = useTechnician ? technicians.length : (queue.count || totalTechnicians);
                                 const booked = slotCounts[slot] || 0;
                                 const isFull = booked >= max;
+                                const isOverlapping = unavailableSlots.has(slot);
+                                const isDisabled = isFull || isOverlapping;
                                 return (
                                     <button
                                         key={slot}
-                                        onClick={() => !isFull && setTime(slot)}
+                                        onClick={() => !isDisabled && setTime(slot)}
                                         className={`rounded-full px-4 py-2 text-sm font-semibold shadow-sm transition-colors
                                             ${time === slot ? 'bg-primary text-white shadow-lg' : 'bg-white text-primary border border-purple-100 hover:bg-purple-50'}
-                                            ${isFull ? 'opacity-40 cursor-not-allowed line-through' : ''}`}
-                                        disabled={isFull}
-                                        title={isFull ? 'คิวเต็ม' : ''}
+                                            ${isDisabled ? 'opacity-40 cursor-not-allowed line-through' : ''}`}
+                                        disabled={isDisabled}
+                                        title={isFull ? 'คิวเต็ม' : isOverlapping ? 'เวลาทับซ้อนกับการจองอื่น' : ''}
                                     >
-                                        {slot} {isFull && <span className="text-xs">(เต็ม)</span>}
+                                        {slot} {isFull && <span className="text-xs">(เต็ม)</span>} {isOverlapping && !isFull && <span className="text-xs">(ทับ)</span>}
                                     </button>
                                 );
                             })}
@@ -489,7 +534,7 @@ function SelectDateTimeContent() {
             </div>
 
             {/* technician Selection */}
-            {usetechnician && time && (
+            {useTechnician && time && (
                 <div className="w-full max-w-md mx-auto mt-6">
                     <h2 className="text-base font-bold mb-2 text-primary">เลือกช่างเสริมสวย</h2>
                     {loading ? (
@@ -499,12 +544,12 @@ function SelectDateTimeContent() {
                     ) : (
                         <div className="space-y-3">
                             {technicians.map(technician => (
-                                <technicianCard
+                                <TechnicianCard
                                     key={technician.id}
                                     technician={technician}
-                                    isSelected={selectedtechnician?.id === technician.id}
-                                    onSelect={setSelectedtechnician}
-                                    isAvailable={!unavailabletechnicianIds.has(technician.id)}
+                                    isSelected={selectedTechnician?.id === technician.id}
+                                    onSelect={setSelectedTechnician}
+                                    isAvailable={!unavailableTechnicianIds.has(technician.id)}
                                 />
                             ))}
                         </div>
@@ -516,7 +561,7 @@ function SelectDateTimeContent() {
             <div className="w-full max-w-md mx-auto mt-8 mb-8">
                 <button
                     onClick={handleConfirm}
-                    disabled={!date || !time || (usetechnician && !selectedtechnician)}
+                    disabled={!date || !time || (useTechnician && !selectedTechnician)}
                     className="w-full bg-primary text-white py-4 rounded-2xl font-bold shadow-lg "
                 >
                     ถัดไป
