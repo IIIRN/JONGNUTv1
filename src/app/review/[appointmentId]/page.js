@@ -56,21 +56,33 @@ function ReviewContent() {
     const appointmentId = params.appointmentId;
 
     useEffect(() => {
-        const getAppointmentId = () => {
-            if (appointmentId) {
-                return appointmentId;
-            }
+        // Try to get appointmentId from all possible sources
+        let id = appointmentId;
+        if (!id) {
+            // Try searchParams (query string)
+            id = searchParams.get('appointmentId');
+        }
+        if (!id) {
+            // Try liff.state (for LIFF deep link)
             const liffState = searchParams.get('liff.state');
             if (liffState) {
                 const parts = liffState.split('/');
                 if (parts.length > 2 && parts[1] === 'review') {
-                    return parts[2];
+                    id = parts[2];
                 }
             }
-            return null;
-        };
-
-        const id = getAppointmentId();
+        }
+        if (!id && typeof window !== 'undefined') {
+            // Try to parse from window.location.pathname (for edge cases)
+            const pathParts = window.location.pathname.split('/');
+            const idx = pathParts.findIndex(p => p === 'review');
+            if (idx !== -1 && pathParts.length > idx + 1) {
+                id = pathParts[idx + 1];
+            }
+        }
+        if (process.env.NODE_ENV !== 'production') {
+            console.log('DEBUG: appointmentId sources', { appointmentId, searchParams: Object.fromEntries(searchParams.entries()), id, pathname: typeof window !== 'undefined' ? window.location.pathname : undefined });
+        }
         if (id) {
             const fetchAppointment = async () => {
                 try {
