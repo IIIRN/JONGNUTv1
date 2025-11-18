@@ -227,8 +227,8 @@ function GeneralInfoContent() {
         <div>
             <ToastComponent />
             <CustomerHeader showBackButton={true} showActionButtons={false} />
-            <div className="px-4 pb-4">
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-4">
+            <div className="p-4">
+                <div className="bg-white rounded-2xl overflow-hidden mb-4">
                     <div className="p-4 border-b border-gray-100  text-black">
                         <div className="flex justify-between items-center mb-2">
                             <span className="text-sm font-medium">วันที่</span>
@@ -343,7 +343,7 @@ function GeneralInfoContent() {
                     </div>
                 </div>
 
-                <div className="bg-white text-black rounded-2xl p-4 mb-4 shadow-sm  border border-gray-100">
+                <div className="bg-white text-black rounded-2xl p-4 mb-4">
                     <label className="block text-md text-center font-medium text-gray-700 mb-4">ข้อมูลลูกค้า</label>
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div className='flex items-center'>
@@ -399,7 +399,7 @@ function GeneralInfoContent() {
                 <button
                     onClick={handleSubmit}
                     disabled={isSubmitting}
-                    className="w-full bg-primary text-white py-4 rounded-2xl font-semibold text-lg shadow-lg disabled:opacity-50"
+                    className="w-full bg-primary-dark text-white py-4 rounded-2xl font-semibold text-lg shadow-lg disabled:opacity-50"
                 >
                     {isSubmitting ? 'กำลังดำเนินการ...' : 'ยืนยันการนัดหมาย'}
                 </button>
@@ -410,7 +410,13 @@ function GeneralInfoContent() {
 
 export default function GeneralInfoPage() {
     return (
-        <Suspense fallback={<div className="p-4 text-center">กำลังโหลด...</div>}>
+        <Suspense
+            fallback={
+                <div className="flex flex-col items-center justify-center min-h-screen w-full">
+                    <div className="p-4 text-center text-lg text-gray-500">กำลังโหลด...</div>
+                </div>
+            }
+        >
             <GeneralInfoContent />
         </Suspense>
     );

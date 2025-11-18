@@ -307,13 +307,13 @@ function SelectDateTimeContent() {
         <div>
             <ToastComponent />
             <CustomerHeader showBackButton={true} showActionButtons={false} />
-            <div className="min-h-screen flex flex-col items-center px-4">
+            <div className="min-h-screen flex flex-col items-center p-4">
             
             {/* Service Summary */}
             {service && (
                 <div className="w-full max-w-md mx-auto mb-6">
                     <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-200">
-                        <div className="flex items-center gap-3 mb-3">
+                        <div className="flex items-center gap-3">
                             <div className="relative w-12 h-12 rounded-lg overflow-hidden flex-shrink-0">
                                 <Image
                                     src={service.imageUrl || 'https://via.placeholder.com/150'}
@@ -332,45 +332,7 @@ function SelectDateTimeContent() {
                             </div>
                         </div>
                         
-                        <div className="space-y-1 text-sm">
-                            <div className="flex justify-between">
-                                <span className="text-gray-600">ระยะเวลา:</span>
-                                <span className="font-medium">
-                                    {(() => {
-                                        let duration = 0;
-                                        if (service.serviceType === 'multi-area' && areaIndex !== null && packageIndex !== null) {
-                                            duration = service.areas[areaIndex].packages[packageIndex].duration;
-                                        } else {
-                                            duration = service.duration || 0;
-                                        }
-                                        const addOnsDuration = selectedAddOns.reduce((total, addOn) => total + (addOn.duration || 0), 0);
-                                        return duration + addOnsDuration;
-                                    })()} นาที
-                                </span>
-                            </div>
-                            
-                            {selectedAddOns.length > 0 && (
-                                <div className="text-xs text-gray-500">
-                                    รวมบริการเสริม: {selectedAddOns.map(a => a.name).join(', ')}
-                                </div>
-                            )}
-                            
-                            <div className="flex justify-between font-bold text-lg pt-2 border-t">
-                                <span className="text-gray-800">ราคารวม:</span>
-                                <span className="text-primary">
-                                    {(() => {
-                                        let price = 0;
-                                        if (service.serviceType === 'multi-area' && areaIndex !== null && packageIndex !== null) {
-                                            price = service.areas[areaIndex].packages[packageIndex].price;
-                                        } else {
-                                            price = service.price || 0;
-                                        }
-                                        const addOnsPrice = selectedAddOns.reduce((total, addOn) => total + (addOn.price || 0), 0);
-                                        return (price + addOnsPrice).toLocaleString();
-                                    })()}  
-                                </span>
-                            </div>
-                        </div>
+                    
                     </div>
                 </div>
             )}
@@ -441,7 +403,7 @@ function SelectDateTimeContent() {
                                         onClick={() => !isDisabled && setDate(d)}
                                         className={`w-10 h-10 flex items-center justify-center rounded-lg text-sm font-semibold transition-colors relative
                                             ${!isCurrentMonth ? 'text-gray-300' : 
-                                              isSelected ? 'bg-primary text-white shadow-lg' : 
+                                              isSelected ? 'bg-primary-dark text-white shadow-lg' : 
                                               isToday ? 'border-2 border-primary text-primary bg-white' : 
                                               isHoliday ? 'bg-red-100 text-red-600 border border-red-300' :
                                               'bg-white text-primary hover:bg-purple-50'}
@@ -520,7 +482,7 @@ function SelectDateTimeContent() {
                                         key={slot}
                                         onClick={() => !isDisabled && setTime(slot)}
                                         className={`rounded-full px-4 py-2 text-sm font-semibold shadow-sm transition-colors
-                                            ${time === slot ? 'bg-primary text-white shadow-lg' : 'bg-white text-primary border border-purple-100 hover:bg-purple-50'}
+                                            ${time === slot ? 'bg-primary-dark text-white shadow-lg' : 'bg-white text-primary border border-purple-100 hover:bg-purple-50'}
                                             ${isDisabled ? 'opacity-40 cursor-not-allowed line-through' : ''}`}
                                         disabled={isDisabled}
                                         title={isFull ? 'คิวเต็ม' : isOverlapping ? 'เวลาทับซ้อนกับการจองอื่น' : ''}
@@ -562,7 +524,7 @@ function SelectDateTimeContent() {
                 <button
                     onClick={handleConfirm}
                     disabled={!date || !time || (useTechnician && !selectedTechnician)}
-                    className="w-full bg-primary text-white py-4 rounded-2xl font-bold shadow-lg "
+                    className="w-full bg-primary-dark text-white py-4 rounded-2xl font-bold shadow-lg "
                 >
                     ถัดไป
                 </button>
@@ -574,7 +536,13 @@ function SelectDateTimeContent() {
 
 export default function SelectDateTimePage() {
     return (
-        <Suspense fallback={<div className="p-4 text-center">กำลังโหลด...</div>}>
+        <Suspense
+            fallback={
+            <div className="flex flex-col items-center justify-center min-h-screen w-full">
+            <div className="p-4 text-center text-lg text-gray-500">กำลังโหลด...</div>
+            </div>
+            }
+            >
             <SelectDateTimeContent />
         </Suspense>
     );

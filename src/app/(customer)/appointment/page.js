@@ -65,16 +65,16 @@ export default function AppointmentPage() {
     return (
         <div>
             <CustomerHeader showBackButton={true} showActionButtons={false} />
-            <div className="px-4 pb-4">
+            <div className="p-4">
                 <div className="grid grid-cols-2 gap-3">
                     {services.map(service => (
                         <div
                             key={service.id}
                             onClick={() => handleSelectService(service)}
-                            className="rounded-md overflow-hidden shadow-md cursor-pointer transform hover:scale-105 transition-transform duration-200 bg-transparent p-0 m-0"
+                            className="rounded-2xl overflow-hidden shadow-md cursor-pointer transform hover:scale-105 transition-transform duration-200 bg-transparent p-0 m-0"
                             style={{ minHeight: 0 }}
                         >
-                            <div className="relative w-full" style={{ aspectRatio: '4/3', minHeight: 0 }}>
+                            <div className="relative w-full" style={{ aspectRatio: '4/4', minHeight: 0 }}>
                                 <Image
                                     src={service.imageUrl || 'https://via.placeholder.com/300'}
                                     alt={service.serviceName}
@@ -83,11 +83,11 @@ export default function AppointmentPage() {
                                     priority
                                 />
                                 {/* overlay gradient + text */}
-                                <div className="absolute bottom-0 left-0 w-full px-2 py-2 bg-white">
+                                <div className="absolute bottom-0 left-0 w-full p-3 bg-white">
                                     <div className="text-gray-800 font-semibold text-sm truncate drop-shadow">
                                         {service.serviceName}
                                     </div>
-                                    <div className="text-gray-600 text-xs mt-0.5 drop-shadow">
+                                    <div className="text-gray-600 text-xs drop-shadow">
                                         ({service.duration || '-'} นาที | {profile?.currency}{(service.price ?? service.basePrice ?? 0).toLocaleString()})
                                     </div>
                                 </div>

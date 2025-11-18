@@ -18,7 +18,7 @@ const AppointmentCard = ({ job, onQrCodeClick, onCancelClick, onConfirmClick, is
 
     return (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="bg-primary p-4 text-white">
+            <div className="bg-primary-dark p-4 text-white">
                 <div className="flex justify-between items-center">
                     <div>
                         <div className="text-sm opacity-90">นัดหมายบริการ</div>
@@ -43,7 +43,7 @@ const AppointmentCard = ({ job, onQrCodeClick, onCancelClick, onConfirmClick, is
                                     </div>
                                 )}
                                 {job.serviceInfo?.selectedPackage && (
-                                    <div className="text-xs text-gray-600">
+                                    <div className="text-xs text-primary">
                                          {job.serviceInfo.selectedPackage.name} ({job.serviceInfo.selectedPackage.duration} นาที)
                                     </div>
                                 )}
@@ -55,7 +55,7 @@ const AppointmentCard = ({ job, onQrCodeClick, onCancelClick, onConfirmClick, is
 
                 {/* Add-on Services */}
                 {addOns.length > 0 && (
-                    <div className="space-y-1 text-sm text-gray-600 mb-3 pl-4 border-l-2">
+                    <div className="space-y-1 text-sm text-primary mb-3 pl-4 border-l-2">
                         {addOns.map((addon, index) => (
                             <div key={index} className="flex justify-between">
                                 <span>+ {addon.name}</span>
@@ -68,8 +68,8 @@ const AppointmentCard = ({ job, onQrCodeClick, onCancelClick, onConfirmClick, is
                 {/* Total Price */}
                 <div className="border-t pt-3 mb-4">
                     <div className="flex justify-between items-center">
-                        <span className="font-semibold text-black">ราคารวม</span>
-                        <span className="font-bold text-lg text-black">{job.paymentInfo?.totalPrice?.toLocaleString() || 'N/A'} {profile?.currencySymbol}</span>
+                        <span className="font-semibold text-primary">ราคารวม</span>
+                        <span className="font-bold text-lg text-primary">{job.paymentInfo?.totalPrice?.toLocaleString() || 'N/A'} {profile?.currencySymbol}</span>
                     </div>
                 </div>
 
@@ -77,7 +77,7 @@ const AppointmentCard = ({ job, onQrCodeClick, onCancelClick, onConfirmClick, is
                 <div className="flex justify-between items-center">
                     <button 
                         onClick={() => onQrCodeClick(job.id)}
-                        className="bg-primary-dark text-white py-2 px-4 rounded-lg font-semibold text-sm hover:bg-slate-600 transition-colors"
+                        className="bg-primary-lifgt text-primary border py-2 px-4 rounded-lg font-semibold text-sm hover:bg-slate-600 transition-colors"
                     >
                         QR Code
                     </button>
@@ -86,7 +86,7 @@ const AppointmentCard = ({ job, onQrCodeClick, onCancelClick, onConfirmClick, is
                             <button 
                                 onClick={() => onConfirmClick(job)}
                                 disabled={isConfirming}
-                                className=" bg-primary text-white py-2 px-4 rounded-lg font-semibold text-sm hover:bg-green-600 transition-colors disabled:bg-gray-400"
+                                className=" bg-primary-dark text-white py-2 px-4 rounded-lg font-semibold text-sm hover:bg-green-600 transition-colors disabled:bg-gray-400"
                             >
                                 {isConfirming ? '...' : 'ยืนยัน'}
                             </button>

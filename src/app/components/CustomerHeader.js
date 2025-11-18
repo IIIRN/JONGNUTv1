@@ -28,43 +28,42 @@ export default function CustomerHeader({ showBackButton = false, showActionButto
     if (loading || error) return null;
 
     return (
-        <div className="p-4">
-            <header className="bg-white shadow-sm rounded-md p-3 flex items-center justify-between">
+        <div className="p-4 bg-primary">
+            <header className="p-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     {profile?.pictureUrl ? (
-                        <div className="w-12 h-12 rounded-md overflow-hidden flex-shrink-0">
-                            <Image src={profile.pictureUrl} width={40} height={40} alt="Profile" className="w-full h-full object-cover" />
+                        <div className="w-14 h-14 rounded-full overflow-hidden flex-shrink-0">
+                            <Image src={profile.pictureUrl} width={56} height={56} alt="Profile" className="w-full h-full object-cover" />
                         </div>
                     ) : (
-                        <div className="w-12 h-12 rounded-xl bg-white/30 flex-shrink-0" />
+                        <div className="w-14 h-14 rounded-full bg-gray-800 flex-shrink-0" />
                     )}
                     <div>
-                        <p className="font-medium text-sm text-primary opacity-90">สวัสดี</p>
-                        <p className="font-bold text-primary-dark">{profile?.displayName ? `${profile.displayName}` : 'ผู้ใช้'}</p>
+                        <p className="text-sm text-primary-dark">สวัสดี</p>
+                        <p className="font-semibold text-primary-dark">{profile?.displayName ? `${profile.displayName}` : 'ผู้ใช้'}</p>
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
-                    <div className="bg-primary rounded-full px-6 py-2 text-white font-bold text-md">
-                        {customerData?.points ?? 0} <span className="font-normal">พ้อย</span>
+                    <div className="bg-primary-light rounded-full px-7 py-3 text-primary font-medium text-md">
+                        {customerData?.points ?? 0} พ้อย
                     </div>
                 </div>
             </header>
 
             {showActionButtons && (
-                <div className="mt-4 grid grid-cols-2 gap-4">
+                <div className="mt-4 grid grid-cols-2 gap-3">
                     <button
                         onClick={() => router.push('/appointment')}
-                        className="bg-white text-primary shadow-sm rounded-2xl py-4 font-semibold text-md hover:shadow-md transition-shadow"
+                        className="bg-white text-gray-800 rounded-2xl py-3 font-medium text-base hover:shadow-md transition-shadow border border-gray-200"
                     >
                         จองบริการ
                     </button>
                     <button
                         onClick={() => router.push('/my-coupons')}
-                        className="bg-white text-primary shadow-sm rounded-2xl py-4  font-semibold text-md hover:shadow-md transition-shadow"
+                        className="bg-white text-gray-800 rounded-2xl py-3 font-medium text-base hover:shadow-md transition-shadow border border-gray-200"
                     >
                         คูปองของฉัน
                     </button>
-
                 </div>
             )}
         </div>

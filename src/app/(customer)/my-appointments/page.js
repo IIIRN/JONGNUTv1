@@ -115,7 +115,7 @@ export default function MyAppointmentsPage() {
     return (
         <div>
             <CustomerHeader showBackButton={false} showActionButtons={true} />
-            <div className="px-4 pb-4 space-y-5">
+            <div className="p-4 space-y-5">
             <Notification {...notification} />
             <ConfirmationModal
                 show={!!appointmentToCancel}
@@ -155,16 +155,16 @@ export default function MyAppointmentsPage() {
             
             <div className="flex flex-col items-center mt-6">
                 <button
-                    className="text-gray-400 flex items-center gap-2 focus:outline-none"
+                    className="text-primary flex items-center gap-2 focus:outline-none"
                     onClick={() => setShowHistory(v => !v)}
                 >
-                    <span className="text-lg">{showHistory ? '▲ ซ่อนประวัติที่ผ่านมา' : '▼ ดูประวัติที่ผ่านมา'}</span>
+                    <span className="text-md">{showHistory ? '▲ ซ่อนประวัติที่ผ่านมา' : '▼ ดูประวัติที่ผ่านมา'}</span>
                 </button>
             </div>
             
             {showHistory && (
                 <div className="space-y-4 mt-2">
-                    <div className="text-md text-gray-700">ประวัติการใช้บริการ</div>
+                    <div className="text-sm text-gray-700">ประวัติการใช้บริการ</div>
                     {historyBookings.length === 0 ? (
                         <div className="text-center text-gray-500 pt-10 bg-white p-8 rounded-xl">
                             <p>ยังไม่มีประวัติการใช้บริการ</p>

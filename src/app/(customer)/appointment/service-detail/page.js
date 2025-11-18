@@ -143,7 +143,7 @@ function ServiceDetailContent() {
         <div>
             <CustomerHeader showBackButton={true} showActionButtons={false} />
 
-            <div className="px-4 pb-24">
+            <div className="p-4">
                 {/* รูปภาพและชื่อบริการ */}
                 <div className="flex gap-3 mb-4">
                     <div className="relative w-1/3 aspect-square rounded-xl overflow-hidden flex-shrink-0">
@@ -239,7 +239,7 @@ function ServiceDetailContent() {
                         </div>
                         <button 
                             onClick={handleConfirm} 
-                            className="w-1/3 bg-primary hover:bg-primary text-white py-3 rounded-full font-bold text-base transition-colors"
+                            className="w-1/3 bg-primary-dark hover:bg-primary text-white py-3 rounded-full font-bold text-base transition-colors"
                             disabled={service.serviceType === 'multi-area' && (selectedAreaIndex === null || selectedPackageIndex === null)}
                         >
                             จองบริการ
