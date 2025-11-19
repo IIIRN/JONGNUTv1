@@ -7,13 +7,16 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import CustomerHeader from '@/app/components/CustomerHeader';
 import { useProfile } from '@/context/ProfileProvider';
+import { useLiff } from '@/context/LiffProvider'; // [เพิ่ม] import useLiff
 
 export default function AppointmentPage() {
     const [services, setServices] = useState([]);
     const [loading, setLoading] = useState(true);
     const [errorMsg, setErrorMsg] = useState('');
     const router = useRouter();
+    
     const { profile } = useProfile();
+    const { isInit } = useLiff(); // [เพิ่ม] ดึงค่า isInit มาตรวจสอบสถานะ LIFF
 
     const fetchServices = async () => {
         setLoading(true);
@@ -44,18 +47,32 @@ export default function AppointmentPage() {
     };
 
     useEffect(() => {
+        // [แก้ไข] ถ้า LIFF ยัง init ไม่เสร็จ ให้รอไปก่อน (แก้ปัญหาจอขาว/ต้องเข้าใหม่)
+        if (!isInit) return; 
+
         fetchServices();
-    }, []);
+    }, [isInit]); // [แก้ไข] ใส่ isInit ใน dependency array
 
     const handleSelectService = (service) => {
         router.push(`/appointment/service-detail?id=${service.id}`);
     };
 
-    if (loading) return <div className="p-4 text-center">กำลังโหลดบริการ...</div>;
-    if (errorMsg) return <div className="p-4 text-center text-red-600">{errorMsg}</div>;
+    // [เพิ่ม] แสดงหน้า Loading ระหว่างรอ LIFF init
+    if (!isInit) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-screen bg-white">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-500 mb-4"></div>
+                <p className="text-gray-500 animate-pulse">กำลังเชื่อมต่อระบบ...</p>
+            </div>
+        );
+    }
+
+    if (loading) return <div className="p-4 text-center pt-10">กำลังโหลดบริการ...</div>;
+    if (errorMsg) return <div className="p-4 text-center text-red-600 pt-10">{errorMsg}</div>;
+    
     if (!loading && services.length === 0) {
         return (
-            <div className="p-6 text-center bg-white rounded-xl">
+            <div className="p-6 text-center bg-white rounded-xl pt-10">
                 <p className="mb-4 text-gray-700">ขออภัย ขณะนี้ยังไม่มีบริการให้เลือก</p>
                 <button onClick={fetchServices} className="px-4 py-2 bg-pink-500 text-white rounded-xl font-semibold">ลองอีกครั้ง</button>
             </div>
@@ -99,4 +116,3 @@ export default function AppointmentPage() {
         </div>
     );
 }
-
