@@ -8,10 +8,9 @@ export function LiffProvider({ children }) {
   const [isInit, setIsInit] = useState(false);
   const [liffError, setLiffError] = useState(null);
   const [profile, setProfile] = useState(null);
-  const initCalled = useRef(false); // ตัวกัน init ซ้ำ (สำคัญมากใน Next.js)
+  const initCalled = useRef(false);
 
   useEffect(() => {
-    // ถ้าเคยเรียก init ไปแล้ว ให้หยุดทันที ไม่ต้องเรียกซ้ำ
     if (initCalled.current) return;
     initCalled.current = true;
 
@@ -21,18 +20,16 @@ export function LiffProvider({ children }) {
           liffId: process.env.NEXT_PUBLIC_LIFF_ID,
         });
 
-        // รอจนกว่า LIFF จะพร้อมทำงานจริงๆ
         await liff.ready;
 
-        // ตรวจสอบว่า Login หรือยัง ถ้ายังให้ Login
         if (!liff.isLoggedIn()) {
             liff.login();
-            return; // จบการทำงานรอบนี้ รอ Redirect กลับมาใหม่
+            return;
         }
 
         const userProfile = await liff.getProfile();
         setProfile(userProfile);
-        setIsInit(true); // แจ้งว่าระบบพร้อมแล้ว!
+        setIsInit(true);
       } catch (error) {
         console.error("LIFF Init Failed:", error);
         setLiffError(error.toString());
@@ -48,7 +45,7 @@ export function LiffProvider({ children }) {
         liff,
         liffError,
         profile,
-        isInit, // ตัวแปรสำคัญเอาไว้เช็คว่าพร้อมหรือยัง
+        isInit,
       }}
     >
       {children}
@@ -56,4 +53,6 @@ export function LiffProvider({ children }) {
   );
 }
 
+// ส่งออกทั้งชื่อใหม่ (useLiff) และชื่อเก่า (useLiffContext) เพื่อไม่ให้ Error
 export const useLiff = () => useContext(LiffContext);
+export const useLiffContext = () => useContext(LiffContext);
